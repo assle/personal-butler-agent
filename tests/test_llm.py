@@ -25,7 +25,7 @@ async def test_llm_client_chat_returns_content():
 
     env_vars = {"DEEPSEEK_API_KEY": "sk-test-key"}
     with patch.dict(os.environ, env_vars, clear=True):
-        with patch("openai.AsyncOpenAI") as mock_openai_cls:
+        with patch("src.llm.client.AsyncOpenAI") as mock_openai_cls:
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(return_value=mock_completion)
             mock_openai_cls.return_value = mock_client
