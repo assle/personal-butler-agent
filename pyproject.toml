@@ -12,6 +12,7 @@ dependencies = [
     "openai>=1.0.0",
     "apscheduler>=3.10.0",
     "python-dotenv>=1.0.0",
+    "greenlet>=3.5.1",
 ]
 
 [project.optional-dependencies]
