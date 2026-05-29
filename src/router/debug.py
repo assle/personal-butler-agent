@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from openai import APIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.schemas.request import DebugMessageRequest
 from src.schemas.response import DebugMessageResponse
@@ -35,7 +36,15 @@ def create_debug_router(
         }
 
         agent = agent_map.get(intent, qa_agent)
-        result = await agent.handle(intent, req.message, req.user_id, db)
+        try:
+            result = await agent.handle(intent, req.message, req.user_id, db)
+        except APIError as e:
+            return DebugMessageResponse(
+                intent=intent,
+                confidence=confidence,
+                response="LLM 服务暂时不可用，请稍后重试。",
+                data={"error": str(e)},
+            )
 
         return DebugMessageResponse(
             intent=intent,
