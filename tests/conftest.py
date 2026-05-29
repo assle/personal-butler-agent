@@ -1,10 +1,17 @@
+import pytest
 import pytest_asyncio
+from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from src.db.base import Base
 
 # Import models so they register on Base.metadata
 import src.models  # noqa: F401
+
+
+@pytest.fixture
+def mock_llm():
+    return AsyncMock()
 
 
 @pytest_asyncio.fixture

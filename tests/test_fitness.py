@@ -1,14 +1,8 @@
 import json
-from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 from src.models.training import TrainingRecord
 from src.models.preference import UserPreference, DEFAULT_PREFERENCES
-
-
-@pytest.fixture
-def mock_llm():
-    return AsyncMock()
 
 
 @pytest.fixture

@@ -47,20 +47,29 @@ class FitnessAgent(BaseAgent):
         except json.JSONDecodeError:
             return AgentResponse(reply="无法解析训练记录，请确认格式后重试。")
 
+        if not isinstance(items, list):
+            return AgentResponse(reply="无法解析训练记录，请确认格式后重试。")
+
         if not items:
             return AgentResponse(reply="未识别到训练记录。示例格式：打卡 今天练胸 卧推80kg5组8次")
 
         saved = []
         for item in items:
-            record = TrainingRecord(
-                user_id=user_id,
-                date=item.get("date", date.today().isoformat()),
-                muscle_group=item["muscle_group"],
-                exercise=item["exercise"],
-                sets=item["sets"],
-                reps=item["reps"],
-                weight_kg=item.get("weight_kg"),
-            )
+            required = ["muscle_group", "exercise", "sets", "reps"]
+            if not all(k in item for k in required):
+                continue
+            try:
+                record = TrainingRecord(
+                    user_id=user_id,
+                    date=str(item.get("date", date.today().isoformat())),
+                    muscle_group=str(item["muscle_group"]),
+                    exercise=str(item["exercise"]),
+                    sets=int(item["sets"]),
+                    reps=int(item["reps"]),
+                    weight_kg=float(item["weight_kg"]) if item.get("weight_kg") is not None else None,
+                )
+            except (ValueError, TypeError):
+                continue
             db.add(record)
             saved.append(
                 {

@@ -1,12 +1,6 @@
 import json
-from unittest.mock import AsyncMock
 import pytest
 from src.models.preference import UserPreference, DEFAULT_PREFERENCES
-
-
-@pytest.fixture
-def mock_llm():
-    return AsyncMock()
 
 
 @pytest.fixture

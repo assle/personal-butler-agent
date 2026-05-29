@@ -1,3 +1,4 @@
+import httpx
 from openai import AsyncOpenAI
 from src.config import settings
 
@@ -7,6 +8,7 @@ class LLMClient:
         self._client = AsyncOpenAI(
             api_key=settings.deepseek_api_key,
             base_url=settings.deepseek_base_url,
+            timeout=httpx.Timeout(30.0, connect=10.0),
         )
 
     async def chat(
