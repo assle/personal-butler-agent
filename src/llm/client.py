@@ -1,14 +1,14 @@
-import httpx
-from openai import AsyncOpenAI
+from langchain_openai import ChatOpenAI
 from src.config import settings
 
 
 class LLMClient:
     def __init__(self):
-        self._client = AsyncOpenAI(
+        self._model = ChatOpenAI(
+            model=settings.deepseek_model,
             api_key=settings.deepseek_api_key,
             base_url=settings.deepseek_base_url,
-            timeout=httpx.Timeout(30.0, connect=10.0),
+            temperature=0.7,
         )
 
     async def chat(
@@ -17,12 +17,8 @@ class LLMClient:
         model: str | None = None,
         temperature: float = 0.7,
     ) -> str:
-        response = await self._client.chat.completions.create(
-            model=model or settings.deepseek_model,
-            messages=messages,
-            temperature=temperature,
-        )
-        content = response.choices[0].message.content
+        response = await self._model.ainvoke(messages, temperature=temperature)
+        content = response.content
         return content if content is not None else ""
 
     async def chat_json(
@@ -31,5 +27,4 @@ class LLMClient:
         model: str | None = None,
         temperature: float = 0.3,
     ) -> str:
-        """Chat with lower temperature, suitable for structured/JSON output."""
         return await self.chat(messages, model=model, temperature=temperature)
