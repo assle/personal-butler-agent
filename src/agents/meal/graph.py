@@ -8,6 +8,7 @@ from src.agents.meal.nodes import (
 )
 from src.llm.client import LLMClient
 from src.schemas.response import AgentResponse
+from src.graph.memory import checkpointer as _checkpointer
 
 
 class MealAgent:
@@ -28,10 +29,10 @@ class MealAgent:
         builder.add_edge("generate", "format")
         builder.add_edge("format", END)
 
-        return builder.compile()
+        return builder.compile(checkpointer=_checkpointer)
 
     async def handle(self, intent: str, message: str, user_id: str, db) -> AgentResponse:
         initial_state: dict = {"intent": intent, "message": message, "user_id": user_id}
-        config = {"configurable": {"db": db, "llm": self._llm}}
+        config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
         result = await self._graph.ainvoke(initial_state, config)
         return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
