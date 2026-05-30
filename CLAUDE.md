@@ -29,6 +29,7 @@
 - New agents follow the pattern: `state.py` (TypedDict) + `nodes.py` (async node functions) + `graph.py` (StateGraph assembly + agent class).
 - Prefer deterministic rules for stable intent matches, then LLM fallback for ambiguous messages.
 - Keep tests isolated from real DeepSeek calls by using mock LLM clients and `DEEPSEEK_API_KEY=test`.
+- All functions and methods must include Chinese comments describing: (1) what the function does, (2) input parameters, (3) return value. Every `.py` file must start with a Chinese comment block explaining the file's purpose and overall workflow.
 
 ## Architecture
 
