@@ -1,0 +1,186 @@
+"""
+企业微信回调路由（URL 验证 + 消息接收）
+提供 create_wechat_router 工厂函数，返回挂载了 GET/POST /api/wechat/callback 的 APIRouter
+
+Workflow:
+GET /api/wechat/callback - URL 验证:
+  1. 从 query params 提取 msg_signature, timestamp, nonce, echostr
+  2. verify_signature 验签 → 失败返回 403
+  3. decrypt echostr → 返回解密后的明文
+
+POST /api/wechat/callback - 消息接收:
+  1. 从 body 解析 EncryptedMessage，从 query params 获取签名参数
+  2. verify_signature 验签 → 失败返回 403
+  3. decrypt → 解析内层消息（JSON 格式）→ 提取 user_id 和 message
+  4. intent_router.route(message) → agent_registry.get(intent) → agent.handle()
+  5. 构建回复 XML → encrypt → 返回加密的 XML 响应
+"""
+import json
+import logging
+import time
+
+from fastapi import APIRouter, Depends, Query, Request, Response
+from openai import APIError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.agents.registry import AgentRegistry
+from src.db.session import get_db
+from src.intent.router import IntentRouter
+
+from .crypto import (
+    CorpIDMismatch,
+    DecryptError,
+    decrypt,
+    encrypt,
+    verify_signature,
+)
+from .messages import build_encrypted_reply_xml
+
+logger = logging.getLogger(__name__)
+
+
+def create_wechat_router(
+    intent_router: IntentRouter,
+    agent_registry: AgentRegistry,
+    corp_id: str,
+    token: str,
+    encoding_aes_key: str,
+) -> APIRouter:
+    """创建企业微信回调路由
+
+    参数:
+        intent_router: 意图路由器
+        agent_registry: agent 注册表
+        corp_id: 企业微信 CorpID
+        token: 回调配置 Token
+        encoding_aes_key: 回调配置 EncodingAESKey
+
+    返回:
+        APIRouter: 挂载了 GET/POST /api/wechat/callback 的路由
+    """
+    router = APIRouter(prefix="/api/wechat", tags=["wechat"])
+
+    @router.get("/callback")
+    async def verify_url(
+        msg_signature: str = Query(...),
+        timestamp: str = Query(...),
+        nonce: str = Query(...),
+        echostr: str = Query(...),
+    ):
+        """企业微信回调 URL 验证（GET 请求）
+
+        参数:
+            msg_signature: 企业微信发送的消息签名
+            timestamp: 时间戳
+            nonce: 随机数
+            echostr: 加密的验证字符串
+
+        返回:
+            PlainTextResponse: 解密后的 echostr 明文，或 403 签名错误
+        """
+        if not verify_signature(token, timestamp, nonce, echostr, msg_signature):
+            logger.warning("WeChat URL verification: signature mismatch")
+            return Response(status_code=403, content="signature error")
+
+        try:
+            plain = decrypt(encoding_aes_key, echostr, corp_id)
+            return Response(content=plain, media_type="text/plain")
+        except (DecryptError, CorpIDMismatch) as e:
+            logger.error("WeChat URL verification: decrypt failed: %s", e)
+            return Response(status_code=403, content="decrypt error")
+
+    @router.post("/callback")
+    async def receive_message(
+        request: Request,
+        msg_signature: str = Query(...),
+        timestamp: str = Query(...),
+        nonce: str = Query(...),
+        db: AsyncSession = Depends(get_db),
+    ):
+        """接收企业微信用户消息（POST 请求）
+
+        参数:
+            request: FastAPI Request 对象，body 为 JSON 格式
+            msg_signature: 消息签名
+            timestamp: 时间戳
+            nonce: 随机数
+            db: 数据库异步会话，通过 FastAPI 依赖注入
+
+        返回:
+            Response: 加密的 XML 回复，或错误响应
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return Response(content="success")
+
+        encrypt_content = body.get("encrypt", "")
+
+        # 验签
+        if not verify_signature(token, timestamp, nonce, encrypt_content, msg_signature):
+            logger.warning("WeChat callback: signature mismatch")
+            return Response(status_code=403, content="signature error")
+
+        # 解密
+        try:
+            decrypted = decrypt(encoding_aes_key, encrypt_content, corp_id)
+        except (DecryptError, CorpIDMismatch) as e:
+            logger.error("WeChat callback: decrypt failed: %s", e)
+            return Response(content="success")
+
+        # 解析内层消息（JSON 格式）
+        try:
+            inner = json.loads(decrypted)
+            from_user = inner.get("from_user_name", "")
+            msg_type = inner.get("msg_type", "text")
+            content = inner.get("content", "")
+        except json.JSONDecodeError:
+            logger.error("WeChat callback: inner message JSON parse failed")
+            return Response(content="success")
+
+        # 非文本消息：回复不支持
+        if msg_type != "text":
+            reply_text = "暂不支持该消息类型"
+        else:
+            # 意图路由 + agent 处理
+            try:
+                intent, _confidence = await intent_router.route(content)
+                agent = agent_registry.get(intent)
+
+                if agent is None:
+                    reply_text = "抱歉，无法处理该消息"
+                else:
+                    try:
+                        result = await agent.handle(intent, content, from_user, db)
+                        reply_text = result.reply
+                    except APIError:
+                        reply_text = "LLM 服务暂时不可用，请稍后重试。"
+            except Exception:
+                reply_text = "抱歉，处理消息时遇到错误，请稍后重试。"
+
+        # 加密回复
+        reply_encrypted = encrypt(encoding_aes_key, reply_text, corp_id)
+        now_ts = str(int(time.time()))
+        reply_sig = _compute_signature(token, now_ts, nonce, reply_encrypted)
+
+        xml = build_encrypted_reply_xml(reply_encrypted, reply_sig, now_ts, nonce)
+        return Response(content=xml, media_type="application/xml")
+
+    return router
+
+
+def _compute_signature(token: str, timestamp: str, nonce: str, encrypt_msg: str) -> str:
+    """计算消息签名（SHA1 排序拼接）
+
+    参数:
+        token: 企业微信 Token
+        timestamp: 时间戳
+        nonce: 随机数
+        encrypt_msg: 加密后的消息
+
+    返回:
+        str: 十六进制 SHA1 签名
+    """
+    import hashlib
+    parts = sorted([token, timestamp, nonce, encrypt_msg])
+    return hashlib.sha1("".join(parts).encode()).hexdigest()
