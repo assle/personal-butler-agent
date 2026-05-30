@@ -1,3 +1,11 @@
+"""
+Fitness Agent 测试
+验证 FitnessAgent 的 training log 记录和 training plan 生成功能
+
+测试范围:
+  - log_training: LLM 提取 → 入库 → 格式化回复
+  - today_plan: 查询历史 → 查询偏好 → 生成计划
+"""
 import json
 import pytest
 from sqlalchemy import select
@@ -7,6 +15,14 @@ from src.models.preference import UserPreference, DEFAULT_PREFERENCES
 
 @pytest.fixture
 def fitness_agent(mock_llm):
+    """创建 FitnessAgent 实例，注入 mock LLM 客户端
+
+    参数:
+        mock_llm: conftest 提供的 AsyncMock LLM 客户端
+
+    返回:
+        FitnessAgent: 使用 mock LLM 的健身 agent 实例
+    """
     from src.agents.fitness import FitnessAgent
 
     return FitnessAgent(llm_client=mock_llm)
@@ -14,6 +30,15 @@ def fitness_agent(mock_llm):
 
 @pytest.mark.asyncio
 async def test_log_training_extracts_and_saves(db_session, fitness_agent, mock_llm):
+    """验证 log_training 意图：LLM 提取 → 入库 → 回复
+
+    模拟 LLM 返回 2 条训练记录 → 验证数据库写入 2 条 → 验证回复和数据字段。
+
+    参数:
+        db_session: 数据库会话 fixture
+        fitness_agent: FitnessAgent fixture
+        mock_llm: mock LLM 客户端 fixture
+    """
     records_json = json.dumps([
         {
             "date": "2026-05-29",
@@ -55,6 +80,15 @@ async def test_log_training_extracts_and_saves(db_session, fitness_agent, mock_l
 
 @pytest.mark.asyncio
 async def test_today_plan_queries_history_and_generates(db_session, fitness_agent, mock_llm):
+    """验证 today_plan 意图：查询历史 → 偏好 → 生成计划
+
+    预置 3 天训练记录和用户偏好 → 模拟 LLM 返回训练建议 → 验证包含推荐部位。
+
+    参数:
+        db_session: 数据库会话 fixture
+        fitness_agent: FitnessAgent fixture
+        mock_llm: mock LLM 客户端 fixture
+    """
     from datetime import date, timedelta
 
     records = [

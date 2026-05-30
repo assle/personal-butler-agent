@@ -1,9 +1,11 @@
-"""End-to-end smoke tests for the Personal Butler Agent MVP.
-
-These tests exercise the full request -> intent routing -> agent -> response flow
-by mocking the LLM client on the real shared instance in src.main.
 """
+端到端烟雾测试
+验证完整的请求 → 意图路由 → agent → 响应流程
 
+测试范围:
+  - log_training 卡片记录后请求 today_plan（多步交互）
+  - summarize_text 群聊总结完整流程
+"""
 import json
 from unittest.mock import patch
 
@@ -14,8 +16,16 @@ import src.main
 
 @pytest.mark.asyncio
 async def test_full_flow_log_training_to_plan(http_client, db_session):
-    """Full flow: log training, then ask for today's plan."""
-    # Step 1: log training
+    """端到端：先打卡记录训练，再请求训练计划
+
+    步骤 1：发送打卡消息 → 验证意图=log_training，数据落地
+    步骤 2：发送训练计划请求 → 验证意图=today_plan，回复非空
+
+    参数:
+        http_client: httpx 异步客户端 fixture
+        db_session: 数据库会话 fixture
+    """
+    # 步骤 1：打卡记录训练
     with patch.object(
         src.main.llm_client,
         "chat_json",
@@ -43,7 +53,7 @@ async def test_full_flow_log_training_to_plan(http_client, db_session):
     assert body["intent"] == "log_training"
     assert body["data"]["records"][0]["exercise"] == "深蹲"
 
-    # Step 2: ask for plan
+    # 步骤 2：请求训练计划
     with patch.object(
         src.main.llm_client,
         "chat",
@@ -65,7 +75,14 @@ async def test_full_flow_log_training_to_plan(http_client, db_session):
 
 @pytest.mark.asyncio
 async def test_full_flow_summarize(http_client, db_session):
-    """Full flow: summarize chat text through the debug endpoint."""
+    """端到端：通过调试端点发送群聊总结请求
+
+    模拟 LLM 返回结构化摘要 → 验证意图=summarize_text。
+
+    参数:
+        http_client: httpx 异步客户端 fixture
+        db_session: 数据库会话 fixture
+    """
     with patch.object(
         src.main.llm_client,
         "chat",

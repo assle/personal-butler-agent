@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" serverName="personal-butler-agent" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="personal-butler-agent">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/ubuntu/apps" local="$PROJECT_DIR$" web="/" />
+            <mapping local="" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/.env" />
+            <excludedPath local="true" path="$PROJECT_DIR$/.venv" />
+            <excludedPath local="true" path="$PROJECT_DIR$/.pytest_cache" />
+            <excludedPath local="true" path="$PROJECT_DIR$/butler.db" />
+            <excludedPath local="true" path="$PROJECT_DIR$/src/__pycache__" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

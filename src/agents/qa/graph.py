@@ -1,3 +1,15 @@
+"""
+QA Agent - StateGraph 组装和 handle 入口
+负责构建 QA StateGraph，获取用户偏好后注入 LLM prompt 实现个性化问答
+
+在总流程中的位置:
+  意图路由 → AgentRegistry.get("qa"|"unknown") → QAAgent
+  → handle() 构建初始状态 → _graph.ainvoke() → AgentResponse
+  QAAgent 同时作为回退 agent，处理 unknown 意图和通用对话
+
+Workflow:
+  fetch_preferences → generate_qa_response → format_qa_response
+"""
 from langgraph.graph import StateGraph, END
 from src.agents.qa.state import QAState
 from src.agents.qa.nodes import fetch_preferences, generate_qa_response, format_qa_response
@@ -7,11 +19,23 @@ from src.graph.memory import checkpointer as _checkpointer
 
 
 class QAAgent:
+    """问答 agent，处理通用问答和回退意图，注入用户偏好提供个性化回复"""
+
     def __init__(self, llm_client: LLMClient):
+        """初始化 QAAgent，构建并编译 StateGraph
+
+        参数:
+            llm_client: LangChain ChatOpenAI 封装实例
+        """
         self._llm = llm_client
         self._graph = self._build_graph()
 
     def _build_graph(self):
+        """构建并编译 QA StateGraph
+
+        返回:
+            CompiledStateGraph: 编译后的 LangGraph 状态图
+        """
         builder = StateGraph(QAState)
         builder.add_node("fetch_prefs", fetch_preferences)
         builder.add_node("generate", generate_qa_response)
@@ -25,6 +49,17 @@ class QAAgent:
         return builder.compile(checkpointer=_checkpointer)
 
     async def handle(self, intent: str, message: str, user_id: str, db) -> AgentResponse:
+        """处理用户消息的入口方法
+
+        参数:
+            intent: 意图标识（"qa" 或 "unknown"）
+            message: 用户原始消息文本
+            user_id: 用户唯一标识
+            db: SQLAlchemy 异步数据库会话
+
+        返回:
+            AgentResponse: 包含个性化回复文本的响应
+        """
         initial_state: dict = {"intent": intent, "message": message, "user_id": user_id}
         config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
         result = await self._graph.ainvoke(initial_state, config)

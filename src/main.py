@@ -41,6 +41,14 @@ agent_registry.set_fallback(qa_agent)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """FastAPI 生命周期管理
+
+    应用启动时自动创建数据库表结构，关闭时释放连接。
+    所有 agent、router 在模块加载时创建（模块级单例），lifespan 仅管理数据库。
+
+    参数:
+        app: FastAPI 应用实例
+    """
     from src.db.base import Base
     from src.db.session import engine
 

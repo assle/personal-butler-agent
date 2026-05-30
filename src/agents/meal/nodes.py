@@ -1,3 +1,12 @@
+"""
+Meal Agent 节点函数
+每个节点是 StateGraph 中的一个执行单元，负责单一职责
+
+Workflow:
+  fetch_preferences → check_training_today → generate_meal_plan → format_meal_response
+
+节点间通过 MealState 字典共享数据，不允许节点直接互相调用
+"""
 import json
 from datetime import date, timedelta
 from sqlalchemy import select
@@ -22,6 +31,14 @@ MEAL_PROMPT = """你是营养师。根据用户信息和最近训练情况，生
 
 
 async def fetch_preferences(state: dict) -> dict:
+    """查询用户饮食偏好（热量目标、饮食类型、过敏原等）
+
+    参数:
+        state: 包含 user_id 的当前状态
+
+    返回:
+        dict: {"preferences": 用户偏好字典}
+    """
     db = get_config()["configurable"]["db"]
     result = await db.execute(
         select(UserPreference).where(UserPreference.user_id == state["user_id"])
@@ -32,6 +49,14 @@ async def fetch_preferences(state: dict) -> dict:
 
 
 async def check_training_today(state: dict) -> dict:
+    """检查用户今天是否有训练记录
+
+    参数:
+        state: 包含 user_id 的当前状态
+
+    返回:
+        dict: {"trained_today": bool，影响食谱的蛋白质比例}
+    """
     db = get_config()["configurable"]["db"]
     cutoff = (date.today() - timedelta(days=1)).isoformat()
     result = await db.execute(
@@ -44,6 +69,14 @@ async def check_training_today(state: dict) -> dict:
 
 
 async def generate_meal_plan(state: dict) -> dict:
+    """调用 LLM 生成一日三餐食谱
+
+    参数:
+        state: 包含 preferences、trained_today 的当前状态
+
+    返回:
+        dict: {"reply": LLM 生成的食谱文本} 或 {"error": 错误信息}
+    """
     llm = get_config()["configurable"]["llm"]
     import json
     prefs = state.get("preferences", {})
@@ -66,6 +99,14 @@ async def generate_meal_plan(state: dict) -> dict:
 
 
 async def format_meal_response(state: dict) -> dict:
+    """格式化食谱输出
+
+    参数:
+        state: 包含 reply 或 error 的当前状态
+
+    返回:
+        dict: {"reply": 格式化后的食谱文本或错误提示}
+    """
     if state.get("error"):
         return {"reply": f"生成食谱失败：{state['error']}"}
     return {"reply": state.get("reply", "无法生成食谱。")}
