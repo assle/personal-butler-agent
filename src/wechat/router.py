@@ -100,7 +100,7 @@ def create_wechat_router(
         """接收企业微信用户消息（POST 请求）
 
         参数:
-            request: FastAPI Request 对象，body 为 JSON 格式
+            request: FastAPI Request 对象，支持 JSON 和 XML body 格式
             msg_signature: 消息签名
             timestamp: 时间戳
             nonce: 随机数
@@ -109,12 +109,19 @@ def create_wechat_router(
         返回:
             Response: 加密的 XML 回复，或错误响应
         """
-        try:
-            body = await request.json()
-        except Exception:
-            return Response(content="success")
-
-        encrypt_content = body.get("encrypt", "")
+        # 解析外层请求体（支持 JSON 和 XML 两种格式）
+        content_type = request.headers.get("content-type", "")
+        if "xml" in content_type:
+            raw_body = await request.body()
+            from .messages import parse_encrypted_xml
+            parsed = parse_encrypted_xml(raw_body)
+            encrypt_content = parsed.encrypt
+        else:
+            try:
+                body = await request.json()
+            except Exception:
+                return Response(content="success")
+            encrypt_content = body.get("encrypt", "")
 
         # 验签
         if not verify_signature(token, timestamp, nonce, encrypt_content, msg_signature):
@@ -128,15 +135,22 @@ def create_wechat_router(
             logger.error("WeChat callback: decrypt failed: %s", e)
             return Response(content="success")
 
-        # 解析内层消息（JSON 格式）
+        # 解析内层消息：先尝试企业微信原生 XML 格式，回退 JSON 格式（测试用）
         try:
-            inner = json.loads(decrypted)
-            from_user = inner.get("from_user_name", "")
-            msg_type = inner.get("msg_type", "text")
-            content = inner.get("content", "")
-        except json.JSONDecodeError:
-            logger.error("WeChat callback: inner message JSON parse failed")
-            return Response(content="success")
+            from .messages import parse_inner_xml
+            inner = parse_inner_xml(decrypted)
+            from_user = inner.from_user_name
+            msg_type = inner.msg_type
+            content = inner.content
+        except Exception:
+            try:
+                inner = json.loads(decrypted)
+                from_user = inner.get("from_user_name", "")
+                msg_type = inner.get("msg_type", "text")
+                content = inner.get("content", "")
+            except json.JSONDecodeError:
+                logger.error("WeChat callback: inner message parse failed")
+                return Response(content="success")
 
         # 非文本消息：回复不支持
         if msg_type != "text":
