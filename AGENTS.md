@@ -84,6 +84,8 @@ Read on demand. Load only the docs relevant to the current task.
 | `docs/agent/troubleshooting.md` | Known issues and proven checks | When debugging failures |
 | `docs/agent/config-variables.md` | Environment variables and config behavior | When touching config, LLM, DB, or runtime setup |
 
+| `docs/agent/upgrade-roadmap.md` | Upgrade points and improvement priorities | When planning future work or evaluating technical debt |
+
 All files are part of the shared project documentation. If you update one root entry file, update the other so `CLAUDE.md` and `AGENTS.md` remain identical.
 
 ### Memory Workflow
@@ -98,6 +100,6 @@ All files are part of the shared project documentation. If you update one root e
 
 ## Current MVP Baseline
 
-- Implemented: debug endpoint, rule-first intent router, LangChain ChatOpenAI LLM fallback, four LangGraph StateGraph agents (Fitness/Summary/Meal/QA), AgentRegistry, LangGraph MemorySaver checkpointing, SQLite persistence for training records and user preferences.
-- Deferred: real WeChat Work callback, group robot webhook pushes, APScheduler reminders and digests, persistent conversation memory (SqliteSaver), and RAG.
-- Latest verified baseline: `DEEPSEEK_API_KEY=test uv run pytest -q` reports 29 passing tests.
+- Implemented: debug endpoint, rule-first intent router, LangChain ChatOpenAI LLM fallback, four LangGraph StateGraph agents (Fitness/Summary/Meal/QA), AgentRegistry, LangGraph MemorySaver checkpointing, SQLite persistence, WeChat Work self-built app callback (encryption + routing), and group bot webhook push client.
+- Deferred: APScheduler reminders and digests, persistent conversation memory (SqliteSaver), async customer-service message reply, and RAG.
+- Latest verified baseline: `DEEPSEEK_API_KEY=test uv run pytest -q` reports 47 passing tests.
