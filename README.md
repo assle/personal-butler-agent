@@ -5,31 +5,37 @@
 ## 架构概览
 
 ```
-用户 → 企业微信自建应用 → FastAPI 回调接口 → Intent Router
-                                                  ↓
-                                        ┌─────────┴──────────┐
-                                        ↓         ↓          ↓
-                                    Fitness   Summary    Meal / QA
-                                        ↓         ↓          ↓
-                                        └─────────┬──────────┘
-                                                  ↓
-                                            SQLite 数据库
-                                                  ↓
-                                        ┌─────────┬──────────┐
-                                        ↓                    ↓
-                                  自建应用私发          群机器人推送
+用户 → 企业微信自建应用 → FastAPI 回调接口 → Intent Router (规则 + LLM)
+                                                    ↓
+                                          Agent Registry
+                                                    ↓
+                                    ┌───────┬───────┼───────┬────────┐
+                                    ↓       ↓       ↓       ↓        ↓
+                                 Fitness Summary  Meal     QA    (可扩展)
+                                    ↓       ↓       ↓       ↓
+                                    └───────┴───────┴───────┘
+                                              │
+                                        StateGraph 引擎
+                                     (LangGraph + MemorySaver)
+                                              │
+                                          SQLite 数据库
+                                              │
+                                    ┌─────────┴──────────┐
+                                    ↓                    ↓
+                              自建应用私发          群机器人推送
 ```
 
-**六层设计：**
+**七层设计：**
 
-| 层 | 角色 | 说明 |
+| 层 | 技术 | 说明 |
 |----|------|------|
-| 自建应用 | 交互入口 | 接收用户指令，私发回复 |
-| 群机器人 | 推送出口 | 公告、日报、通知推送到群 |
-| SQLite | 记忆层 | 持久化用户偏好、训练历史 |
-| LLM | 解析和生成层 | 意图理解、内容生成、自然语言处理 |
-| 规则模块 | 稳定决策层 | 关键词匹配确定性路由 |
-| Scheduler | 定时触发器 | 定时任务驱动（日报、提醒） |
+| 自建应用 | 企业微信 | 交互入口，接收用户指令 |
+| 群机器人 | Webhook | 公告、日报、通知推送到群 |
+| Agent 编排 | LangGraph StateGraph | 状态机驱动，多步推理，条件路由 |
+| LLM | LangChain ChatOpenAI → DeepSeek | 意图理解、内容生成、结构化提取 |
+| 规则模块 | 关键词匹配 | 确定性路由，零成本 |
+| 记忆层 | SQLite + MemorySaver | 持久化偏好/训练记录 + 多轮对话 checkpoint |
+| 调度器 | APScheduler | 定时任务驱动（日报、提醒） |
 
 ## 技术栈
 
@@ -37,19 +43,20 @@
 |------|------|
 | Runtime | Python 3.13+ |
 | Web 框架 | FastAPI |
+| Agent 框架 | LangGraph + LangChain |
+| LLM | langchain-openai → DeepSeek API |
 | ORM | SQLAlchemy 2.0 (async) + aiosqlite |
 | 数据校验 | Pydantic v2 |
 | 定时任务 | APScheduler |
 | 包管理 | uv |
 | 测试 | pytest + pytest-asyncio |
-| LLM | DeepSeek API (OpenAI 兼容) |
 
 ## 项目结构
 
 ```
 personal_butler_agent/
 ├── src/
-│   ├── main.py              # FastAPI 应用入口
+│   ├── main.py              # FastAPI 应用入口 + AgentRegistry 注册
 │   ├── config.py            # .env 配置加载
 │   ├── router/
 │   │   └── debug.py         # POST /api/debug/message
@@ -57,11 +64,17 @@ personal_butler_agent/
 │   │   ├── rules.py         # 关键词规则匹配
 │   │   └── router.py        # 规则优先 + LLM 兜底路由
 │   ├── agents/
-│   │   ├── base.py          # BaseAgent 抽象基类
-│   │   ├── fitness.py       # 健身 Agent
-│   │   ├── summary.py       # 群聊总结 Agent
-│   │   ├── meal.py          # 食谱 Agent
-│   │   └── qa.py            # 问答 Agent
+│   │   ├── registry.py      # intent → agent 中心注册表
+│   │   ├── base.py          # BaseGraphAgent 抽象基类
+│   │   ├── fitness/
+│   │   │   ├── state.py     # FitnessState TypedDict
+│   │   │   ├── nodes.py     # 节点函数（extract/validate/persist/generate...）
+│   │   │   └── graph.py     # StateGraph 组装 + FitnessAgent 类
+│   │   ├── summary/         # 同上 pattern
+│   │   ├── meal/            # 同上 pattern
+│   │   └── qa/              # 同上 pattern
+│   ├── graph/
+│   │   └── memory.py        # LangGraph MemorySaver 实例
 │   ├── models/
 │   │   ├── training.py      # 训练记录 ORM
 │   │   └── preference.py    # 用户偏好 ORM (JSON)
@@ -69,7 +82,7 @@ personal_butler_agent/
 │   │   ├── request.py       # 请求 Schema
 │   │   └── response.py      # 响应 Schema
 │   ├── llm/
-│   │   └── client.py        # DeepSeek API 客户端
+│   │   └── client.py        # ChatOpenAI 封装（DeepSeek 兼容）
 │   └── db/
 │       ├── base.py          # SQLAlchemy Base
 │       └── session.py       # 异步引擎 + 会话工厂
@@ -181,28 +194,37 @@ curl -X POST http://localhost:8000/api/debug/message \
 | `summarize_text` | "帮我总结..." / "summary" | 结构化的群聊文本总结 |
 | `make_meal_plan` | "今天吃什么" / "食谱" | 生成带营养估算的一日三餐 |
 | `qa` | 默认兜底 | 个性化问答 |
-| `unknown` | 无法识别时 | 返回错误提示 |
+| `unknown` | 无法识别时 | 返回提示 |
 
-**意图路由策略：** 关键词规则优先（确定性、零成本），未命中时由 DeepSeek LLM 兜底分类。
+**意图路由策略：** 关键词规则优先（确定性、零成本），未命中时由 LangChain ChatOpenAI 调用 DeepSeek 兜底分类。
 
-## 功能模块
+## Agent 架构
 
-### 健身 Agent
+每个 Agent 是一个 LangGraph `StateGraph`，由三部分组成：
 
-- **记录训练：** LLM 从自然语言提取结构化数据（部位、动作、组数、次数、重量），校验后写入 SQLite
-- **训练计划：** 查询近 7 天训练记录 + 用户偏好，LLM 生成部位轮换建议
+| 文件 | 职责 |
+|------|------|
+| `state.py` | 定义 graph 状态的 TypedDict |
+| `nodes.py` | 单职责异步节点函数（extract / validate / generate / format 等） |
+| `graph.py` | StateGraph 组装 + Agent 类（提供 `handle()` 入口） |
 
-### 总结 Agent
+**FitnessAgent 示例：**
 
-- 输入群聊文本 → LLM 输出结构化摘要（讨论主题 / 关键结论 / 待办事项 / 决策）
+```
+__start__
+    │
+[classify] ← 根据 intent 条件路由
+  /     \
+log_training  today_plan
+  extract      fetch_history
+  validate     fetch_prefs
+  persist      generate
+  format       format
+     \     /
+    __end__
+```
 
-### 食谱 Agent
-
-- 根据用户身体数据、饮食偏好、当日训练状态 → 生成带营养素估算是三餐建议
-
-### 问答 Agent
-
-- 注入用户偏好的个性化问答
+添加新 Agent：创建 `state.py` + `nodes.py` + `graph.py` → 在 `src/main.py` 中 `agent_registry.register(intent, agent)` 注册。
 
 ## 数据库
 
@@ -251,7 +273,7 @@ preferences JSON 结构可扩展，新模块只需添加自己的 namespace：
 
 ```bash
 # 运行全部测试
-DEEPSEEK_API_KEY=test uv run pytest tests/ -v
+DEEPSEEK_API_KEY=test uv run pytest -q
 
 # 运行单个模块
 DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v
@@ -262,7 +284,10 @@ DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v
 **已实现：**
 - `POST /api/debug/message` 调试端点
 - 意图路由（规则 + LLM 兜底，6 种意图）
-- 健身/总结/食谱/问答四个 Agent
+- 四个 LangGraph StateGraph Agent（Fitness/Summary/Meal/QA）
+- AgentRegistry 中心注册表
+- LangGraph MemorySaver 多轮对话 checkpointing
+- LangChain ChatOpenAI 封装（DeepSeek 兼容）
 - SQLite 持久化训练记录和用户偏好
 - 29 个测试覆盖
 
@@ -270,7 +295,7 @@ DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v
 - 企业微信自建应用回调对接
 - 群机器人 Webhook 推送
 - APScheduler 定时任务（日报、提醒）
-- 多轮对话上下文记忆
+- MemorySaver → SqliteSaver 持久化对话记忆
 - RAG 知识库集成
 
 ## License
