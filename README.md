@@ -45,6 +45,7 @@
 | Web 框架 | FastAPI |
 | Agent 框架 | LangGraph + LangChain |
 | LLM | langchain-openai → DeepSeek API |
+| 企业微信加解密 | cryptography (AES-256-CBC) |
 | ORM | SQLAlchemy 2.0 (async) + aiosqlite |
 | 数据校验 | Pydantic v2 |
 | 定时任务 | APScheduler |
@@ -56,10 +57,15 @@
 ```
 personal_butler_agent/
 ├── src/
-│   ├── main.py              # FastAPI 应用入口 + AgentRegistry 注册
-│   ├── config.py            # .env 配置加载
+│   ├── main.py              # FastAPI 应用入口 + AgentRegistry 注册 + 条件启动企业微信路由
+│   ├── config.py            # .env 配置加载（LLM / DB / 企业微信）
 │   ├── router/
-│   │   └── debug.py         # POST /api/debug/message
+│   │   └── debug.py         # POST /api/debug/message（本地调试端点）
+│   ├── wechat/              # 企业微信集成模块
+│   │   ├── crypto.py        # AES-256-CBC 加解密 + SHA1 签名验证
+│   │   ├── messages.py      # XML 解析/构建 + 消息数据类
+│   │   ├── webhook.py       # 群机器人 Webhook 推送客户端
+│   │   └── router.py        # GET/POST /api/wechat/callback
 │   ├── intent/
 │   │   ├── rules.py         # 关键词规则匹配
 │   │   └── router.py        # 规则优先 + LLM 兜底路由
@@ -74,7 +80,7 @@ personal_butler_agent/
 │   │   ├── meal/            # 同上 pattern
 │   │   └── qa/              # 同上 pattern
 │   ├── graph/
-│   │   └── memory.py        # LangGraph MemorySaver 实例
+│   │   └── memory.py        # LangGraph MemorySaver 共享实例
 │   ├── models/
 │   │   ├── training.py      # 训练记录 ORM
 │   │   └── preference.py    # 用户偏好 ORM (JSON)
@@ -84,62 +90,56 @@ personal_butler_agent/
 │   ├── llm/
 │   │   └── client.py        # ChatOpenAI 封装（DeepSeek 兼容）
 │   └── db/
-│       ├── base.py          # SQLAlchemy Base
-│       └── session.py       # 异步引擎 + 会话工厂
-├── tests/                   # 29 个测试
-├── docs/superpowers/
-│   ├── specs/               # 设计文档
-│   └── plans/               # 实现计划
+│       ├── base.py          # SQLAlchemy DeclarativeBase
+│       └── session.py       # 异步引擎 + 会话工厂 + get_db 依赖注入
+├── tests/                   # 47 个测试
+├── docs/
+│   ├── agent/               # 项目记忆文档（active-context / patterns / decisions / upgrade-roadmap）
+│   └── superpowers/
+│       ├── specs/           # 设计文档
+│       └── plans/           # 实现计划
 ├── pyproject.toml
-└── .env.example
+├── .env.example
+├── CLAUDE.md                # AI 助手项目指令
+├── 部署指南.md               # Dev / Production 环境部署完整步骤
+└── README.md
 ```
 
 ## 快速开始
 
-### 1. 环境准备
+### Dev 环境（本地）
 
 ```bash
-# 安装 uv (如果还没有)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# 1. 克隆项目
+git clone https://github.com/assle/personal-butler-agent.git
+cd personal-butler-agent
 
-# 安装依赖
+# 2. 安装依赖
 uv sync
-```
+uv pip install pytest pytest-asyncio httpx
 
-### 2. 配置 LLM
-
-```bash
+# 3. 配置 .env
 cp .env.example .env
-```
+# 编辑 .env，填入 DEEPSEEK_API_KEY=sk-xxxxxxxx
 
-编辑 `.env`，填入你的 DeepSeek API Key：
-
-```
-DEEPSEEK_API_KEY=sk-your-actual-key
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-chat
-DATABASE_URL=sqlite+aiosqlite:///butler.db
-```
-
-### 3. 启动服务
-
-```bash
+# 4. 启动开发服务器
 uv run uvicorn src.main:app --host 0.0.0.0 --port 8000
-```
 
-### 4. 测试调用
-
-```bash
+# 5. 测试调用
 curl -X POST http://localhost:8000/api/debug/message \
   -H "Content-Type: application/json" \
   -d '{"user_id":"assle","message":"打卡 今天练胸 卧推80kg5组8次"}'
 ```
 
-## API 文档
+### Production 环境（云服务器）
+
+详见 [`部署指南.md`](部署指南.md) —— 包含 uv + Caddy + systemd 从零到上线的完整步骤。
+
+## API 端点
 
 ### POST /api/debug/message
 
-模拟发送消息给机器人（MVP 阶段使用此接口代替企业微信回调）。
+本地调试端点，模拟企业微信消息回调。始终可用，无需企业微信配置。
 
 **请求：**
 
@@ -164,17 +164,7 @@ curl -X POST http://localhost:8000/api/debug/message \
   "intent": "log_training",
   "confidence": 1.0,
   "response": "已记录 2 条训练：卧推、飞鸟",
-  "data": {
-    "records": [
-      {
-        "muscle_group": "胸",
-        "exercise": "卧推",
-        "sets": 5,
-        "reps": 8,
-        "weight_kg": 80.0
-      }
-    ]
-  }
+  "data": { "records": [{ "muscle_group": "胸", "exercise": "卧推", ... }] }
 }
 ```
 
@@ -184,6 +174,17 @@ curl -X POST http://localhost:8000/api/debug/message \
 | confidence | float | 置信度 0.0-1.0 |
 | response | string | 回复文本 |
 | data | object | 结构化数据（可选） |
+
+### GET/POST /api/wechat/callback
+
+企业微信自建应用回调。**仅当 `.env` 中 `WECHAT_CORP_ID` 和 `WECHAT_TOKEN` 均配置时注册。**
+
+| 方法 | 用途 | 说明 |
+|------|------|------|
+| GET | URL 验证 | 企业微信后台配置回调 URL 时触发，验证签名并解密 echostr |
+| POST | 消息接收 | 用户在企业微信中发送消息时触发，解密 → 意图路由 → agent 回复 → 加密返回 |
+
+详细设计见 `docs/superpowers/specs/2026-05-30-wechat-work-integration-design.md`。
 
 ## 支持的意图
 
@@ -213,18 +214,41 @@ curl -X POST http://localhost:8000/api/debug/message \
 ```
 __start__
     │
-[classify] ← 根据 intent 条件路由
-  /     \
-log_training  today_plan
-  extract      fetch_history
-  validate     fetch_prefs
-  persist      generate
-  format       format
-     \     /
-    __end__
+[path_condition] ← 根据 intent 条件路由
+ /               \
+log_training     today_plan
+ extract         fetch_history
+ validate        fetch_prefs
+ persist         generate
+ format_log      format_plan
+    \               /
+   __end__        __end__
 ```
 
 添加新 Agent：创建 `state.py` + `nodes.py` + `graph.py` → 在 `src/main.py` 中 `agent_registry.register(intent, agent)` 注册。
+
+## 企业微信集成
+
+### 自建应用回调
+
+- 用户在企业微信中给自建应用发消息 → 企业微信 POST 加密 XML 到 `/api/wechat/callback`
+- 加密方案：AES-256-CBC + PKCS#7 padding + SHA1 签名验证
+- 回调 URL 和 Token/EncodingAESKey 在企业微信管理后台配置
+
+### 群机器人 Webhook
+
+- `WechatWebhookClient` 通过 HTTP POST 向群 Webhook URL 推送 text/markdown 消息
+- 配置 `WECHAT_WEBHOOK_URL` 后自动创建客户端实例
+
+### 配置变量
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `WECHAT_CORP_ID` | 回调必需 | 企业 CorpID |
+| `WECHAT_TOKEN` | 回调必需 | URL 验证 Token |
+| `WECHAT_ENCODING_AES_KEY` | 回调必需 | 消息加解密 AES 密钥 |
+| `WECHAT_AGENT_ID` | 否 | 应用 AgentId |
+| `WECHAT_WEBHOOK_URL` | 推送必需 | 群机器人 Webhook 地址 |
 
 ## 数据库
 
@@ -272,31 +296,37 @@ preferences JSON 结构可扩展，新模块只需添加自己的 namespace：
 ## 运行测试
 
 ```bash
-# 运行全部测试
+# 运行全部测试（47 个）
 DEEPSEEK_API_KEY=test uv run pytest -q
 
 # 运行单个模块
 DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v
+
+# 运行企业微信模块测试
+DEEPSEEK_API_KEY=test uv run pytest tests/test_wechat_crypto.py tests/test_wechat_messages.py -v
 ```
 
-## MVP 范围
+## 当前状态
 
 **已实现：**
 - `POST /api/debug/message` 调试端点
+- 企业微信自建应用回调（GET URL 验证 + POST 消息接收，AES 加密）
+- 群机器人 Webhook 推送客户端
 - 意图路由（规则 + LLM 兜底，6 种意图）
 - 四个 LangGraph StateGraph Agent（Fitness/Summary/Meal/QA）
 - AgentRegistry 中心注册表
 - LangGraph MemorySaver 多轮对话 checkpointing
 - LangChain ChatOpenAI 封装（DeepSeek 兼容）
 - SQLite 持久化训练记录和用户偏好
-- 29 个测试覆盖
+- 47 个测试覆盖（含 18 个企业微信模块测试）
 
 **后续计划：**
-- 企业微信自建应用回调对接
-- 群机器人 Webhook 推送
 - APScheduler 定时任务（日报、提醒）
 - MemorySaver → SqliteSaver 持久化对话记忆
+- 客服消息 API 异步回复（突破 5 秒回调限制）
 - RAG 知识库集成
+
+详见 [`docs/agent/upgrade-roadmap.md`](docs/agent/upgrade-roadmap.md)。
 
 ## License
 
