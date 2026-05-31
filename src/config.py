@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     wechat_encoding_aes_key: str = ""
     wechat_agent_id: str = ""
 
+    # 企业微信智能机器人 API 模式配置（回调消息加解密，receiveid 为空字符串）
+    wechat_robot_token: str = ""
+    wechat_robot_encoding_aes_key: str = ""
+
     # 企业微信群机器人 Webhook 推送地址
     wechat_webhook_url: str = ""
 

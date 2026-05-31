@@ -2,24 +2,27 @@
 
 ## Current State
 
-The MVP is complete and migrated to LangChain + LangGraph. The app exposes `POST /api/debug/message` and `POST /api/wechat/callback`, routes messages through a rule-first intent router, dispatches to one of four LangGraph StateGraph agents, and persists fitness/group-message/user-preference state in SQLite.
+The MVP is complete and migrated to LangChain + LangGraph. The app exposes `POST /api/debug/message`, `POST /api/wechat/callback` (self-built app), and `POST /api/wechat/robot/callback` (intelligent robot), routes messages through a rule-first intent router, dispatches to one of four LangGraph StateGraph agents, and persists fitness/group-message/user-preference state in SQLite.
 
 Current implementation baseline:
 - FastAPI app entry: `src.main:app`
 - Debug route: `src/router/debug.py` — supports chat_type/chat_id for group chat simulation
-- WeChat Work callback: `src/wechat/router.py` — GET URL verification + POST message receive with encryption
+- WeChat Work self-built app callback: `src/wechat/router.py` — GET URL verification + POST message receive with AES-256-CBC encryption, CorpID validation, passive encrypted XML reply
+- WeChat Work intelligent robot callback: `src/wechat/robot_router.py` — GET URL verification (receiveid="") + POST with intelligent-robot-specific JSON parsing, active reply via `response_url` POST
 - Intent routing: `src/intent/rules.py` and `src/intent/router.py`
 - Agents: `FitnessAgent`, `SummaryAgent` (text + group), `MealAgent`, `QAAgent`
 - Agent registry: `src/agents/registry.py` — 7 intent→agent mappings
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek
 - Persistence: `training_records`, `user_preferences`, `group_messages`
 - Multi-turn memory: LangGraph `MemorySaver` checkpointing (in-memory, per user_id thread)
-- Verification baseline: 68 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
+- Verification baseline: 82 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
+- Config: `WECHAT_ROBOT_TOKEN` + `WECHAT_ROBOT_ENCODING_AES_KEY` for intelligent robot callback (alongside existing `WECHAT_CORP_ID` + `WECHAT_TOKEN` + `WECHAT_ENCODING_AES_KEY` for self-built app)
 
 ## What Is Implemented
 
 - Debug API request/response schema (with chat_type/chat_id for group simulation).
-- WeChat Work self-built app callback (AES-256-CBC crypto, XML parsing, passive reply).
+- WeChat Work self-built app callback (AES-256-CBC crypto, XML parsing, passive encrypted XML reply).
+- WeChat Work intelligent robot API callback (receiveid="" decryption, intelligent-robot JSON message parsing, active reply via `response_url` POST).
 - Rule-first classification for known intent keywords.
 - DeepSeek/OpenAI-compatible LLM fallback classification via LangChain ChatOpenAI.
 - Training record extraction and persistence (FitnessAgent StateGraph).
@@ -38,7 +41,7 @@ The README and MVP spec list these as future scope:
 - APScheduler jobs for scheduled reminders and daily reports.
 - Persistent conversation memory (SqliteSaver — MemorySaver is the current in-memory placeholder).
 - RAG or knowledge-base integration.
-- Async customer-service message reply (currently only passive reply is implemented).
+- Async customer-service message reply for self-built app callback (robot callback already uses active reply via `response_url`; self-built app still uses synchronous passive XML reply with 5-second timeout limitation).
 
 ## Working Guidance
 

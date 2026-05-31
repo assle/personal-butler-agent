@@ -81,6 +81,18 @@ if settings.wechat_corp_id and settings.wechat_token:
     )
     app.include_router(wechat_router)
 
+# 企业微信智能机器人回调路由（仅当配置了机器人 Token 时注册）
+if settings.wechat_robot_token:
+    from src.wechat.robot_router import create_robot_router
+
+    robot_router = create_robot_router(
+        intent_router=intent_router,
+        agent_registry=agent_registry,
+        token=settings.wechat_robot_token,
+        encoding_aes_key=settings.wechat_robot_encoding_aes_key,
+    )
+    app.include_router(robot_router)
+
 # 企业微信群推送客户端（仅当配置了 Webhook URL 时创建）
 _webhook_client = None
 if settings.wechat_webhook_url:
