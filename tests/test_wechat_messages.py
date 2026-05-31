@@ -33,6 +33,18 @@ INNER_XML = """<xml>
 <MsgId>100001</MsgId>
 </xml>"""
 
+# 群聊消息的 XML 包含 ChatId 和 ChatType
+INNER_XML_GROUP = """<xml>
+<ToUserName><![CDATA[wx123456]]></ToUserName>
+<FromUserName><![CDATA[user_openid_002]]></FromUserName>
+<CreateTime>1780217822</CreateTime>
+<MsgType><![CDATA[text]]></MsgType>
+<Content><![CDATA[@机器人 总结一下群消息]]></Content>
+<MsgId>100002</MsgId>
+<ChatId><![CDATA[group_chat_123]]></ChatId>
+<ChatType><![CDATA[group]]></ChatType>
+</xml>"""
+
 
 def test_parse_encrypted_xml():
     """测试解析外层加密 XML：提取 ToUserName、AgentID、Encrypt
@@ -49,10 +61,10 @@ def test_parse_encrypted_xml():
 
 
 def test_parse_inner_xml():
-    """测试解析内层明文 XML：提取 FromUserName、Content、MsgType 等
+    """测试解析内层明文 XML（私聊）：提取基本字段，chat 字段使用默认值
 
-    输入: 解密后的内层明文 XML 字符串
-    输出: InnerMessage(from_user_name="user_openid_001", msg_type="text", content="今天练什么", ...)
+    输入: 解密后的内层明文 XML 字符串（无 ChatId/ChatType）
+    输出: InnerMessage(..., chat_id="", chat_type="single")
     """
     result = parse_inner_xml(INNER_XML)
 
@@ -63,6 +75,28 @@ def test_parse_inner_xml():
     assert result.msg_type == "text"
     assert result.content == "今天练什么"
     assert result.msg_id == "100001"
+    # 私聊消息：chat 字段为空
+    assert result.chat_id == ""
+    assert result.chat_type == "single"
+
+
+def test_parse_inner_xml_group_chat():
+    """测试解析群聊内层明文 XML：提取 ChatId 和 ChatType
+
+    输入: 包含 ChatId="group_chat_123" 和 ChatType="group" 的 XML
+    输出: InnerMessage(chat_id="group_chat_123", chat_type="group")
+    """
+    result = parse_inner_xml(INNER_XML_GROUP)
+
+    assert isinstance(result, InnerMessage)
+    assert result.to_user_name == "wx123456"
+    assert result.from_user_name == "user_openid_002"
+    assert result.msg_type == "text"
+    assert result.content == "@机器人 总结一下群消息"
+    assert result.msg_id == "100002"
+    # 群聊消息：chat 字段有值
+    assert result.chat_id == "group_chat_123"
+    assert result.chat_type == "group"
 
 
 def test_build_reply_xml():

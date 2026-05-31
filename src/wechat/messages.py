@@ -31,6 +31,8 @@ class InnerMessage:
     msg_type: str        # 消息类型（text/image/voice 等）
     content: str         # 消息内容（文本消息时）
     msg_id: str          # 消息 ID
+    chat_id: str = ""    # 群聊 ID，私聊时为空
+    chat_type: str = "single"  # 会话类型："single"（私聊）或 "group"（群聊）
 
 
 def parse_encrypted_xml(body: bytes) -> EncryptedMessage:
@@ -64,10 +66,12 @@ def parse_inner_xml(decrypted: str) -> InnerMessage:
     return InnerMessage(
         to_user_name=_get_cdata(root, "ToUserName"),
         from_user_name=_get_cdata(root, "FromUserName"),
-        create_time=int(_get_cdata(root, "CreateTime")),
+        create_time=int(_get_cdata(root, "CreateTime") or "0"),
         msg_type=_get_cdata(root, "MsgType"),
         content=_get_cdata(root, "Content"),
         msg_id=_get_cdata(root, "MsgId"),
+        chat_id=_get_cdata(root, "ChatId"),
+        chat_type=_get_cdata(root, "ChatType") or "single",
     )
 
 
