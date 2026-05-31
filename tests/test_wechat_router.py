@@ -11,12 +11,13 @@ import json
 import os
 import time
 from unittest.mock import AsyncMock, MagicMock
+from xml.etree import ElementTree
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.wechat.crypto import encrypt
+from src.wechat.crypto import decrypt, encrypt
 from src.wechat.router import create_wechat_router
 
 
@@ -81,6 +82,22 @@ def _build_app(wechat_config, intent_router, agent_registry, db_session=None):
         app.dependency_overrides[get_db] = lambda: db_session
 
     return TestClient(app)
+
+
+def _xml_text(xml: str, tag: str) -> str:
+    """读取 XML 中指定标签的文本
+
+    参数:
+        xml: XML 字符串
+        tag: 需要读取的标签名
+
+    返回:
+        str: 标签文本，不存在时返回空字符串
+    """
+    element = ElementTree.fromstring(xml).find(tag)
+    if element is None or element.text is None:
+        return ""
+    return element.text
 
 
 def test_get_callback_url_verification_success(wechat_config):
@@ -187,6 +204,13 @@ async def test_post_callback_text_message(
     intent_router.route.assert_called()
     agent_registry.get.assert_called()
     agent_registry.get().handle.assert_called()
+
+    encrypted_reply = _xml_text(response.text, "Encrypt")
+    decrypted_reply = decrypt(aes_key, encrypted_reply, corp_id)
+    assert _xml_text(decrypted_reply, "ToUserName") == "user_001"
+    assert _xml_text(decrypted_reply, "FromUserName") == corp_id
+    assert _xml_text(decrypted_reply, "MsgType") == "text"
+    assert _xml_text(decrypted_reply, "Content") == "这是测试回复"
 
 
 async def test_post_callback_non_text_message(
