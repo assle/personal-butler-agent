@@ -18,7 +18,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.wechat.crypto import decrypt, encrypt
-from src.wechat.router import create_wechat_router
+from src.wechat.router import _is_summarize_trigger, create_wechat_router
+from src.models.group_message import GroupMessage
 
 
 @pytest.fixture
@@ -278,3 +279,195 @@ def test_post_callback_bad_signature(wechat_config):
     )
 
     assert response.status_code == 403
+
+
+# ── 群聊消息处理测试 ──
+
+
+async def test_post_callback_group_message_trigger(
+    wechat_config, intent_router, agent_registry, db_session
+):
+    """测试群聊触发消息：保存到 DB 并正常处理返回回复
+
+    输入: chat_type="group" 的加密消息，内容包含 "总结" 触发词
+    输出: 200 + XML 加密回复；消息已写入 group_messages 表
+    """
+    token = wechat_config["token"]
+    aes_key = wechat_config["encoding_aes_key"]
+    corp_id = wechat_config["corp_id"]
+
+    inner = {
+        "to_user_name": corp_id,
+        "from_user_name": "user_group_001",
+        "msg_type": "text",
+        "content": "@机器人 总结一下群消息",
+        "chat_id": "group_123",
+        "chat_type": "group",
+        "create_time": 1780217822,
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), corp_id)
+
+    timestamp = str(int(time.time()))
+    nonce = "test_nonce_group"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_app(wechat_config, intent_router, agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={
+            "to_user_name": corp_id,
+            "agent_id": "1000001",
+            "encrypt": encrypted_content,
+        },
+    )
+
+    # 触发消息应有 XML 加密回复
+    assert response.status_code == 200
+    encrypted_reply = _xml_text(response.text, "Encrypt")
+    decrypted_reply = decrypt(aes_key, encrypted_reply, corp_id)
+    assert _xml_text(decrypted_reply, "Content") == "这是测试回复"
+
+    # 消息应已保存到数据库
+    recent = await GroupMessage.get_recent(db_session, "group_123", limit=10)
+    assert len(recent) == 1
+    assert recent[0].content == "@机器人 总结一下群消息"
+    assert recent[0].user_id == "user_group_001"
+
+
+async def test_post_callback_group_message_silent_collection(
+    wechat_config, intent_router, agent_registry, db_session
+):
+    """测试群聊非触发消息：保存到 DB 但静默返回不回复
+
+    输入: chat_type="group" 的加密消息，内容为普通聊天（无触发词）
+    输出: 200 + body 内容为 "success"；agent 未被调用；消息已写入 DB
+    """
+    token = wechat_config["token"]
+    aes_key = wechat_config["encoding_aes_key"]
+    corp_id = wechat_config["corp_id"]
+
+    inner = {
+        "to_user_name": corp_id,
+        "from_user_name": "user_group_002",
+        "msg_type": "text",
+        "content": "明天什么时候开会",
+        "chat_id": "group_456",
+        "chat_type": "group",
+        "create_time": 1780217900,
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), corp_id)
+
+    timestamp = str(int(time.time()))
+    nonce = "test_nonce_silent"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_app(wechat_config, intent_router, agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={
+            "to_user_name": corp_id,
+            "agent_id": "1000001",
+            "encrypt": encrypted_content,
+        },
+    )
+
+    # 非触发消息应静默返回
+    assert response.status_code == 200
+    assert response.text.strip() == "success"
+
+    # agent 不应被调用
+    intent_router.route.assert_not_called()
+
+    # 消息应已保存到数据库
+    recent = await GroupMessage.get_recent(db_session, "group_456", limit=10)
+    assert len(recent) == 1
+    assert recent[0].content == "明天什么时候开会"
+
+
+async def test_post_callback_private_chat_not_saved(
+    wechat_config, intent_router, agent_registry, db_session
+):
+    """测试私聊消息：不应保存到群聊消息表
+
+    输入: chat_type 未设置（默认 "single"）的普通消息
+    输出: 正常回复，group_messages 表中无数据
+    """
+    token = wechat_config["token"]
+    aes_key = wechat_config["encoding_aes_key"]
+    corp_id = wechat_config["corp_id"]
+
+    inner = {
+        "from_user_name": "user_private_001",
+        "msg_type": "text",
+        "content": "今天练什么",
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), corp_id)
+
+    timestamp = str(int(time.time()))
+    nonce = "test_nonce_private"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_app(wechat_config, intent_router, agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={
+            "to_user_name": corp_id,
+            "agent_id": "1000001",
+            "encrypt": encrypted_content,
+        },
+    )
+
+    assert response.status_code == 200
+    # agent 正常调用
+    intent_router.route.assert_called()
+
+    # 私聊消息不应进入群聊消息表
+    from sqlalchemy import select, func
+    count_result = await db_session.execute(
+        select(func.count()).select_from(GroupMessage)
+    )
+    assert count_result.scalar() == 0
+
+
+# ── _is_summarize_trigger 单元测试 ──
+
+
+def test_is_summarize_trigger_true():
+    """测试触发词匹配：包含总结类关键词返回 True"""
+    assert _is_summarize_trigger("@机器人 总结一下群消息") is True
+    assert _is_summarize_trigger("帮我总结") is True
+    assert _is_summarize_trigger("摘要一下今天的讨论") is True
+    assert _is_summarize_trigger("概括一下") is True
+    assert _is_summarize_trigger("汇总群聊") is True
+
+
+def test_is_summarize_trigger_false():
+    """测试触发词不匹配：不含总结类关键词返回 False"""
+    assert _is_summarize_trigger("明天什么时候开会") is False
+    assert _is_summarize_trigger("大家好") is False
+    assert _is_summarize_trigger("今天练什么") is False
+    assert _is_summarize_trigger("") is False

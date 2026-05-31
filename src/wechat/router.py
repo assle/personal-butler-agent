@@ -151,6 +151,9 @@ def create_wechat_router(
             from_user = inner.from_user_name
             msg_type = inner.msg_type
             content = inner.content
+            chat_id = inner.chat_id
+            chat_type = inner.chat_type
+            inner_create_time = inner.create_time
         except Exception as e:
             logger.info("WeChat callback: XML parse failed (%s), trying JSON fallback", e)
             try:
@@ -159,12 +162,27 @@ def create_wechat_router(
                 from_user = inner.get("from_user_name", "")
                 msg_type = inner.get("msg_type", "text")
                 content = inner.get("content", "")
+                chat_id = inner.get("chat_id", "")
+                chat_type = inner.get("chat_type", "single")
+                inner_create_time = inner.get("create_time", 0)
             except json.JSONDecodeError:
                 logger.error("WeChat callback: inner message parse failed (both XML and JSON)")
                 return Response(content="success")
 
-        logger.info("WeChat callback: parsed msg_type=%s, from_user=%s, to_user=%s, content=%s",
-                    msg_type, from_user, to_user, content[:200])
+        logger.info("WeChat callback: parsed msg_type=%s, from_user=%s, to_user=%s, chat_type=%s, content=%s",
+                    msg_type, from_user, to_user, chat_type, content[:200])
+
+        # 群聊消息：始终保存到数据库用于后续总结
+        if chat_type == "group" and chat_id:
+            from src.models.group_message import GroupMessage
+            await GroupMessage.save(db, chat_id, from_user, content, inner_create_time)
+            await GroupMessage.cleanup(db, chat_id, keep=200)
+            logger.info("WeChat callback: saved group message, chat_id=%s", chat_id)
+
+            # 非触发消息：静默收集，不回复到群聊
+            if not _is_summarize_trigger(content):
+                logger.info("WeChat callback: non-trigger group message, returning silently")
+                return Response(content="success")
 
         # 非文本消息：回复不支持
         intent = "non_text"
@@ -226,3 +244,16 @@ def _compute_signature(token: str, timestamp: str, nonce: str, encrypt_msg: str)
     import hashlib
     parts = sorted([token, timestamp, nonce, encrypt_msg])
     return hashlib.sha1("".join(parts).encode()).hexdigest()
+
+
+def _is_summarize_trigger(content: str) -> bool:
+    """检测消息是否触发群聊总结（内容中包含总结类关键词）
+
+    参数:
+        content: 消息文本内容
+
+    返回:
+        bool: 命中关键词返回 True
+    """
+    keywords = ["总结", "摘要", "概括", "汇总"]
+    return any(kw in content for kw in keywords)
