@@ -250,8 +250,8 @@ async def test_robot_post_callback_text_message(
     call_args = mock_httpx_post.call_args
     assert call_args[0][0] == "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=test_response_001"
     sent_payload = call_args[1]["json"]
-    assert sent_payload["msgtype"] == "text"
-    assert sent_payload["text"]["content"] == "这是机器人测试回复"
+    assert sent_payload["msgtype"] == "markdown"
+    assert sent_payload["markdown"]["content"] == "这是机器人测试回复"
 
 
 async def test_robot_post_callback_non_text_message(
@@ -299,7 +299,7 @@ async def test_robot_post_callback_non_text_message(
     robot_intent_router.route.assert_not_called()
 
     sent_payload = mock_httpx_post.call_args[1]["json"]
-    assert sent_payload["text"]["content"] == "暂不支持该消息类型"
+    assert sent_payload["markdown"]["content"] == "暂不支持该消息类型"
 
 
 def test_robot_post_callback_bad_signature(robot_config):
@@ -374,7 +374,7 @@ async def test_robot_post_callback_group_message_trigger(
     # 回复通过 response_url 推送
     mock_httpx_post.assert_called_once()
     sent_payload = mock_httpx_post.call_args[1]["json"]
-    assert sent_payload["text"]["content"] == "这是机器人测试回复"
+    assert sent_payload["markdown"]["content"] == "这是机器人测试回复"
 
     # 消息应已保存到数据库
     recent = await GroupMessage.get_recent(db_session, "robot_group_123", limit=10)

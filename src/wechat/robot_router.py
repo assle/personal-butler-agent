@@ -246,16 +246,18 @@ def create_robot_router(
 async def _post_reply(response_url: str, content: str) -> None:
     """向 response_url 发送 JSON 格式的主动回复
 
-    智能机器人回复格式（JSON POST）:
-      {"msgtype": "text", "text": {"content": "回复内容"}}
+    智能机器人 response_url 仅支持两种 msgtype:
+      - markdown: {"msgtype": "markdown", "markdown": {"content": "回复内容"}}
+      - template_card: 模板卡片消息
+      text 类型不被智能机器人 response_url 支持
 
     参数:
         response_url: 企业微信智能机器人提供的临时回复 URL
-        content: 回复文本内容
+        content: 回复文本内容（支持 Markdown 格式）
     """
     payload = {
-        "msgtype": "text",
-        "text": {"content": content},
+        "msgtype": "markdown",
+        "markdown": {"content": content},
     }
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
