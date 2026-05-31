@@ -1,5 +1,7 @@
 # Personal Butler Agent
 
+[English](README.en.md)
+
 基于企业微信的 AI 私人管家系统 —— 通过自然语言交互管理健身、饮食、群聊总结等日常事务。
 
 ## 架构概览

@@ -1,5 +1,7 @@
 # Personal Butler Agent
 
+[中文](README.md)
+
 An AI personal butler system based on WeChat Work — manage fitness, meals, group chat summaries, and daily tasks through natural language interaction.
 
 ## Architecture Overview
