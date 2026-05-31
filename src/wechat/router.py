@@ -173,6 +173,7 @@ def create_wechat_router(
                     msg_type, from_user, to_user, chat_type, content[:200])
 
         # 群聊消息：始终保存到数据库用于后续总结
+        is_group_trigger = False
         if chat_type == "group" and chat_id:
             from src.models.group_message import GroupMessage
             await GroupMessage.save(db, chat_id, from_user, content, inner_create_time)
@@ -183,14 +184,31 @@ def create_wechat_router(
             if not _is_summarize_trigger(content):
                 logger.info("WeChat callback: non-trigger group message, returning silently")
                 return Response(content="success")
+            is_group_trigger = True
 
         # 非文本消息：回复不支持
         intent = "non_text"
         if msg_type != "text":
             logger.info("WeChat callback: non-text message type=%s, replying with unsupported", msg_type)
             reply_text = "暂不支持该消息类型"
+        elif is_group_trigger:
+            # 群聊触发消息：使用 summarize_group 意图，传入 chat_id 和 chat_type
+            intent = "summarize_group"
+            agent = agent_registry.get(intent)
+            if agent is None:
+                reply_text = "抱歉，无法处理该消息"
+            else:
+                try:
+                    result = await agent.handle(
+                        intent, content, from_user, db,
+                        extra_state={"chat_id": chat_id, "chat_type": "group"},
+                    )
+                    reply_text = result.reply
+                except APIError as e:
+                    logger.error("WeChat callback: APIError from group agent: %s", e)
+                    reply_text = "LLM 服务暂时不可用，请稍后重试。"
         else:
-            # 意图路由 + agent 处理
+            # 意图路由 + agent 处理（私聊）
             try:
                 intent, _confidence = await intent_router.route(content)
                 logger.info("WeChat callback: intent=%s, confidence=%s", intent, _confidence)

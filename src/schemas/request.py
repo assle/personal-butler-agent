@@ -21,3 +21,9 @@ class DebugMessageRequest(BaseModel):
 
     timestamp: datetime | None = None
     """消息时间戳（可选），ISO 格式"""
+
+    chat_type: str = "single"
+    """会话类型："single"（私聊）或 "group"（群聊），默认 single"""
+
+    chat_id: str = ""
+    """群聊 ID，chat_type="group" 时使用"""
