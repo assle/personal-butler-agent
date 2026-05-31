@@ -36,6 +36,55 @@ DEEPSEEK_API_KEY=test uv run pytest -q
 
 Tests should mock LLM calls and should not depend on the placeholder key being valid.
 
+## WeChat Work Self-Built App
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `WECHAT_CORP_ID` | No | `""` | Enterprise CorpID for message encryption/decryption |
+| `WECHAT_TOKEN` | No | `""` | Callback URL verification Token |
+| `WECHAT_ENCODING_AES_KEY` | No | `""` | 43-char Base64 AES key for encrypting/decrypting messages |
+| `WECHAT_AGENT_ID` | No | `""` | Self-built app AgentID |
+
+When `WECHAT_CORP_ID` and `WECHAT_TOKEN` are both set, the `/api/wechat/callback` route is registered. The callback uses **passive encrypted XML reply** (5-second timeout applies).
+
+```env
+WECHAT_CORP_ID=ww1234567890abcdef
+WECHAT_TOKEN=YourRandomToken123
+WECHAT_ENCODING_AES_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WECHAT_AGENT_ID=1000005
+```
+
+## WeChat Work Intelligent Robot
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `WECHAT_ROBOT_TOKEN` | No | `""` | Intelligent robot callback Token |
+| `WECHAT_ROBOT_ENCODING_AES_KEY` | No | `""` | 43-char Base64 AES key for robot message crypto |
+
+When `WECHAT_ROBOT_TOKEN` is set, the `/api/wechat/robot/callback` route is registered. The robot callback uses **active reply via `response_url` POST** (no 5-second timeout). The `receiveid` for crypto is empty string `""` (not CorpID).
+
+```env
+WECHAT_ROBOT_TOKEN=YourRobotToken
+WECHAT_ROBOT_ENCODING_AES_KEY=YourRobotEncodingAESKey
+```
+
+Key differences from self-built app:
+- Message format: intelligent-robot-specific JSON (`from.userid`, `text.content`, `chatid`, `response_url`)
+- Reply mechanism: POST JSON to `response_url` (only `markdown` and `template_card` msgtypes supported — `text` returns errcode 40008)
+- Crypto receiveid: `""` (empty string) instead of CorpID
+
+## WeChat Work Group Bot Webhook
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `WECHAT_WEBHOOK_URL` | No | `""` | Group bot webhook URL for proactive push |
+
+When set, a `WechatWebhookClient` instance is created at app startup for sending proactive group notifications.
+
+```env
+WECHAT_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxx
+```
+
 ## Change Guidance
 
 - Add new environment variables to `Settings` in `src/config.py`.

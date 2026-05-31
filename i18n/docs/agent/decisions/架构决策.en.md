@@ -66,3 +66,17 @@ Reasoning:
 - LangGraph is the current industry standard for agent development and aligns with interview expectations.
 - Simple agents (QA, Summary) stay simple with a linear graph. Complex agents (Fitness) gain conditional routing between sub-intents.
 - The `handle()` interface remains identical — callers (routes, tests, schedulers) are unaffected.
+
+## ADR-008: Separate Intelligent Robot Callback from Self-Built App Callback
+
+The intelligent robot API callback (`/api/wechat/robot/callback`) is implemented as a separate router and route from the self-built app callback (`/api/wechat/callback`).
+
+Reasoning:
+- **Different message format**: The intelligent robot sends JSON with nested fields (`from.userid`, `text.content`, `chatid`, `response_url`), while the self-built app sends XML/flat JSON (`FromUserName`, `Content`, `ChatId`). Attempting to share a parser would create fragile branching logic.
+- **Different reply mechanism**: The robot uses active reply via `response_url` POST (JSON), while the self-built app uses passive encrypted XML reply. These are fundamentally different code paths.
+- **Different crypto receiveid**: The robot uses `""` (empty string), the self-built app uses CorpID. Sharing the decrypt call with different receiveid values is bug-prone.
+- **Independent config**: Separate `WECHAT_ROBOT_TOKEN`/`WECHAT_ROBOT_ENCODING_AES_KEY` from `WECHAT_CORP_ID`/`WECHAT_TOKEN`/`WECHAT_ENCODING_AES_KEY`. Each can be enabled independently.
+- **Independent failure domains**: A bug in the robot callback won't break the self-built app callback, and vice versa.
+- **response_url msgtype constraint**: The robot's `response_url` only supports `markdown` and `template_card` msgtypes — not `text`. This constraint only applies to the robot router.
+
+Trade-off: The two routers (`src/wechat/router.py` and `src/wechat/robot_router.py`) share some structural similarity (GET URL verification, POST decrypt + signature check). The shared crypto and message-building utilities in `src/wechat/crypto.py` and `src/wechat/messages.py` prevent code duplication at the lower layers while keeping the routing logic separate where it diverges.
