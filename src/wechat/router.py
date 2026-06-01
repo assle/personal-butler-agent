@@ -169,6 +169,20 @@ def create_wechat_router(
                 logger.error("WeChat callback: inner message parse failed (both XML and JSON)")
                 return Response(content="success")
 
+        # 语音消息：从 Recognition 字段提取识别文本，空则静默忽略
+        if msg_type == "voice":
+            voice_text = (
+                inner.recognition
+                if not isinstance(inner, dict)
+                else inner.get("recognition", "")
+            )
+            if not voice_text:
+                logger.info("WeChat callback: voice recognition empty, silently ignoring")
+                return Response(content="success")
+            content = voice_text
+            msg_type = "text"
+            logger.info("WeChat callback: voice recognition: %s", content[:200])
+
         logger.info("WeChat callback: parsed msg_type=%s, from_user=%s, to_user=%s, chat_type=%s, content=%s",
                     msg_type, from_user, to_user, chat_type, content[:200])
 

@@ -471,3 +471,104 @@ def test_is_summarize_trigger_false():
     assert _is_summarize_trigger("大家好") is False
     assert _is_summarize_trigger("今天练什么") is False
     assert _is_summarize_trigger("") is False
+
+
+# ── 语音消息处理测试 ──
+
+
+async def test_post_callback_voice_message_with_recognition(
+    wechat_config, intent_router, agent_registry, db_session
+):
+    """测试自建应用 POST 语音消息（有 Recognition）：识别文本应当作普通文本路由
+
+    输入: msg_type="voice" + recognition="今天练上肢" 的加密消息（JSON 格式，模拟内层）
+    输出: 200 + XML 加密回复；agent 流水线被调用且收到识别文本
+    """
+    token = wechat_config["token"]
+    aes_key = wechat_config["encoding_aes_key"]
+    corp_id = wechat_config["corp_id"]
+
+    inner = {
+        "from_user_name": "user_voice_001",
+        "msg_type": "voice",
+        "content": "",
+        "recognition": "今天练上肢",
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), corp_id)
+
+    timestamp = str(int(time.time()))
+    nonce = "test_nonce_voice"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_app(wechat_config, intent_router, agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={
+            "to_user_name": corp_id,
+            "agent_id": "1000001",
+            "encrypt": encrypted_content,
+        },
+    )
+
+    assert response.status_code == 200
+    # agent 流水线应被调用（语音识别文本作为 text 路由）
+    intent_router.route.assert_called()
+    # 验证路由传入的是识别文本，不是空字符串
+    call_arg = intent_router.route.call_args[0][0]
+    assert call_arg == "今天练上肢"
+
+
+async def test_post_callback_voice_message_empty_recognition(
+    wechat_config, intent_router, agent_registry, db_session
+):
+    """测试自建应用 POST 语音消息（无 Recognition）：应静默返回不调用 agent
+
+    输入: msg_type="voice" + recognition="" 的加密消息
+    输出: 200 + body "success"；agent 未被调用
+    """
+    token = wechat_config["token"]
+    aes_key = wechat_config["encoding_aes_key"]
+    corp_id = wechat_config["corp_id"]
+
+    inner = {
+        "from_user_name": "user_voice_002",
+        "msg_type": "voice",
+        "content": "",
+        "recognition": "",
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), corp_id)
+
+    timestamp = str(int(time.time()))
+    nonce = "test_nonce_voice_empty"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_app(wechat_config, intent_router, agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={
+            "to_user_name": corp_id,
+            "agent_id": "1000001",
+            "encrypt": encrypted_content,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.strip() == "success"
+    # agent 不应被调用（空识别文本，静默忽略）
+    intent_router.route.assert_not_called()
