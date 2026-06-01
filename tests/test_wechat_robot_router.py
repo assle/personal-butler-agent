@@ -302,6 +302,109 @@ async def test_robot_post_callback_non_text_message(
     assert sent_payload["markdown"]["content"] == "暂不支持该消息类型"
 
 
+async def test_robot_post_callback_voice_message(
+    robot_config, robot_intent_router, robot_agent_registry, db_session, mock_httpx_post
+):
+    """测试智能机器人 POST 语音消息：识别文本走正常意图路由
+
+    输入: msgtype="voice" + voice.content="今天练胸" 的智能机器人 JSON 格式加密消息
+    输出: 200 "success"；agent 流水线被调用；回复 POST 到 response_url
+    """
+    token = robot_config["token"]
+    aes_key = robot_config["encoding_aes_key"]
+
+    inner = {
+        "msgid": "test_msg_voice_001",
+        "aibotid": "aibTestBot123",
+        "chattype": "single",
+        "from": {"userid": "robot_voice_user_001"},
+        "msgtype": "voice",
+        "voice": {"content": "今天练胸"},
+        "response_url": "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=test_resp_voice",
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), "")
+
+    timestamp = str(int(time.time()))
+    nonce = "robot_test_nonce_voice"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_robot_app(robot_config, robot_intent_router, robot_agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/robot/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={"encrypt": encrypted_content},
+    )
+
+    assert response.status_code == 200
+    assert response.text.strip() == "success"
+
+    # agent 流水线应被调用（语音识别文本走正常路由）
+    robot_intent_router.route.assert_called()
+    robot_agent_registry.get.assert_called()
+    robot_agent_registry.get().handle.assert_called()
+
+    # 回复通过 response_url 推送
+    mock_httpx_post.assert_called_once()
+    sent_payload = mock_httpx_post.call_args[1]["json"]
+    assert sent_payload["markdown"]["content"] == "这是机器人测试回复"
+
+
+async def test_robot_post_callback_voice_message_empty(
+    robot_config, robot_intent_router, robot_agent_registry, db_session, mock_httpx_post
+):
+    """测试智能机器人 POST 语音消息（识别为空）：静默不回复
+
+    输入: msgtype="voice" + voice.content="" 的智能机器人 JSON 格式加密消息
+    输出: 200 "success"；agent 未被调用；response_url 未被调用
+    """
+    token = robot_config["token"]
+    aes_key = robot_config["encoding_aes_key"]
+
+    inner = {
+        "msgid": "test_msg_voice_002",
+        "aibotid": "aibTestBot123",
+        "chattype": "single",
+        "from": {"userid": "robot_voice_user_002"},
+        "msgtype": "voice",
+        "voice": {"content": ""},
+        "response_url": "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=test_resp_voice_empty",
+    }
+    encrypted_content = encrypt(aes_key, json.dumps(inner, ensure_ascii=False), "")
+
+    timestamp = str(int(time.time()))
+    nonce = "robot_test_nonce_voice_empty"
+    msg_signature = hashlib.sha1(
+        "".join(sorted([token, timestamp, nonce, encrypted_content])).encode()
+    ).hexdigest()
+
+    client = _build_robot_app(robot_config, robot_intent_router, robot_agent_registry, db_session)
+
+    response = client.post(
+        "/api/wechat/robot/callback",
+        params={
+            "msg_signature": msg_signature,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        },
+        json={"encrypt": encrypted_content},
+    )
+
+    assert response.status_code == 200
+    assert response.text.strip() == "success"
+
+    # agent 不应被调用
+    robot_intent_router.route.assert_not_called()
+    # response_url 不应被调用
+    mock_httpx_post.assert_not_called()
+
+
 def test_robot_post_callback_bad_signature(robot_config):
     """测试智能机器人 POST 消息：签名不匹配应返回 403
 

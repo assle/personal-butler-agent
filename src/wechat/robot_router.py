@@ -169,7 +169,15 @@ def create_robot_router(
         #   msgid        - 消息 ID
         from_user = inner.get("from", {}).get("userid", "")
         msg_type = inner.get("msgtype", "text")
-        content = inner.get("text", {}).get("content", "")
+        # 根据消息类型提取文本内容
+        if msg_type == "voice":
+            content = inner.get("voice", {}).get("content", "")
+            if not content:
+                logger.info("Robot callback: voice recognition empty, silently ignoring")
+                return Response(content="success")
+            logger.info("Robot callback: voice recognition: %s", content[:200])
+        else:
+            content = inner.get("text", {}).get("content", "")
         chat_id = inner.get("chatid", "")
         chat_type = inner.get("chattype", "single")
         response_url = inner.get("response_url", "")
@@ -193,7 +201,8 @@ def create_robot_router(
             is_group_trigger = True
 
         # 非文本消息
-        if msg_type != "text":
+        # 非文本且非语音消息
+        if msg_type not in ("text", "voice"):
             reply_text = "暂不支持该消息类型"
         elif is_group_trigger:
             # 群聊触发消息：使用 summarize_group 代理
