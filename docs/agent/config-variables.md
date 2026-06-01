@@ -79,7 +79,7 @@ Key differences from self-built app:
 |----------|----------|---------|---------|
 | `WECHAT_WEBHOOK_URL` | No | `""` | Group bot webhook URL for proactive push |
 
-When set, a `WechatWebhookClient` instance is created at app startup for sending proactive group notifications.
+When set, a `WechatWebhookClient` instance is created at app startup. Note: the client is instantiated but not yet called — proactive push scheduling (APScheduler + agent integration) is deferred work (see upgrade-roadmap §3.1).
 
 ```env
 WECHAT_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxx

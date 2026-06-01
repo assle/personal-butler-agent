@@ -38,7 +38,7 @@
 
 ### 3.1 APScheduler 定时推送
 
-- **当前**: 群机器人 webhook 推送能力已实现（`src/wechat/webhook.py`），但缺少定时触发机制
+- **当前**: 群机器人 webhook 推送客户端已实现（`src/wechat/webhook.py`），且通过单元测试验证。但缺少定时调度和 agent 集成——`_webhook_client` 在 `main.py` 启动时创建但未被任何模块实际调用，主动推送功能尚未启用
 - **目标**: 接入 APScheduler（已在 `pyproject.toml` 依赖中），实现每日定时推送训练计划、每周饮食报告等
 - **收益**: 自动化群组通知，无需手动触发
 - **工作量**: 中（新增 scheduler 模块，定义 job 函数，在 lifespan 中启动）
@@ -135,4 +135,4 @@
 | 中 | 预计 1-3 小时 |
 | 大 | 预计半天以上 |
 
-最后更新: 2026-05-31（智能机器人回调 + response_url 主动回复完成后）
+最后更新: 2026-06-01（区分机器人回调与主动推送 webhook 当前状态，修正 webhook 推送能力描述，明确 APScheduler 集成尚未开始）

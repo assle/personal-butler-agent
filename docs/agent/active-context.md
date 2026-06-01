@@ -37,7 +37,7 @@ Current implementation baseline:
 ## Deferred Work
 
 The README and MVP spec list these as future scope:
-- Group robot webhook pushes for announcements, digests, and notifications (WechatWebhookClient exists, needs scheduler + agent integration).
+- Group robot webhook pushes for announcements, digests, and notifications (WechatWebhookClient class is implemented and tested; `_webhook_client` is created at startup but never called — needs APScheduler + agent integration to become operational).
 - APScheduler jobs for scheduled reminders and daily reports.
 - Persistent conversation memory (SqliteSaver — MemorySaver is the current in-memory placeholder).
 - RAG or knowledge-base integration.
