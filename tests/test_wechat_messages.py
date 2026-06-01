@@ -33,6 +33,25 @@ INNER_XML = """<xml>
 <MsgId>100001</MsgId>
 </xml>"""
 
+# 语音消息 XML（包含 Recognition 字段）
+VOICE_INNER_XML = """<xml>
+<ToUserName><![CDATA[wx123456]]></ToUserName>
+<FromUserName><![CDATA[user_voice_001]]></FromUserName>
+<CreateTime>1234567890</CreateTime>
+<MsgType><![CDATA[voice]]></MsgType>
+<Recognition><![CDATA[今天练胸肌]]></Recognition>
+<MsgId>100003</MsgId>
+</xml>"""
+
+# 语音消息 XML（不含 Recognition 字段）
+VOICE_INNER_XML_NO_RECOGNITION = """<xml>
+<ToUserName><![CDATA[wx123456]]></ToUserName>
+<FromUserName><![CDATA[user_voice_002]]></FromUserName>
+<CreateTime>1234567890</CreateTime>
+<MsgType><![CDATA[voice]]></MsgType>
+<MsgId>100004</MsgId>
+</xml>"""
+
 # 群聊消息的 XML 包含 ChatId 和 ChatType
 INNER_XML_GROUP = """<xml>
 <ToUserName><![CDATA[wx123456]]></ToUserName>
@@ -115,6 +134,31 @@ def test_build_reply_xml():
     assert "<FromUserName><![CDATA[wx123456]]></FromUserName>" in xml
     assert "<MsgType><![CDATA[text]]></MsgType>" in xml
     assert "<Content><![CDATA[今天的训练计划是：胸肌训练]]></Content>" in xml
+
+
+def test_parse_inner_xml_voice_recognition():
+    """测试解析语音消息 XML：正确提取 Recognition 字段
+
+    输入: 包含 <Recognition> 的 voice 消息 XML
+    输出: InnerMessage(recognition="今天练胸肌", msg_type="voice", content="")
+    """
+    result = parse_inner_xml(VOICE_INNER_XML)
+
+    assert result.msg_type == "voice"
+    assert result.recognition == "今天练胸肌"
+    assert result.content == ""
+
+
+def test_parse_inner_xml_voice_no_recognition():
+    """测试解析没有 Recognition 字段的语音消息 XML：recognition 为空字符串
+
+    输入: 无 <Recognition> 标签的 voice 消息 XML
+    输出: InnerMessage(recognition="")
+    """
+    result = parse_inner_xml(VOICE_INNER_XML_NO_RECOGNITION)
+
+    assert result.msg_type == "voice"
+    assert result.recognition == ""
 
 
 def test_build_encrypted_reply_xml():

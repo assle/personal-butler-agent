@@ -33,6 +33,7 @@ class InnerMessage:
     msg_id: str          # 消息 ID
     chat_id: str = ""    # 群聊 ID，私聊时为空
     chat_type: str = "single"  # 会话类型："single"（私聊）或 "group"（群聊）
+    recognition: str = ""  # 语音识别文本（voice 消息时），非 voice 消息为空
 
 
 def parse_encrypted_xml(body: bytes) -> EncryptedMessage:
@@ -72,6 +73,7 @@ def parse_inner_xml(decrypted: str) -> InnerMessage:
         msg_id=_get_cdata(root, "MsgId"),
         chat_id=_get_cdata(root, "ChatId"),
         chat_type=_get_cdata(root, "ChatType") or "single",
+        recognition=_get_cdata(root, "Recognition"),
     )
 
 
