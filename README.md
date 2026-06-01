@@ -7,24 +7,29 @@
 ## 架构概览
 
 ```
-用户 → 企业微信自建应用 → FastAPI 回调接口 → Intent Router (规则 + LLM)
-                                                    ↓
-                                          Agent Registry
-                                                    ↓
-                                    ┌───────┬───────┼───────┬────────┐
-                                    ↓       ↓       ↓       ↓        ↓
-                                 Fitness Summary  Meal     QA    (可扩展)
-                                    ↓       ↓       ↓       ↓
-                                    └───────┴───────┴───────┘
-                                              │
-                                        StateGraph 引擎
-                                     (LangGraph + MemorySaver)
-                                              │
-                                          SQLite 数据库
-                                              │
-                                    ┌─────────┴──────────┐
-                                    ↓                    ↓
-                              自建应用私发          群机器人推送
+用户 → 企业微信自建应用 ─┐
+                         ├→ FastAPI 回调接口 → Intent Router (规则 + LLM)
+用户 → 企业微信智能机器人 ─┘                              ↓
+                                                  Agent Registry
+                                                         ↓
+                                         ┌───────┬───────┼───────┬────────┐
+                                         ↓       ↓       ↓       ↓        ↓
+                                      Fitness Summary  Meal     QA    (可扩展)
+                                         ↓       ↓       ↓       ↓
+                                         └───────┴───────┴───────┘
+                                                   │
+                                             StateGraph 引擎
+                                          (LangGraph + MemorySaver)
+                                                   │
+                                               SQLite 数据库
+                                                   │
+                                         ┌─────────┴──────────┐
+                                         ↓                    ↓
+                                    response_url        群机器人推送
+                                    (主动回复)          (Webhook)
+                                         ↓
+                                    自建应用私发
+                                    (被动加密回复)
 ```
 
 **七层设计：**
@@ -32,6 +37,7 @@
 | 层 | 技术 | 说明 |
 |----|------|------|
 | 自建应用 | 企业微信 | 交互入口，接收用户指令 |
+| 智能机器人 | 企业微信 | 第二条消息入口，支持私聊和群聊 @，主动 JSON 回复 |
 | 群机器人 | Webhook | 公告、日报、通知推送到群 |
 | Agent 编排 | LangGraph StateGraph | 状态机驱动，多步推理，条件路由 |
 | LLM | LangChain ChatOpenAI → DeepSeek | 意图理解、内容生成、结构化提取 |
@@ -67,7 +73,8 @@ personal_butler_agent/
 │   │   ├── crypto.py        # AES-256-CBC 加解密 + SHA1 签名验证
 │   │   ├── messages.py      # XML 解析/构建 + 消息数据类
 │   │   ├── webhook.py       # 群机器人 Webhook 推送客户端
-│   │   └── router.py        # GET/POST /api/wechat/callback
+│   │   ├── router.py        # GET/POST /api/wechat/callback（自建应用）
+│   │   └── robot_router.py  # GET/POST /api/wechat/robot/callback（智能机器人）
 │   ├── intent/
 │   │   ├── rules.py         # 关键词规则匹配
 │   │   └── router.py        # 规则优先 + LLM 兜底路由
@@ -85,7 +92,8 @@ personal_butler_agent/
 │   │   └── memory.py        # LangGraph MemorySaver 共享实例
 │   ├── models/
 │   │   ├── training.py      # 训练记录 ORM
-│   │   └── preference.py    # 用户偏好 ORM (JSON)
+│   │   ├── preference.py    # 用户偏好 ORM (JSON)
+│   │   └── group_message.py # 群聊消息 ORM（收集 + 触发总结）
 │   ├── schemas/
 │   │   ├── request.py       # 请求 Schema
 │   │   └── response.py      # 响应 Schema
@@ -94,7 +102,7 @@ personal_butler_agent/
 │   └── db/
 │       ├── base.py          # SQLAlchemy DeclarativeBase
 │       └── session.py       # 异步引擎 + 会话工厂 + get_db 依赖注入
-├── tests/                   # 47 个测试
+├── tests/                   # 88 个测试
 ├── docs/
 │   ├── agent/               # 项目记忆文档（active-context / patterns / decisions / upgrade-roadmap）
 │   └── superpowers/
@@ -188,13 +196,36 @@ curl -X POST http://localhost:8000/api/debug/message \
 
 详细设计见 `docs/superpowers/specs/2026-05-30-wechat-work-integration-design.md`。
 
+### GET/POST /api/wechat/robot/callback
+
+企业微信智能机器人回调。**仅当 `.env` 中 `WECHAT_ROBOT_TOKEN` 和 `WECHAT_ROBOT_ENCODING_AES_KEY` 均配置时注册。**
+
+| 方法 | 用途 | 说明 |
+|------|------|------|
+| GET | URL 验证 | 智能机器人回调 URL 验证，receiveid 为空字符串 |
+| POST | 消息接收 | 智能机器人推送 JSON 消息，解密 → 意图路由 → agent 回复 → 通过 `response_url` 主动 POST JSON 回复 |
+
+与自建应用回调的关键区别：
+- 加解密时 `receiveid` 为空字符串（非 CorpID）
+- 消息格式为 JSON（非 XML）
+- 回复通过 `response_url` 主动推送（非被动加密 XML 返回），支持 markdown 格式
+
+### 消息类型支持
+
+| 消息类型 | 自建应用 | 智能机器人 | 说明 |
+|----------|----------|------------|------|
+| 文本 | 支持 | 支持 | 意图路由 → agent 回复 |
+| 语音 | 支持 | 支持 | 提取企业微信内置识别文本后当文本路由；识别为空时静默忽略 |
+| 其他 | 暂不支持 | 暂不支持 | 回复"暂不支持该消息类型" |
+
 ## 支持的意图
 
 | 意图 | 触发方式 | 功能 |
 |------|----------|------|
 | `log_training` | "打卡 练胸..." / "记录训练" | 自然语言记录训练数据 |
 | `today_plan` | "今天练什么" / "训练建议" | 基于历史和偏好生成训练计划 |
-| `summarize_text` | "帮我总结..." / "summary" | 结构化的群聊文本总结 |
+| `summarize_text` | "帮我总结..." / "summary" | 结构化文本摘要（用户提供内容） |
+| `summarize_group` | 群聊中"总结"/"摘要"/"概括"/"汇总" | 拉取群聊历史生成结构化摘要 |
 | `make_meal_plan` | "今天吃什么" / "食谱" | 生成带营养估算的一日三餐 |
 | `qa` | 默认兜底 | 个性化问答 |
 | `unknown` | 无法识别时 | 返回提示 |
@@ -236,6 +267,14 @@ log_training     today_plan
 - 用户在企业微信中给自建应用发消息 → 企业微信 POST 加密 XML 到 `/api/wechat/callback`
 - 加密方案：AES-256-CBC + PKCS#7 padding + SHA1 签名验证
 - 回调 URL 和 Token/EncodingAESKey 在企业微信管理后台配置
+- 回复方式：被动加密 XML 返回（受 5 秒超时限制）
+
+### 智能机器人回调
+
+- 用户在企业微信中给智能机器人发私聊或在群里 @机器人 → 企业微信 POST 加密 JSON 到 `/api/wechat/robot/callback`
+- 加密方案同自建应用，但 `receiveid` 为空字符串
+- 回调 URL 和 Token/EncodingAESKey 在企业微信智能机器人管理后台配置
+- 回复方式：通过消息中的 `response_url` 主动 POST JSON（不受 5 秒超时限制，支持 markdown 格式）
 
 ### 群机器人 Webhook
 
@@ -246,10 +285,11 @@ log_training     today_plan
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `WECHAT_CORP_ID` | 回调必需 | 企业 CorpID |
-| `WECHAT_TOKEN` | 回调必需 | URL 验证 Token |
-| `WECHAT_ENCODING_AES_KEY` | 回调必需 | 消息加解密 AES 密钥 |
-| `WECHAT_AGENT_ID` | 否 | 应用 AgentId |
+| `WECHAT_CORP_ID` | 自建应用必需 | 企业 CorpID |
+| `WECHAT_TOKEN` | 自建应用必需 | URL 验证 Token |
+| `WECHAT_ENCODING_AES_KEY` | 自建应用必需 | 消息加解密 AES 密钥 |
+| `WECHAT_ROBOT_TOKEN` | 智能机器人必需 | 智能机器人回调 Token |
+| `WECHAT_ROBOT_ENCODING_AES_KEY` | 智能机器人必需 | 智能机器人加解密 AES 密钥 |
 | `WECHAT_WEBHOOK_URL` | 推送必需 | 群机器人 Webhook 地址 |
 
 ## 数据库
@@ -278,6 +318,19 @@ log_training     today_plan
 | user_id | TEXT NOT NULL UNIQUE | 用户标识 |
 | preferences | TEXT NOT NULL | JSON 偏好（按 namespace 组织） |
 
+**group_messages** — 群聊消息收集
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | 自增 |
+| chat_id | TEXT NOT NULL | 群聊 ID |
+| user_id | TEXT NOT NULL | 发送者 |
+| content | TEXT NOT NULL | 消息内容 |
+| timestamp | INTEGER NOT NULL | 消息时间戳 |
+| created_at | TEXT | 创建时间 |
+
+每个群最多保留 200 条消息，超出自动清理。
+
 preferences JSON 结构可扩展，新模块只需添加自己的 namespace：
 
 ```json
@@ -298,7 +351,7 @@ preferences JSON 结构可扩展，新模块只需添加自己的 namespace：
 ## 运行测试
 
 ```bash
-# 运行全部测试（47 个）
+# 运行全部测试（88 个）
 DEEPSEEK_API_KEY=test uv run pytest -q
 
 # 运行单个模块
@@ -371,7 +424,7 @@ DEEPSEEK_API_KEY=test uv run pytest tests/test_wechat_crypto.py tests/test_wecha
 
 **收到回复：** 结构化的文本摘要，包含讨论主题、关键结论、待办行动项和决策。
 
-**⚠️ 当前限制：** 此功能是纯文本摘要器——用户需要把待总结的文本内容直接粘贴在消息中。应用无法自主获取群聊历史消息，因此发送 `帮我总结一下刚才的聊天记录`（不附带具体内容）时，无法返回有价值的摘要。真正的群聊消息自动收集+总结功能尚未实现，详见[升级路线图](docs/agent/upgrade-roadmap.md)。
+> **注意：** 此功能需要用户直接在消息中提供待总结的文本内容。在群聊场景中，使用 `summarize_group` 意图（触发词"总结"/"摘要"/"概括"/"汇总"）可自动拉取群聊历史消息进行总结，无需手动粘贴内容。
 
 #### 1.4 食谱计划 (`make_meal_plan`)
 
@@ -448,19 +501,73 @@ curl -X POST http://localhost:8000/api/debug/message \
 
 ---
 
+### 3. 智能机器人私聊 + 群聊 @回复
+
+通过企业微信智能机器人 API 模式接入，用户可以在私聊中与机器人对话，或在群聊中 @机器人 触发回复。
+
+**与自建应用的关键区别：**
+- 消息格式为 JSON（非 XML）
+- 回复通过 `response_url` 主动推送，不受 5 秒超时限制
+- 支持 markdown 格式回复
+- 群聊消息自动收集到 SQLite，发送"总结"/"摘要"等触发词时自动生成群聊摘要
+
+**使用方式：**
+
+1. 在企业微信管理后台创建智能机器人，配置回调 URL 为 `https://<你的域名>/api/wechat/robot/callback`
+2. 在 `.env` 中填入智能机器人配置：
+   ```bash
+   WECHAT_ROBOT_TOKEN=your_robot_token
+   WECHAT_ROBOT_ENCODING_AES_KEY=your_robot_aes_key
+   ```
+3. 重启服务，在私聊或群聊中与机器人交互
+
+---
+
+### 4. 群聊消息收集与总结
+
+群聊中的文本和语音消息会被自动收集到 SQLite（每次最多保留 200 条/群）。当用户发送包含触发词的消息时，系统会自动拉取近期群聊历史并生成结构化摘要。
+
+| 触发词 | 示例 |
+|--------|------|
+| 总结 | `@机器人 总结一下今天群消息` |
+| 摘要 | `@机器人 摘要最近讨论` |
+| 概括 | `@机器人 概括一下大家聊了什么` |
+| 汇总 | `@机器人 汇总群聊内容` |
+
+**接收回复：** 结构化的群聊摘要，包含讨论主题、核心结论、待办事项、关键决策。
+
+---
+
+### 5. 语音消息支持
+
+自建应用和智能机器人都支持语音消息 —— 系统提取企业微信内置的语音识别文本后，当作普通文本走完整的意图路由和 agent 管线。
+
+**处理逻辑：**
+- 语音识别文本非空 → 正常路由（训练打卡、问训练计划、总结等全部支持）
+- 语音识别文本为空 → 静默忽略，不调用 LLM，不回复
+
+**支持场景：**
+- 自建应用私聊：发送语音 → 识别文本 → 意图路由 → agent 回复
+- 智能机器人私聊：发送语音 → 同上
+- 智能机器人群聊 @：发送语音 → 识别文本 → 存 DB → 触发词检测（识别文本中包含"总结"等关键词时触发）
+
+---
+
 ### 当前限制与后续计划
 
 | 状态 | 功能 | 说明 |
 |------|------|------|
-| 已实现 | 自建应用私聊问答 | 五种意图完整可用 |
+| 已实现 | 自建应用私聊问答 | 五种意图完整可用，支持文本和语音 |
+| 已实现 | 智能机器人私聊 + 群聊 @ | 主动 JSON 回复，markdown 格式，支持文本和语音 |
+| 已实现 | 群聊消息收集 + 触发总结 | 自动存 DB，触发词生成结构化摘要 |
 | 已实现 | 调试端点 | 本地测试全功能可用 |
 | 已实现 | 训练数据持久化 | SQLite 存储，支持历史查询 |
 | 已实现 | 用户偏好管理 | 自动提取并持久化偏好 |
 | 已实现 | 多轮对话记忆 | MemorySaver checkpointing（进程内，重启丢失） |
+| 已实现 | 多消息类型支持 | 文本 + 语音（提取企业微信内置识别文本后路由） |
 | 已有客户端未接入 | 群机器人 Webhook 推送 | `WechatWebhookClient` 已实现并通过测试，但尚未与 Agent 和定时任务对接 |
 | 未实现 | APScheduler 定时任务 | 日报推送、训练提醒等定时场景 |
-| 未实现 | 对话记忆持久化 | MemorySaver → SqliteSaver，重启后保留对话上下文 |
-| 未实现 | 客服消息异步回复 | 突破企业微信被动回复的 5 秒超时限制 |
+| 未实现 | 客服消息异步回复 | 突破自建应用被动回复的 5 秒超时限制 |
 | 未实现 | RAG 知识库 | 查询外部知识增强回答 |
 
 详见 [`docs/agent/upgrade-roadmap.md`](docs/agent/upgrade-roadmap.md)。
