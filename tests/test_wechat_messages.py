@@ -97,6 +97,7 @@ def test_parse_inner_xml():
     # 私聊消息：chat 字段为空
     assert result.chat_id == ""
     assert result.chat_type == "single"
+    assert result.recognition == ""
 
 
 def test_parse_inner_xml_group_chat():
@@ -116,6 +117,7 @@ def test_parse_inner_xml_group_chat():
     # 群聊消息：chat 字段有值
     assert result.chat_id == "group_chat_123"
     assert result.chat_type == "group"
+    assert result.recognition == ""
 
 
 def test_build_reply_xml():
