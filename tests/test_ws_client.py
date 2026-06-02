@@ -37,7 +37,7 @@ async def test_on_message_setter(ws_client):
 @pytest.mark.asyncio
 async def test_send_reply_when_not_connected(ws_client):
     """验证未连接时 send_reply 返回 False"""
-    ok = await ws_client.send_reply("msgid-1", "hello")
+    ok = await ws_client.send_reply("req-1", "hello")
     assert ok is False
 
 
@@ -118,14 +118,15 @@ async def test_send_reply_sends_correct_payload(ws_client):
     fake_ws = FakeWebSocket()
     ws_client._ws = fake_ws
 
-    ok = await ws_client.send_reply("msg-42", "hello world")
+    ok = await ws_client.send_reply("original-req-id", "hello world")
     assert ok is True
     assert len(fake_ws.sent) == 1
     sent = fake_ws.sent[0]
     assert sent["cmd"] == "aibot_respond_msg"
-    assert sent["body"]["msgid"] == "msg-42"
+    assert sent["headers"]["req_id"] == "original-req-id"
     assert sent["body"]["msgtype"] == "markdown"
     assert sent["body"]["markdown"]["content"] == "hello world"
+    assert "msgid" not in sent["body"]
 
 
 @pytest.mark.asyncio

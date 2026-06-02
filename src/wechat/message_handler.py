@@ -29,6 +29,7 @@ _SUMMARIZE_KEYWORDS = ["总结", "摘要", "概括", "汇总"]
 
 async def handle_ws_message(
     msg: dict,
+    req_id: str,
     ws_client,
     intent_router: IntentRouter,
     agent_registry: AgentRegistry,
@@ -38,6 +39,7 @@ async def handle_ws_message(
 
     参数:
         msg: aibot_msg_callback 的 body 部分，包含 from.userid, text.content, chatid 等
+        req_id: 原始消息回调 headers 中的 req_id，回复时需要透传
         ws_client: WeComWSClient 实例，用于回复消息
         intent_router: 意图路由器
         agent_registry: agent 注册表
@@ -45,7 +47,6 @@ async def handle_ws_message(
     """
     from_user = msg.get("from", {}).get("userid", "")
     msg_type = msg.get("msgtype", "text")
-    msgid = msg.get("msgid", "")
 
     # 提取文本内容
     if msg_type == "voice":
@@ -117,7 +118,7 @@ async def handle_ws_message(
             reply_text = "抱歉，处理消息时遇到错误"
 
     logger.info("WS handler: reply_text=%s", reply_text[:200])
-    await ws_client.send_reply(msgid, reply_text)
+    await ws_client.send_reply(req_id, reply_text)
 
 
 def _is_summarize_trigger(content: str) -> bool:

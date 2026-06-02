@@ -45,10 +45,10 @@ async def test_handle_private_message(db_session, mock_ws, mock_intent_router, m
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(msg, "req-1", mock_ws, mock_intent_router, mock_agent_registry, db_session)
 
     mock_intent_router.route.assert_called_once_with("今天练什么")
-    mock_ws.send_reply.assert_called_once_with("msg-1", "mock reply")
+    mock_ws.send_reply.assert_called_once_with("req-1", "mock reply")
 
 
 @pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_handle_group_trigger_message(db_session, mock_ws, mock_intent_rou
         "chatid": "chat-1",
     }
 
-    await handle_ws_message(msg, mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(msg, "req-2", mock_ws, mock_intent_router, mock_agent_registry, db_session)
 
     mock_ws.send_reply.assert_called_once()
     # 验证群聊消息被保存
@@ -91,7 +91,7 @@ async def test_handle_group_non_trigger(db_session, mock_ws, mock_intent_router,
         "chatid": "chat-2",
     }
 
-    await handle_ws_message(msg, mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(msg, "req-3", mock_ws, mock_intent_router, mock_agent_registry, db_session)
 
     # 非触发消息不应回复
     mock_ws.send_reply.assert_not_called()
@@ -110,7 +110,7 @@ async def test_handle_voice_message(db_session, mock_ws, mock_intent_router, moc
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(msg, "req-4", mock_ws, mock_intent_router, mock_agent_registry, db_session)
 
     mock_intent_router.route.assert_called_once_with("今天练胸")
     mock_ws.send_reply.assert_called_once()
@@ -129,7 +129,7 @@ async def test_handle_voice_empty(db_session, mock_ws, mock_intent_router, mock_
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(msg, "req-5", mock_ws, mock_intent_router, mock_agent_registry, db_session)
 
     mock_ws.send_reply.assert_not_called()
 
@@ -146,7 +146,7 @@ async def test_non_text_message(db_session, mock_ws, mock_intent_router, mock_ag
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(msg, "req-6", mock_ws, mock_intent_router, mock_agent_registry, db_session)
 
     mock_ws.send_reply.assert_called_once()
     args = mock_ws.send_reply.call_args

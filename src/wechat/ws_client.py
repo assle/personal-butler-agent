@@ -27,8 +27,8 @@ if not logger.handlers:
     h.setLevel(logging.INFO)
     logger.addHandler(h)
 
-# 收到消息的回调类型
-OnMessageCallback = Callable[[dict], Awaitable[None]]
+# 收到消息的回调类型：参数为 (消息体 dict, 原始请求 req_id str)
+OnMessageCallback = Callable[[dict, str], Awaitable[None]]
 
 
 class WeComWSClient:
@@ -131,9 +131,18 @@ class WeComWSClient:
             cmd = data.get("cmd", "")
             if cmd == "aibot_msg_callback":
                 msg = data.get("body", data)
-                logger.info("WS: received msg_callback, msgid=%s", msg.get("msgid", ""))
+                req_id = data.get("headers", {}).get("req_id", "")
+                logger.info(
+                    "WS: msg_callback msgid=%s chattype=%s chatid=%s from=%s msgtype=%s req_id=%s",
+                    msg.get("msgid", ""),
+                    msg.get("chattype", ""),
+                    msg.get("chatid", ""),
+                    msg.get("from", {}).get("userid", ""),
+                    msg.get("msgtype", ""),
+                    req_id,
+                )
                 if self._on_message is not None:
-                    await self._on_message(msg)
+                    await self._on_message(msg, req_id)
             elif cmd == "aibot_event_callback":
                 logger.info("WS: received event_callback: %s", data.get("body", {}).get("event_type", ""))
             else:
@@ -149,11 +158,11 @@ class WeComWSClient:
                 except websockets.exceptions.ConnectionClosed:
                     break
 
-    async def send_reply(self, msgid: str, content: str) -> bool:
+    async def send_reply(self, req_id: str, content: str) -> bool:
         """回复用户消息（通过 aibot_respond_msg）
 
         参数:
-            msgid: 原始消息的 msgid
+            req_id: 原始消息回调 headers 中的 req_id，用于关联回复
             content: 回复内容（支持 markdown）
 
         返回:
@@ -165,9 +174,8 @@ class WeComWSClient:
         try:
             payload = {
                 "cmd": "aibot_respond_msg",
-                "headers": {"req_id": str(uuid.uuid4())},
+                "headers": {"req_id": req_id},
                 "body": {
-                    "msgid": msgid,
                     "msgtype": "markdown",
                     "markdown": {"content": content},
                 },

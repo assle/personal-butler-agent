@@ -82,11 +82,11 @@ async def lifespan(app: FastAPI):
         )
         app.state.ws_client = ws_client
 
-        async def on_message_callback(msg: dict):
+        async def on_message_callback(msg: dict, req_id: str):
             async with async_session() as db:
                 try:
                     await handle_ws_message(
-                        msg, ws_client, intent_router, agent_registry, db,
+                        msg, req_id, ws_client, intent_router, agent_registry, db,
                     )
                     await db.commit()
                 except Exception:
