@@ -24,7 +24,12 @@ class BaseGraphAgent(ABC):
 
     @abstractmethod
     async def handle(
-        self, intent: str, message: str, user_id: str, db
+        self,
+        intent: str,
+        message: str,
+        user_id: str,
+        db,
+        extra_state: dict | None = None,
     ) -> AgentResponse:
         """处理用户消息，执行对应业务逻辑
 
@@ -33,6 +38,7 @@ class BaseGraphAgent(ABC):
             message: 用户原始消息文本
             user_id: 用户唯一标识（企业微信 OpenID 或调试用户 ID）
             db: SQLAlchemy 异步数据库会话，用于读写训练记录和用户偏好
+            extra_state: 可选，路由层传入的 chat_type/chat_id 等额外上下文
 
         返回:
             AgentResponse: 包含回复文本和可选结构化数据的响应对象

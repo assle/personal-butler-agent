@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from src.db.base import Base
+from src.db.session import enable_sqlite_foreign_keys
 
 # 导入 models 模块以触发 ORM 类注册到 Base.metadata
 import src.models  # noqa: F401
@@ -39,6 +40,7 @@ async def db_session():
         AsyncSession: SQLAlchemy 异步数据库会话
     """
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    enable_sqlite_foreign_keys(engine)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -57,6 +59,7 @@ async def db_engine():
         AsyncEngine: SQLAlchemy 异步引擎
     """
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    enable_sqlite_foreign_keys(engine)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine

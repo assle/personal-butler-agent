@@ -127,7 +127,13 @@ def create_debug_router(
                 response="抱歉，无法处理该消息",
             )
         try:
-            result = await agent.handle(intent, req.message, req.user_id, db)
+            result = await agent.handle(
+                intent,
+                req.message,
+                req.user_id,
+                db,
+                extra_state={"chat_type": req.chat_type, "chat_id": req.chat_id or None},
+            )
         except APIError as e:
             return DebugMessageResponse(
                 intent=intent,

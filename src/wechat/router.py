@@ -232,7 +232,13 @@ def create_wechat_router(
                     reply_text = "抱歉，无法处理该消息"
                 else:
                     try:
-                        result = await agent.handle(intent, content, from_user, db)
+                        result = await agent.handle(
+                            intent,
+                            content,
+                            from_user,
+                            db,
+                            extra_state={"chat_type": chat_type, "chat_id": chat_id or None},
+                        )
                         reply_text = result.reply
                     except APIError as e:
                         logger.error("WeChat callback: APIError from agent: %s", e)

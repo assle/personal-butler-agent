@@ -16,7 +16,12 @@ class GraphAgent(Protocol):
     """Graph Agent 协议，定义 agent 必须实现的 handle 接口"""
 
     async def handle(
-        self, intent: str, message: str, user_id: str, db
+        self,
+        intent: str,
+        message: str,
+        user_id: str,
+        db,
+        extra_state: dict | None = None,
     ) -> AgentResponse:
         """处理用户消息的入口方法
 
@@ -25,6 +30,7 @@ class GraphAgent(Protocol):
             message: 用户消息
             user_id: 用户标识
             db: 数据库会话
+            extra_state: 可选，路由层传入的额外上下文字段
 
         返回:
             AgentResponse: 处理结果
