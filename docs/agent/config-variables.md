@@ -76,6 +76,18 @@ WECOM_AIBOT_SECRET=your-bot-secret
 - 回复方式：通过 WebSocket 连接下发消息，支持 `aibot_send_msg` 主动推送
 - 部署：无需公网地址，无需 AES 加解密
 
+## 企业微信服务端 API
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `WECOM_CORP_SECRET` | No | `""` | 自建应用 Secret，用于调用 `/cgi-bin/gettoken` 获取 access_token，进而查询用户详细信息（姓名/部门/头像等） |
+
+当 `WECOM_CORP_SECRET` 和 `WECHAT_CORP_ID` 同时设置时，应用启动时初始化 `WeComUserService`，在 Bot 消息处理流程中自动查询用户信息并注入 agent 上下文（user_name / user_department），本地 SQLite 缓存 TTL 24h。
+
+```env
+WECOM_CORP_SECRET=your-app-secret
+```
+
 ## APScheduler 定时推送
 
 | Variable | Required | Default | Purpose |
