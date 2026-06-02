@@ -17,13 +17,13 @@ Current implementation baseline:
 - Persistence: `training_records`, `user_preferences`, `group_messages`
 - Multi-turn memory: LangGraph `MemorySaver` checkpointing (in-memory, per user_id thread)
 - Verification baseline: 132 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
-- Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_SECRET` for intelligent robot WebSocket long-connection mode; `SCHEDULER_CRON`/`SCHEDULER_MESSAGE`/etc. for APScheduler timed push; `WECOM_CORP_SECRET` for server API access_token / user info queries (paired with `WECHAT_CORP_ID`)
+- Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_SECRET` for intelligent robot WebSocket long-connection mode; `SCHEDULER_*` 系列字段支持 `|` 分隔多目标+独立消息+混合指定/自动 intent，通过 IntentRouter 自动路由; `WECOM_CORP_SECRET` for server API access_token / user info queries (paired with `WECHAT_CORP_ID`)
 
 ## What Is Implemented
 
 - Debug API request/response schema (with chat_type/chat_id for group simulation).
 - WeChat Work intelligent robot WebSocket 长连接模式 (消息接收、非阻塞后台处理、回复、主动推送 `aibot_send_msg`).
-- APScheduler 定时 LLM 推送 (可配置 cron/目标/触发消息，通过长连接模式主动推送).
+- APScheduler 定时 LLM 推送 (可配置 cron、多目标(`|` 分隔 TYPE/ID/MESSAGE/INTENT 按位置配对)、每个目标独立消息和 intent（空位由 IntentRouter 自动规则/LLM 判定），通过长连接模式主动推送).
 - Rule-first classification for known intent keywords.
 - DeepSeek/OpenAI-compatible LLM fallback classification via LangChain ChatOpenAI.
 - Training record extraction and persistence — supports both strength (sets/reps/weight) and cardio (duration/speed/incline/calories) training types (FitnessAgent StateGraph).

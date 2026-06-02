@@ -75,19 +75,29 @@ WECOM_CORP_SECRET=your-app-secret
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `SCHEDULER_CRON` | No | `""` | Cron 表达式，定义调度频率（例：`0 9 * * 1-5` 表示工作日 9:00） |
-| `SCHEDULER_TARGET_TYPE` | No | `"single"` | 推送目标类型：`single`（单聊）或 `group`（群聊） |
-| `SCHEDULER_TARGET_ID` | No | `""` | 推送目标 ID：单聊时为 `userid`，群聊时为 `chatid` |
-| `SCHEDULER_MESSAGE` | No | `""` | 定时触发消息文本，发送给 LLM 进行意图路由和 agent 处理 |
-| `SCHEDULER_INTENT` | No | `""` | 可选，指定使用的 intent，绕过 intent 路由。为空时自动路由 |
+| `SCHEDULER_TARGET_TYPE` | No | `"single"` | 推送目标类型，支持 `\|` 分隔多个值：`single`（单聊）/ `group`（群聊） |
+| `SCHEDULER_TARGET_ID` | No | `""` | 推送目标 ID，支持 `\|` 分隔多个值。单聊时为 `userid`，群聊时为 `chatid`，按位置与 TARGET_TYPE 配对 |
+| `SCHEDULER_MESSAGE` | No | `""` | 定时触发消息文本，支持 `\|` 分隔多个值。单值共享所有目标，多值时须与目标数一致 |
+| `SCHEDULER_INTENT` | No | `""` | 可选，支持 `\|` 分隔多个值。有值走指定 agent，空位由 IntentRouter 自动判定（规则 → LLM → unknown/QA 兜底）。全空时所有目标均自动路由 |
 
-当 `SCHEDULER_CRON` 和 `SCHEDULER_MESSAGE` 同时设置且长连接模式已启用时，应用启动时注册 APScheduler 定时任务，按 cron 表达式周期触发 LLM 推送。
+所有四个字段 `TARGET_TYPE`、`TARGET_ID`、`MESSAGE`、`INTENT` 均使用 `|` 分隔，按位置配对。单值格式（无 `|`）保持向前兼容。
+
+当 `SCHEDULER_CRON`、`SCHEDULER_TARGET_ID` 同时设置且长连接模式已启用时，应用启动时注册 APScheduler 定时任务，按 cron 表达式周期触发 LLM 推送。
 
 ```env
+# 单目标（与原有格式兼容）
 SCHEDULER_CRON=0 9 * * 1-5
 SCHEDULER_TARGET_TYPE=single
 SCHEDULER_TARGET_ID=AssLe
 SCHEDULER_MESSAGE=早安！今天我该做什么训练？
 SCHEDULER_INTENT=
+
+# 多目标 + 独立消息 + 混合指定/自动 intent
+SCHEDULER_CRON=0 9 * * *
+SCHEDULER_TARGET_TYPE=single|single|group
+SCHEDULER_TARGET_ID=AssLe|ZhangSan|chatid123456
+SCHEDULER_MESSAGE=今日训练建议|今天吃什么？|总结一下最近群聊重点
+SCHEDULER_INTENT=today_plan||summarize_group
 ```
 
 ## Change Guidance

@@ -129,3 +129,25 @@ Reasoning:
 - **可选配置**: `WECOM_CORP_SECRET` 未配置时整套功能静默跳过，不影响现有消息流程。
 
 Trade-off: 用户信息不够实时（最长 24h 延迟），但姓名/部门/头像等信息变化频次远低于消息交互频次。如果需要实时数据，可将 TTL 调短或提供手动刷新接口。
+
+## ADR-013: 调度器多目标逗号分隔配置
+
+SCHEDULER_TARGET_TYPE 和 SCHEDULER_TARGET_ID 均支持逗号分隔多个值，按位置配对后遍历推送。
+
+Reasoning:
+- **最小配置复杂度**: 在现有的 `.env` 单值字符串字段上扩展，无需引入 JSON 或 YAML 结构化配置。单目标场景（`TARGET_TYPE=single, TARGET_ID=user1`）与原有格式完全兼容。
+- **按位置配对**: `TARGET_TYPE` 和 `TARGET_ID` 通过索引对应 —— 第 N 个 type 对应第 N 个 id。直观且易于校验（长度必须一致，否则启动时报 ValueError）。
+- **独立失败隔离**: 遍历推送时每个目标的 agent.handle + push_message 独立 try/except，单个目标失败不影响后续目标。
+- **复用 agent 管线**: 每个目标独立调用 agent.handle()，因此不同用户可能因 user_id 和 user_name 差异获得个性化回复。
+
+Trade-off: 配置超过 3-4 个目标时逗号分隔可读性下降，但当前场景下目标数量有限，结构化格式（JSON/YAML）的收益不及其引入的复杂度。
+
+### 迭代（2026-06-02）：扩展为按目标独立配置
+
+ADR-013 的逗号分隔多目标方案进一步扩展：
+
+- **分隔符改为 `|`**：避免英文逗号与消息文本潜在冲突。
+- **MESSAGE 和 INTENT 独立配置**：每个目标可指定不同消息和 intent。MESSAGE 单值广播，多值按位置配对。INTENT 有值走指定 agent，空位走 IntentRouter 自动路由（规则 → LLM → unknown/QA 兜底）。
+- **SchedulerManager 接收 IntentRouter**：intent 为空时调用 `intent_router.route(message)` 自动判定，不再强制 fallback 到 QA。
+
+详见 `docs/superpowers/specs/2026-06-02-scheduler-per-target-config-design.md`。
