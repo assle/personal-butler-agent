@@ -2,7 +2,6 @@
 WeComTokenManager 测试
 覆盖 token 缓存命中、过期刷新、并发锁、API 错误处理
 """
-import select
 import time
 
 import httpx
