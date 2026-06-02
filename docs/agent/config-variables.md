@@ -1,5 +1,7 @@
 # Config Variables
 
+> Environment variables, WeChat Work config, and change guidance. Load when modifying config, LLM, DB, or runtime setup.
+
 Configuration is loaded by `src/config.py` with Pydantic Settings. The app reads `.env` by default.
 
 ## Required Variables

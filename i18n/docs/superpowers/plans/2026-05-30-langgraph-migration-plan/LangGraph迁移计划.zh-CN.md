@@ -1,23 +1,23 @@
-# LangGraph Migration Implementation Plan
+# LangGraph迁移实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **对于智能体工作人员：** 所需的子技能：使用 superpowers:subagent-driven-development （推荐）或 superpowers:executing-plans 来逐个任务地实施此计划。步骤使用复选框 (`- [ ]`) 语法进行跟踪。
 
-**Goal:** Migrate the current MVP to LangChain + LangGraph while preserving the FastAPI surface, SQLite persistence, and debug endpoint contract.
+**目标：** 将当前 MVP 迁移到 LangChain + LangGraph，同时保留 FastAPI 表面、SQLite 持久性和调试端点契约。
 
-**Architecture:** Replace `openai.AsyncOpenAI` with `langchain_openai.ChatOpenAI` in the LLM client wrapper. Convert each agent from a linear class method into a LangGraph `StateGraph` with typed state and single-purpose node functions. Inject DB session and LLM client through `RunnableConfig`. Add an agent registry to replace the hardcoded intent→agent map. Wire LangGraph `MemorySaver` for multi-turn conversation checkpointing.
+**架构：** 在 LLM 客户端包装器中将 `openai.AsyncOpenAI` 替换为 `langchain_openai.ChatOpenAI`。将每个代理从线性类方法转换为具有类型化状态和单一用途节点函数的 LangGraph `StateGraph`。通过`RunnableConfig`注入DB会话和LLM客户端。添加代理注册表以替换硬编码的意图→代理映射。用于多轮对话检查点的 Wire LangGraph `MemorySaver`。
 
-**Tech Stack:** Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, SQLite, Pydantic v2, pytest
+**技术堆栈：** Python 3.13+、FastAPI、LangChain、LangGraph、langchain-openai、SQLAlchemy 2 异步、SQLite、Pydantic v2、pytest
 
 ---
 
-### Task 1: Add LangChain dependencies
+### 任务一：添加LangChain依赖
 
-**Files:**
-- Modify: `pyproject.toml`
+**文件：**
+- 修改：`pyproject.toml`
 
-- [ ] **Step 1: Add dependencies**
+- [ ] **第 1 步：添加依赖项**
 
-Replace the `openai>=1.0.0` line in `pyproject.toml` with `langchain`, `langgraph`, `langchain-openai`. Keep `openai` as a transitive dep.
+将 `pyproject.toml` 中的 `openai>=1.0.0` 行替换为 `langchain`、`langgraph`、`langchain-openai`。保留 `openai` 作为传递 dep。
 
 ```toml
 [project]
@@ -40,12 +40,12 @@ dependencies = [
 ]
 ```
 
-- [ ] **Step 2: Install dependencies**
+- [ ] **第2步：安装依赖项**
 
-Run: `uv sync`
-Expected: packages installed successfully, no version conflicts.
+运行：`uv sync`
+预期：软件包安装成功，没有版本冲突。
 
-- [ ] **Step 3: Commit**
+- [ ] **第 3 步：承诺**
 
 ```bash
 git add pyproject.toml uv.lock
@@ -54,13 +54,13 @@ git commit -m "deps: add langchain, langgraph, langchain-openai"
 
 ---
 
-### Task 2: Replace LLM client with ChatOpenAI wrapper
+### 任务 2：用 ChatOpenAI 包装器替换 LLM 客户端
 
-**Files:**
-- Modify: `src/llm/client.py`
-- Modify: `tests/test_llm.py`
+**文件：**
+- 修改：`src/llm/client.py`
+- 修改：`tests/test_llm.py`
 
-- [ ] **Step 1: Rewrite `src/llm/client.py`**
+- [ ] **第1步：重写`src/llm/client.py`**
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -95,7 +95,7 @@ class LLMClient:
         return await self.chat(messages, model=model, temperature=temperature)
 ```
 
-- [ ] **Step 2: Rewrite `tests/test_llm.py`**
+- [ ] **步骤2：重写`tests/test_llm.py`**
 
 ```python
 import os
@@ -124,17 +124,17 @@ async def test_llm_client_chat_returns_content():
             assert result == "Hello, I am an AI."
 ```
 
-- [ ] **Step 3: Run LLM tests**
+- [ ] **步骤 3：运行 LLM 测试**
 
-Run: `DEEPSEEK_API_KEY=test uv run pytest tests/test_llm.py -v`
-Expected: 1 test passes.
+运行：`DEEPSEEK_API_KEY=test uv run pytest tests/test_llm.py -v`
+预期：1 次测试通过。
 
-- [ ] **Step 4: Run full test suite to check nothing is broken**
+- [ ] **第 4 步：运行完整的测试套件以检查是否没有损坏**
 
-Run: `DEEPSEEK_API_KEY=test uv run pytest -q`
-Expected: all existing tests pass (or identify which tests need updating in later tasks).
+运行：`DEEPSEEK_API_KEY=test uv run pytest -q`
+预期：所有现有测试都通过（或确定哪些测试需要在以后的任务中更新）。
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/llm/client.py tests/test_llm.py
@@ -143,18 +143,18 @@ git commit -m "refactor: replace AsyncOpenAI with langchain ChatOpenAI"
 
 ---
 
-### Task 3: Convert FitnessAgent to StateGraph
+### 任务 3：将 FitnessAgent 转换为 StateGraph
 
-**Files:**
-- Create: `src/agents/fitness/__init__.py`
-- Create: `src/agents/fitness/state.py`
-- Create: `src/agents/fitness/nodes.py`
-- Create: `src/agents/fitness/graph.py`
-- Move: `src/agents/fitness.py` → deleted (replaced by package)
-- Modify: `src/main.py` (update import path)
-- Modify: `src/router/debug.py` (update import path)
+**文件：**
+- 创建：`src/agents/fitness/__init__.py`
+- 创建：`src/agents/fitness/state.py`
+- 创建：`src/agents/fitness/nodes.py`
+- 创建：`src/agents/fitness/graph.py`
+- 移动：`src/agents/fitness.py` → 删除（被包替换）
+- 修改：`src/main.py`（更新导入路径）
+- 修改：`src/router/debug.py`（更新导入路径）
 
-- [ ] **Step 1: Create `src/agents/fitness/__init__.py`**
+- [ ] **第1步：创建`src/agents/fitness/__init__.py`**
 
 ```python
 from src.agents.fitness.graph import FitnessAgent
@@ -162,7 +162,7 @@ from src.agents.fitness.graph import FitnessAgent
 __all__ = ["FitnessAgent"]
 ```
 
-- [ ] **Step 2: Create `src/agents/fitness/state.py`**
+- [ ] **步骤2：创建`src/agents/fitness/state.py`**
 
 ```python
 from typing import TypedDict, Optional
@@ -182,7 +182,7 @@ class FitnessState(TypedDict, total=False):
     error: Optional[str]
 ```
 
-- [ ] **Step 3: Create `src/agents/fitness/nodes.py`**
+- [ ] **步骤3：创建`src/agents/fitness/nodes.py`**
 
 ```python
 import json
@@ -380,7 +380,7 @@ async def error_handler(state: dict) -> dict:
     return {"reply": state.get("error", "处理请求时发生错误，请稍后重试。")}
 ```
 
-- [ ] **Step 4: Create `src/agents/fitness/graph.py`**
+- [ ] **第4步：创建`src/agents/fitness/graph.py`**
 
 ```python
 from langgraph.graph import StateGraph, END
@@ -467,47 +467,47 @@ class FitnessAgent:
         return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
 ```
 
-- [ ] **Step 5: Update imports in `src/main.py`**
+- [ ] **步骤 5：更新 `src/main.py` 中的导入**
 
-Change:
+改变：
 ```python
 from src.agents.fitness import FitnessAgent
 ```
-To:
+到：
 ```python
 from src.agents.fitness import FitnessAgent
 ```
-(No change — the package `__init__.py` re-exports `FitnessAgent`, so the import stays valid.)
+（没有变化 - 包 `__init__.py` 重新导出 `FitnessAgent`，因此导入仍然有效。）
 
-- [ ] **Step 6: Update imports in `src/router/debug.py`**
+- [ ] **步骤 6：更新 `src/router/debug.py` 中的导入**
 
-Change:
+改变：
 ```python
 from src.agents.fitness import FitnessAgent
 ```
-To:
+到：
 ```python
 from src.agents.fitness import FitnessAgent
 ```
-(Same — no change needed.)
+（相同——无需更改。）
 
-But remove the old `src/agents/fitness.py` file:
+但删除旧的 `src/agents/fitness.py` 文件：
 
 ```bash
 rm src/agents/fitness.py
 ```
 
-- [ ] **Step 7: Run fitness tests**
+- [ ] **第 7 步：进行体能测试**
 
-Run: `DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v`
-Expected: both fitness tests pass. The `mock_llm` fixture is an `AsyncMock()` — the agent's `handle()` method calls `self._llm.chat_json()` and `self._llm.chat()` via graph nodes, and the mock still catches these calls.
+运行：`DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v`
+预期：两项体能测试均通过。 `mock_llm` fixture是 `AsyncMock()` - 代理的 `handle()` 方法通过图形节点调用 `self._llm.chat_json()` 和 `self._llm.chat()`，并且模拟仍然捕获这些调用。
 
-- [ ] **Step 8: Run full test suite**
+- [ ] **第 8 步：运行完整的测试套件**
 
-Run: `DEEPSEEK_API_KEY=test uv run pytest -q`
-Expected: all tests that were passing before should still pass.
+运行：`DEEPSEEK_API_KEY=test uv run pytest -q`
+预期：之前通过的所有测试仍应通过。
 
-- [ ] **Step 9: Commit**
+- [ ] **第 9 步：承诺**
 
 ```bash
 git rm src/agents/fitness.py
@@ -517,16 +517,16 @@ git commit -m "refactor: convert FitnessAgent to LangGraph StateGraph"
 
 ---
 
-### Task 4: Convert SummaryAgent to StateGraph
+### 任务 4：将 SummaryAgent 转换为 StateGraph
 
-**Files:**
-- Create: `src/agents/summary/__init__.py`
-- Create: `src/agents/summary/state.py`
-- Create: `src/agents/summary/nodes.py`
-- Create: `src/agents/summary/graph.py`
-- Delete: `src/agents/summary.py`
+**文件：**
+- 创建：`src/agents/summary/__init__.py`
+- 创建：`src/agents/summary/state.py`
+- 创建：`src/agents/summary/nodes.py`
+- 创建：`src/agents/summary/graph.py`
+- 删除：`src/agents/summary.py`
 
-- [ ] **Step 1: Create `src/agents/summary/__init__.py`**
+- [ ] **第1步：创建`src/agents/summary/__init__.py`**
 
 ```python
 from src.agents.summary.graph import SummaryAgent
@@ -534,7 +534,7 @@ from src.agents.summary.graph import SummaryAgent
 __all__ = ["SummaryAgent"]
 ```
 
-- [ ] **Step 2: Create `src/agents/summary/state.py`**
+- [ ] **步骤2：创建`src/agents/summary/state.py`**
 
 ```python
 from typing import TypedDict, Optional
@@ -548,7 +548,7 @@ class SummaryState(TypedDict, total=False):
     error: Optional[str]
 ```
 
-- [ ] **Step 3: Create `src/agents/summary/nodes.py`**
+- [ ] **步骤3：创建`src/agents/summary/nodes.py`**
 
 ```python
 from langgraph.config import get_config
@@ -587,7 +587,7 @@ async def format_summary_response(state: dict) -> dict:
     return {"reply": state.get("reply", "")}
 ```
 
-- [ ] **Step 4: Create `src/agents/summary/graph.py`**
+- [ ] **第4步：创建`src/agents/summary/graph.py`**
 
 ```python
 from langgraph.graph import StateGraph, END
@@ -618,15 +618,15 @@ class SummaryAgent:
         return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
 ```
 
-- [ ] **Step 5: Delete old file and run summary tests**
+- [ ] **步骤 5：删除旧文件并运行摘要测试**
 
 ```bash
 rm src/agents/summary.py
 DEEPSEEK_API_KEY=test uv run pytest tests/test_summary.py -v
 ```
-Expected: summary tests pass.
+预期：总结测试通过。
 
-- [ ] **Step 6: Commit**
+- [ ] **第 6 步：承诺**
 
 ```bash
 git rm src/agents/summary.py
@@ -636,16 +636,16 @@ git commit -m "refactor: convert SummaryAgent to LangGraph StateGraph"
 
 ---
 
-### Task 5: Convert MealAgent to StateGraph
+### 任务 5：将 MealAgent 转换为 StateGraph
 
-**Files:**
-- Create: `src/agents/meal/__init__.py`
-- Create: `src/agents/meal/state.py`
-- Create: `src/agents/meal/nodes.py`
-- Create: `src/agents/meal/graph.py`
-- Delete: `src/agents/meal.py`
+**文件：**
+- 创建：`src/agents/meal/__init__.py`
+- 创建：`src/agents/meal/state.py`
+- 创建：`src/agents/meal/nodes.py`
+- 创建：`src/agents/meal/graph.py`
+- 删除：`src/agents/meal.py`
 
-- [ ] **Step 1: Create `src/agents/meal/__init__.py`**
+- [ ] **第1步：创建`src/agents/meal/__init__.py`**
 
 ```python
 from src.agents.meal.graph import MealAgent
@@ -653,7 +653,7 @@ from src.agents.meal.graph import MealAgent
 __all__ = ["MealAgent"]
 ```
 
-- [ ] **Step 2: Create `src/agents/meal/state.py`**
+- [ ] **步骤2：创建`src/agents/meal/state.py`**
 
 ```python
 from typing import TypedDict, Optional
@@ -670,7 +670,7 @@ class MealState(TypedDict, total=False):
     error: Optional[str]
 ```
 
-- [ ] **Step 3: Create `src/agents/meal/nodes.py`**
+- [ ] **步骤3：创建`src/agents/meal/nodes.py`**
 
 ```python
 import json
@@ -746,7 +746,7 @@ async def format_meal_response(state: dict) -> dict:
     return {"reply": state.get("reply", "无法生成食谱。")}
 ```
 
-- [ ] **Step 4: Create `src/agents/meal/graph.py`**
+- [ ] **第4步：创建`src/agents/meal/graph.py`**
 
 ```python
 from langgraph.graph import StateGraph, END
@@ -788,15 +788,15 @@ class MealAgent:
         return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
 ```
 
-- [ ] **Step 5: Delete old file and run meal tests**
+- [ ] **步骤 5：删除旧文件并运行膳食测试**
 
 ```bash
 rm src/agents/meal.py
 DEEPSEEK_API_KEY=test uv run pytest tests/test_meal.py -v
 ```
-Expected: meal tests pass.
+预期：膳食测试通过。
 
-- [ ] **Step 6: Commit**
+- [ ] **第 6 步：承诺**
 
 ```bash
 git rm src/agents/meal.py
@@ -806,16 +806,16 @@ git commit -m "refactor: convert MealAgent to LangGraph StateGraph"
 
 ---
 
-### Task 6: Convert QAAgent to StateGraph
+### 任务 6：将 QAAgent 转换为 StateGraph
 
-**Files:**
-- Create: `src/agents/qa/__init__.py`
-- Create: `src/agents/qa/state.py`
-- Create: `src/agents/qa/nodes.py`
-- Create: `src/agents/qa/graph.py`
-- Delete: `src/agents/qa.py`
+**文件：**
+- 创建：`src/agents/qa/__init__.py`
+- 创建：`src/agents/qa/state.py`
+- 创建：`src/agents/qa/nodes.py`
+- 创建：`src/agents/qa/graph.py`
+- 删除：`src/agents/qa.py`
 
-- [ ] **Step 1: Create `src/agents/qa/__init__.py`**
+- [ ] **第1步：创建`src/agents/qa/__init__.py`**
 
 ```python
 from src.agents.qa.graph import QAAgent
@@ -823,7 +823,7 @@ from src.agents.qa.graph import QAAgent
 __all__ = ["QAAgent"]
 ```
 
-- [ ] **Step 2: Create `src/agents/qa/state.py`**
+- [ ] **步骤2：创建`src/agents/qa/state.py`**
 
 ```python
 from typing import TypedDict, Optional
@@ -838,7 +838,7 @@ class QAState(TypedDict, total=False):
     error: Optional[str]
 ```
 
-- [ ] **Step 3: Create `src/agents/qa/nodes.py`**
+- [ ] **步骤3：创建`src/agents/qa/nodes.py`**
 
 ```python
 import json
@@ -894,7 +894,7 @@ async def format_qa_response(state: dict) -> dict:
     return {"reply": state.get("reply", "")}
 ```
 
-- [ ] **Step 4: Create `src/agents/qa/graph.py`**
+- [ ] **第4步：创建`src/agents/qa/graph.py`**
 
 ```python
 from langgraph.graph import StateGraph, END
@@ -929,15 +929,15 @@ class QAAgent:
         return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
 ```
 
-- [ ] **Step 5: Delete old file and run QA tests**
+- [ ] **步骤 5：删除旧文件并运行 QA 测试**
 
 ```bash
 rm src/agents/qa.py
 DEEPSEEK_API_KEY=test uv run pytest tests/test_qa.py -v
 ```
-Expected: QA tests pass.
+预期：QA 测试通过。
 
-- [ ] **Step 6: Commit**
+- [ ] **第 6 步：承诺**
 
 ```bash
 git rm src/agents/qa.py
@@ -947,13 +947,13 @@ git commit -m "refactor: convert QAAgent to LangGraph StateGraph"
 
 ---
 
-### Task 7: Create BaseGraphAgent and Agent Registry
+### 任务 7：创建 BaseGraphAgent 和代理注册表
 
-**Files:**
-- Create: `src/agents/base.py` (rewrite)
-- Create: `src/agents/registry.py`
+**文件：**
+- 创建：`src/agents/base.py`（重写）
+- 创建：`src/agents/registry.py`
 
-- [ ] **Step 1: Rewrite `src/agents/base.py`**
+- [ ] **第1步：重写`src/agents/base.py`**
 
 ```python
 from abc import ABC, abstractmethod
@@ -972,7 +972,7 @@ class BaseGraphAgent(ABC):
         ...
 ```
 
-- [ ] **Step 2: Create `src/agents/registry.py`**
+- [ ] **步骤2：创建`src/agents/registry.py`**
 
 ```python
 from typing import Protocol, runtime_checkable
@@ -1002,7 +1002,7 @@ class AgentRegistry:
         return self._agents.get(intent, self._fallback)
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **第 3 步：承诺**
 
 ```bash
 git add src/agents/base.py src/agents/registry.py
@@ -1011,13 +1011,13 @@ git commit -m "feat: add BaseGraphAgent ABC and AgentRegistry"
 
 ---
 
-### Task 8: Wire AgentRegistry into main and router
+### 任务 8：将 AgentRegistry 连接到主设备和路由器
 
-**Files:**
-- Modify: `src/main.py`
-- Modify: `src/router/debug.py`
+**文件：**
+- 修改：`src/main.py`
+- 修改：`src/router/debug.py`
 
-- [ ] **Step 1: Update `src/main.py`**
+- [ ] **第1步：更新`src/main.py`**
 
 ```python
 from contextlib import asynccontextmanager
@@ -1069,7 +1069,7 @@ debug_router = create_debug_router(
 app.include_router(debug_router)
 ```
 
-- [ ] **Step 2: Update `src/router/debug.py`**
+- [ ] **第2步：更新`src/router/debug.py`**
 
 ```python
 from fastapi import APIRouter, Depends
@@ -1115,12 +1115,12 @@ def create_debug_router(
     return router
 ```
 
-- [ ] **Step 3: Run full test suite**
+- [ ] **第 3 步：运行完整的测试套件**
 
-Run: `DEEPSEEK_API_KEY=test uv run pytest -q`
-Expected: all tests pass.
+运行：`DEEPSEEK_API_KEY=test uv run pytest -q`
+预期：所有测试均通过。
 
-- [ ] **Step 4: Commit**
+- [ ] **第 4 步：承诺**
 
 ```bash
 git add src/main.py src/router/debug.py
@@ -1129,19 +1129,19 @@ git commit -m "refactor: wire AgentRegistry into main and router, remove hardcod
 
 ---
 
-### Task 9: Wire LangGraph MemorySaver for multi-turn conversation
+### 任务 9：用于多轮对话的 Wire LangGraph MemorySaver
 
-**Files:**
-- Create: `src/graph/__init__.py`
-- Create: `src/graph/memory.py`
+**文件：**
+- 创建：`src/graph/__init__.py`
+- 创建：`src/graph/memory.py`
 
-- [ ] **Step 1: Create `src/graph/__init__.py`**
+- [ ] **第1步：创建`src/graph/__init__.py`**
 
 ```python
 # Graph utilities package
 ```
 
-- [ ] **Step 2: Create `src/graph/memory.py`**
+- [ ] **步骤2：创建`src/graph/memory.py`**
 
 ```python
 from langgraph.checkpoint.memory import MemorySaver
@@ -1149,11 +1149,11 @@ from langgraph.checkpoint.memory import MemorySaver
 checkpointer = MemorySaver()
 ```
 
-- [ ] **Step 3: Update agent graphs to use checkpointer**
+- [ ] **步骤 3：更新代理图以使用检查点**
 
-In each agent's `graph.py`, update `_build_graph()` to accept an optional checkpointer:
+在每个代理的 `graph.py` 中，更新 `_build_graph()` 以接受可选的检查点：
 
-For `src/agents/fitness/graph.py`, change the return in `_build_graph`:
+对于 `src/agents/fitness/graph.py`，更改 `_build_graph` 中的返回：
 ```python
 from src.graph.memory import checkpointer as _checkpointer
 
@@ -1168,40 +1168,40 @@ class FitnessAgent:
         return builder.compile(checkpointer=_checkpointer)
 ```
 
-Apply the same pattern to the other three agents.
+对其他三个代理应用相同的模式。
 
-In `src/agents/summary/graph.py`, change:
+在 `src/agents/summary/graph.py` 中，更改：
 ```python
         return builder.compile()
 ```
-To:
+到：
 ```python
         from src.graph.memory import checkpointer
         return builder.compile(checkpointer=checkpointer)
 ```
 
-In `src/agents/meal/graph.py`, make the same change.
+在 `src/agents/meal/graph.py` 中，进行相同的更改。
 
-In `src/agents/qa/graph.py`, make the same change.
+在 `src/agents/qa/graph.py` 中，进行相同的更改。
 
-- [ ] **Step 4: Verify thread_id wiring**
+- [ ] **第4步：验证thread_id接线**
 
-In each agent's `handle()` method, update config to include `thread_id`:
+在每个代理的 `handle()` 方法中，更新配置以包含 `thread_id`：
 ```python
 config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
 ```
-Ensure `thread_id` is set — this was implicit before but should be explicit now. Update each agent's `handle()` to include it:
+确保设置了 `thread_id` - 这在之前是隐式的，但现在应该是显式的。更新每个代理的 `handle()` 以包含它：
 
 ```python
 config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
 ```
 
-- [ ] **Step 5: Run full test suite**
+- [ ] **第 5 步：运行完整的测试套件**
 
-Run: `DEEPSEEK_API_KEY=test uv run pytest -q`
-Expected: all tests pass.
+运行：`DEEPSEEK_API_KEY=test uv run pytest -q`
+预期：所有测试均通过。
 
-- [ ] **Step 6: Commit**
+- [ ] **第 6 步：承诺**
 
 ```bash
 git add src/graph/ src/agents/fitness/graph.py src/agents/summary/graph.py src/agents/meal/graph.py src/agents/qa/graph.py
@@ -1210,39 +1210,39 @@ git commit -m "feat: wire LangGraph MemorySaver for multi-turn conversation"
 
 ---
 
-### Task 10: Final verification
+### 任务 10：最终验证
 
-- [ ] **Step 1: Run full test suite**
+- [ ] **第 1 步：运行完整的测试套件**
 
 ```bash
 DEEPSEEK_API_KEY=test uv run pytest -q
 ```
-Expected: all tests pass.
+预期：所有测试均通过。
 
-- [ ] **Step 2: Start dev server and manually test**
+- [ ] **第2步：启动开发服务器并手动测试**
 
 ```bash
 uv run uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
-In another terminal:
+在另一个终端中：
 ```bash
 curl -X POST http://localhost:8000/api/debug/message \
   -H "Content-Type: application/json" \
   -d '{"user_id":"assle","message":"打卡 今天练胸 卧推80kg5组8次"}'
 ```
-Expected: response contains `"intent":"log_training"` and `"response"` with training log confirmation.
+预期：响应包含 `"intent":"log_training"` 和 `"response"` 以及训练日志确认。
 
 ```bash
 curl -X POST http://localhost:8000/api/debug/message \
   -H "Content-Type: application/json" \
   -d '{"user_id":"assle","message":"你好"}'
 ```
-Expected: response contains `"intent":"qa"` and a friendly reply.
+预期：响应包含 `"intent":"qa"` 和友好回复。
 
-- [ ] **Step 3: Commit final state if any changes**
+- [ ] **第 3 步：如果有任何更改，请提交最终状态**
 
 ```bash
 git status
 ```
-If clean, no commit needed.
+如果干净，则无需提交。

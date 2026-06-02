@@ -1,106 +1,93 @@
-# Personal Butler Agent Instructions
+# Personal Butler Agent说明
 
-<!-- Keep this file and CLAUDE.md byte-for-byte identical. -->
-<!-- Template 2 style: concise root guidance plus on-demand project memory docs. -->
+<!-- 保持此文件和 CLAUDE.md 逐字节相同。 -->
+<!-- 模板2风格：简洁的根指导加上按需项目记忆文档。 -->
 
-## Project Overview
+## 项目概况
 
-- Name: Personal Butler Agent
-- Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, SQLite, Pydantic v2, uv, pytest
-- Purpose: AI personal butler for WeChat Work style natural-language workflows: fitness logging and plans, meal planning, group-chat summaries, and personalized Q&A.
-- Runtime entry: `src.main:app`
-- Current interfaces: `POST /api/debug/message` for local debug; `GET/POST /api/wechat/callback` for WeChat Work self-built app message routing.
+- 名称： Personal Butler Agent
+- 技术栈：Python 3.13+、FastAPI、LangChain、LangGraph、langchain-openai、SQLAlchemy 2 异步、SQLite、Pydantic v2、uv、pytest
+- 用途：企业微信风格自然语言工作流程的AI 私人管家：健身记录和计划、膳食计划、群聊摘要和个性化问答。
+- 运行时入口：`src.main:app`
+- 当前接口：`POST /api/debug/message`，用于本地调试； `GET/POST /api/wechat/callback` 企业微信自建应用消息路由。
 
-## Build, Test & Verify
+## 构建、测试和验证
 
-- Install dependencies: `uv sync`
-- Run dev server: `uv run uvicorn src.main:app --host 0.0.0.0 --port 8000`
-- Run all tests: `DEEPSEEK_API_KEY=test uv run pytest -q`
-- Run focused tests: `DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v`
-- Test API manually after starting server:
-  `curl -X POST http://localhost:8000/api/debug/message -H "Content-Type: application/json" -d '{"user_id":"assle","message":"打卡 今天练胸 卧推80kg5组8次"}'`
+- 构建、测试和验证具体步骤和内容可以参考
 
-## Code Style & Conventions
+## 代码风格和约定
 
-- Follow existing Python style in `src/` and `tests/`; keep changes small and local.
-- Use async SQLAlchemy sessions for database work. Do not introduce sync DB access.
-- Keep Pydantic request/response schemas in `src/schemas/`; keep ORM models in `src/models/`.
-- Preserve the current agent boundary: intent routing chooses an intent, AgentRegistry resolves to a graph agent, handle() builds state and runs the StateGraph, returning `AgentResponse`.
-- New agents follow the pattern: `state.py` (TypedDict) + `nodes.py` (async node functions) + `graph.py` (StateGraph assembly + agent class).
-- Prefer deterministic rules for stable intent matches, then LLM fallback for ambiguous messages.
-- Keep tests isolated from real DeepSeek calls by using mock LLM clients and `DEEPSEEK_API_KEY=test`.
-- All functions and methods must include Chinese comments describing: (1) what the function does, (2) input parameters, (3) return value. Every `.py` file must start with a Chinese comment block explaining the file's purpose and overall workflow.
+- 遵循`src/`和`tests/`中现有的Python风格；保持变更小且局部化。
+- 使用异步 SQLAlchemy 会话进行数据库工作。不要引入同步数据库访问。
+- 将 Pydantic 请求/响应模式保留在 `src/schemas/` 中；将 ORM 模型保留在 `src/models/` 中。
+- 保留当前代理边界：意图路由选择一个意图，AgentRegistry 解析为图智能体，handle() 构建状态并运行 StateGraph，返回 `AgentResponse`。
+- 新代理遵循以下模式：`state.py`（TypedDict）+ `nodes.py`（异步节点函数）+ `graph.py`（StateGraph 组装 + 智能体类）。
+- 优先选择确定性规则来实现稳定的意图匹配，然后选择 LLM 后备来处理不明确的消息。
+- 通过使用模拟 LLM 客户端和 `DEEPSEEK_API_KEY=test` 将测试与真实的 DeepSeek 调用隔离。
+- 所有函数和方法都必须包含中文注释，描述：（1）函数做什么，（2）输入参数，（3）返回值。每个 `.py` 文件必须以中文注释块开头，解释文件的用途和总体工作流程。
 
-## Architecture
+## 架构
 
-- `src/main.py`: FastAPI app, lifespan DB initialization, singleton wiring, AgentRegistry registration.
-- `src/router/`: API routes — debug message endpoint and conditional WeChat callback router.
-- `src/wechat/`: WeChat Work integration — AES-256-CBC crypto, XML message parsing, group bot webhook push client.
-- `src/intent/`: rule-first intent classification with LLM fallback.
-- `src/agents/`: business agents for fitness, summary, meal, and Q&A — each a LangGraph StateGraph package.
-- `src/agents/registry.py`: central intent-to-agent mapping; new agents register here.
-- `src/graph/`: shared graph utilities, MemorySaver checkpoint instance.
-- `src/db/`: async SQLAlchemy engine, session factory, declarative base.
-- `src/models/`: SQLite ORM models for training records and user preferences.
-- `src/llm/`: LangChain ChatOpenAI wrapper pointed at DeepSeek.
-- `tests/`: pytest coverage for schemas, config, DB, intent routing, agents, and API smoke flow.
+- `src/main.py`：FastAPI 应用、lifespan 数据库初始化、单例装配、AgentRegistry 注册。
+- `src/router/`：API 路由 — 调试消息端点和条件微信回调路由器。
+- `src/wechat/`：企业微信集成 — AES-256-CBC 加密、XML 消息解析、群机器人 Webhook 推送客户端。
+- `src/intent/`：具有 LLM 后备的规则优先意图分类。
+- `src/agents/`：健身、总结、用餐和问答的业务代理——每个代理都是一个 LangGraph StateGraph 包。
+- `src/agents/registry.py`：中央意图到代理映射；新代理在此注册。
+- `src/graph/`：共享图形实用程序，MemorySaver 检查点实例。
+- `src/db/`：异步 SQLAlchemy 引擎、会话工厂、声明性基础。
+- `src/models/`：用于训练记录和用户偏好的 SQLite ORM 模型。
+- `src/llm/`：LangChain ChatOpenAI 包装器指向 DeepSeek。
+- `tests/`：模式、配置、数据库、意图路由、代理和 API 冒烟流程的 pytest 覆盖范围。
 
 ---
 
-## Core Rules
+## 核心规则
 
-**Investigation & accuracy:**
-- Never speculate about code you have not read. Read files and use `rg` for usages before making claims.
-- If the user references a file, read it before answering.
-- If uncertain, say so and propose how to verify. Do not fabricate APIs, paths, or behavior.
+**调查和准确性：**
+- 永远不要猜测你没有读过的代码。在提出索赔之前，请阅读文件并使用 `rg` 进行使用。
+- 如果用户引用文件，请在回答之前阅读该文件。
+- 如果不确定，请说明并提出如何验证的建议。请勿伪造 API、路径或行为。
 
-**Scope discipline:**
-- Do what has been asked; nothing more, nothing less.
-- When intent is ambiguous, default to research and recommendations. Only edit when explicitly asked.
-- Make only requested changes. Do not refactor adjacent code or create abstractions for one use.
-- Follow scoping words like "only", "just", and "exactly" literally.
+**范围纪律：**
+- 做所要求的事；仅此而已。
+- 当意图不明确时，默认进行研究和建议。仅在明确要求时进行编辑。
+- 仅进行请求的更改。不要重构相邻代码或为一种用途创建抽象。
+- 按照字面上的“仅”、“只是”和“完全”等范围词进行操作。
 
-**Verification & safety:**
-- Before declaring done, re-check requirements, run relevant tests, and state what changed and what could not be verified.
-- Ask before destructive or hard-to-reverse actions: deleting files or branches, force pushes, hard resets, or `--no-verify`.
-- Edit existing files in place where practical. Do not create scratch files unless needed, and clean them up.
-- Never commit secrets or real `.env` values.
+**验证和安全：**
+- 在宣布完成之前，重新检查需求，运行相关测试，并说明哪些内容发生了变化，哪些内容无法验证。
+- 在破坏性或难以逆转的操作之前询问：删除文件或分支、强制推送、硬重置或 `--no-verify`。
+- 在可行的地方编辑现有文件。除非需要，否则不要创建临时文件，并清理它们。
+- 切勿提交秘密或真实的 `.env` 值。
 
-**Efficiency & tools:**
-- Parallelize independent reads and searches; serialize dependent steps.
-- Use `rg` instead of `grep` and `rg --files` instead of recursive `find` for repo exploration.
-- Use structured parsers and project APIs instead of ad hoc text manipulation when reasonable.
+**效率和工具：**
+- 并行独立读取和搜索；序列化相关步骤。
+- 使用 `rg` 代替 `grep` 和 `rg --files` 代替递归 `find` 进行仓库探索。
+- 在合理的情况下，使用结构化解析器和项目 API，而不是临时文本操作。
 
 ---
 
-## Project Memory Docs
+## 项目内存文档
 
-Read on demand. Load only the docs relevant to the current task.
+按需阅读。仅加载与当前任务相关的文档。
 
-| File | Purpose | Read When |
+| 文件 | 目的 | 阅读时间 |
 |------|---------|-----------|
-| `docs/agent/active-context.md` | Current state, MVP completion, near-term roadmap | At session start or before planning feature work |
-| `docs/agent/patterns.md` | Established implementation patterns | Before adding or changing code |
-| `docs/agent/decisions.md` | Architecture decisions and constraints | Before design choices or scope changes |
-| `docs/agent/troubleshooting.md` | Known issues and proven checks | When debugging failures |
-| `docs/agent/config-variables.md` | Environment variables and config behavior | When touching config, LLM, DB, or runtime setup |
+| `docs/agent/active-context.md` | 当前状态、MVP 完成情况、近期路线图 | 在会议开始时或计划专题工作之前 |
+| `docs/agent/patterns.md` | 既定的实施模式 | 添加或更改代码之前 |
+| `docs/agent/decisions.md` | 架构决策和约束 | 在设计选择或范围变更之前 |
+| `docs/agent/troubleshooting.md` | 已知问题和经过验证的检查 | 调试失败时 |
+| `docs/agent/config-variables.md` | 环境变量和配置行为 | 当接触配置、LLM、DB 或运行时设置时 |
 
-| `docs/agent/upgrade-roadmap.md` | Upgrade points and improvement priorities | When planning future work or evaluating technical debt |
+| `docs/agent/upgrade-roadmap.md` | 升级点和改进重点 | 在规划未来工作或评估技术债务时 |
 
-All files are part of the shared project documentation. If you update one root entry file, update the other so `CLAUDE.md` and `AGENTS.md` remain identical.
+所有文件都是共享项目文档的一部分。如果您更新一个根条目文件，请更新另一个根条目文件，以便 `CLAUDE.md` 和 `AGENTS.md` 保持相同。
 
-### Memory Workflow
+### 内存工作流程
 
-1. Session start: read `docs/agent/active-context.md` for continuity.
-2. Before implementation: read `docs/agent/patterns.md` and relevant source files.
-3. Before architecture changes: read `docs/agent/decisions.md`.
-4. When debugging: read `docs/agent/troubleshooting.md`, then verify against current code.
-5. After significant work: update the relevant `docs/agent/*.md` file only if the user asked for project documentation to be maintained or the change would otherwise make the docs misleading.
-
----
-
-## Current MVP Baseline
-
-- Implemented: debug endpoint, rule-first intent router, LangChain ChatOpenAI LLM fallback, four LangGraph StateGraph agents (Fitness/Summary/Meal/QA), AgentRegistry, LangGraph MemorySaver checkpointing, SQLite persistence, WeChat Work self-built app callback (encryption + routing), and group bot webhook push client.
-- Deferred: APScheduler reminders and digests, persistent conversation memory (SqliteSaver), async customer-service message reply, and RAG.
-- Latest verified baseline: `DEEPSEEK_API_KEY=test uv run pytest -q` reports 47 passing tests.
+1. 会话开始：读取 `docs/agent/active-context.md` 以保持连续性。
+2. 实现前：阅读`docs/agent/patterns.md`及相关源文件。
+3. 在架构更改之前：阅读 `docs/agent/decisions.md`。
+4. 调试时：读取`docs/agent/troubleshooting.md`，然后根据当前代码进行验证。
+5. 重大工作之后：仅当用户要求维护项目文档时才更新相关的 `docs/agent/*.md` 文件，否则更改会使文档产生误导。

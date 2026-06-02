@@ -1,51 +1,52 @@
-# Personal Butler Agent MVP Design Spec
+# 个人管家代理 MVP 设计规范
 
-## Overview
+## 概述
 
-基于企业微信的私人管家系统 MVP 版本。用户通过企业微信自建应用发送指令，后端 Agent 负责意图路由、调用业务模块、读写 SQLite 数据库、生成结果，通过自建应用私发回复或群机器人 Webhook 推送。
+基于企业微信的MVP 个人管家系统。用户通过企业微信自建应用发送命令，后端Agent处理意图路由、调用业务模块、读写SQLite数据库、生成结果，并通过自建应用私信或群机器人Webhook推送进行回复。
 
-## Tech Stack
+## 技术堆栈
 
-| Layer | Choice |
+| 层 | 选择 |
 |-------|--------|
-| Runtime | Python 3.13+ |
-| Web Framework | FastAPI |
+| 运行时 | Python 3.13+ |
+| Web 框架 | FastAPI |
 | ORM | SQLAlchemy + SQLite |
-| Data Validation | Pydantic |
-| Scheduler | APScheduler (内存模式) |
-| Package Manager | uv |
-| Testing | pytest |
-| LLM | DeepSeek API (`deepseek-v4-pro`), OpenAI 兼容客户端 |
+| 数据验证 | Pydantic |
+| 调度程序 | APScheduler（内存模式） |
+| 包管理器 | uv |
+| 测试 | py测试 |
+| LLM | DeepSeek API (`deepseek-v4-pro`)，OpenAI 兼容客户端 |
 
-**Constraints:** No Redis, Celery, Kafka, Docker, Kubernetes. Single-process deployment.
+**限制：** 没有 Redis、Celery、Kafka、Docker、Kubernetes。单进程部署。
 
-## Architecture
+## 架构
 
 ```
-用户 → 企业微信自建应用 → FastAPI 回调接口 → Intent Router
-                                                  ↓
-                                        ┌─────────┴──────────┐
-                                        ↓         ↓          ↓
-                                    Fitness   Summary    Meal / QA
-                                        ↓         ↓          ↓
-                                        └─────────┬──────────┘
-                                                  ↓
-                                            SQLite 数据库
-                                                  ↓
-                                        ┌─────────┬──────────┐
-                                        ↓                    ↓
-                                  自建应用私发          群机器人推送
+User → WeChat Work Self-Built App → FastAPI Callback → Intent Router
+                                                          ↓
+                                                ┌─────────┴──────────┐
+                                                ↓         ↓          ↓
+                                            Fitness   Summary    Meal / QA
+                                                ↓         ↓          ↓
+                                                └─────────┬──────────┘
+                                                          ↓
+                                                    SQLite Database
+                                                          ↓
+                                                ┌─────────┬──────────┐
+                                                ↓                    ↓
+                                          Self-Built App        Group Bot
+                                          Private Reply        Webhook Push
 ```
 
-Six layers:
-- **自建应用** = 交互入口
+六层：
+- **自建应用**=交互入口
 - **群机器人** = 主动推送出口
-- **SQLite** = 记忆层
-- **LLM** = 解析和生成层
-- **规则模块** = 稳定决策层
-- **Scheduler** = 定时触发器
+- **SQLite** = 内存层
+- **LLM** = 解析并生成层
+- **规则引擎** = 稳定的决策层
+- **调度程序** = 定时触发器
 
-## Project Structure
+## 项目结构
 
 ```
 personal_butler_agent/
@@ -95,33 +96,33 @@ personal_butler_agent/
 └── uv.lock
 ```
 
-## Database Design
+## 数据库设计
 
-### training_records
+### 训练记录
 
-| Column | Type | Description |
+| 柱子 | 类型 | 描述 |
 |--------|------|-------------|
-| id | INTEGER PK | Auto-increment |
-| user_id | TEXT NOT NULL | User identifier |
-| date | TEXT NOT NULL | Training date YYYY-MM-DD |
-| muscle_group | TEXT NOT NULL | Target muscle group |
-| exercise | TEXT NOT NULL | Exercise name |
-| sets | INTEGER NOT NULL | Number of sets |
-| reps | INTEGER NOT NULL | Reps per set |
-| weight_kg | REAL | Weight, nullable for bodyweight |
-| created_at | TEXT | Creation timestamp |
+| ID | 整数PK | 自动递增 |
+| 用户身份 | 文本不为空 | 用户标识符 |
+| 日期 | 文本不为空 | 培训日期 YYYY-MM-DD |
+| 肌肉群 | 文本不为空 | 目标肌群 |
+| 锻炼 | 文本不为空 | 练习名称 |
+| 套 | 整数不为空 | 套数 |
+| 代表 | 整数不为空 | 每组次数 |
+| 体重kg | 真实的 | 体重，体重可为空 |
+| 创建时间 | 文本 | 创建时间戳 |
 
-### user_preferences
+### 用户偏好
 
-| Column | Type | Description |
+| 柱子 | 类型 | 描述 |
 |--------|------|-------------|
-| id | INTEGER PK | Auto-increment |
-| user_id | TEXT NOT NULL UNIQUE | User identifier |
-| preferences | TEXT NOT NULL | JSON blob, namespace-organized |
-| created_at | TEXT | Creation timestamp |
-| updated_at | TEXT | Last update timestamp |
+| ID | 整数PK | 自动递增 |
+| 用户身份 | 文本不为空唯一 | 用户标识符 |
+| 偏好 | 文本不为空 | JSON blob，按命名空间组织 |
+| 创建时间 | 文本 | 创建时间戳 |
+| 更新时间 | 文本 | 最后更新时间戳 |
 
-Default preferences JSON:
+默认首选项 JSON：
 
 ```json
 {
@@ -138,11 +139,11 @@ Default preferences JSON:
 }
 ```
 
-Preferences are extensible — new modules add their own namespace under the JSON root. No schema migration needed. Pydantic validates known namespaces; unknown namespaces pass through unchanged.
+首选项是可扩展的——新模块在 JSON 根下添加自己的命名空间。无需架构迁移。 Pydantic 验证已知的命名空间；未知的命名空间不变地通过。
 
-## Intent Router
+## 意图路由器
 
-Two-tier routing: **rules first, LLM fallback.**
+两层路由：**规则第一，LLM 后备。**
 
 ```
 User Message
@@ -156,32 +157,32 @@ LLM Fallback (router.py)
      → return classification (intent, confidence)
 ```
 
-### Intent Types
+### 意图类型
 
-| Intent | Trigger Keywords |
+| 意图 | 触发关键词 |
 |--------|-----------------|
 | `log_training` | 打卡, 记录训练, 练了, 训练 |
 | `today_plan` | 今天练什么, 今日计划, 训练建议 |
-| `summarize_text` | 总结, summary, 帮我总结 |
-| `make_meal_plan` | 食谱, 吃什么, meal plan, 饮食 |
-| `qa` | Default fallback for non-empty messages |
-| `unknown` | Unrecognizable input |
+| `summarize_text` | 总结，总结，帮我总结 |
+| `make_meal_plan` | 食谱、吃什么、膳食计划、饮食 |
+| `qa` | 非空消息的默认回退 |
+| `unknown` | 无法识别的输入 |
 
-### LLM Fallback
+### LLM后备
 
-System prompt lists 6 intents with descriptions. Model returns:
+系统提示列出了 6 个意图并附有说明。模型返回：
 
 ```json
 {"intent": "qa", "confidence": 0.85}
 ```
 
-Hard rule: if LLM returns an intent not in the known list, fallback to `unknown`.
+硬性规则：如果 LLM 返回的意图不在已知列表中，则回退到 `unknown`。
 
-## Fitness Agent
+## 健身代理
 
-### log_training
+### 日志训练
 
-User sends natural language → LLM extracts structured data → validate → write to `training_records`.
+用户发送自然语言→LLM提取结构化数据→验证→写入`training_records`。
 
 ```
 "打卡 今天练胸 卧推80kg5组8次 飞鸟15kg3组12次"
@@ -192,69 +193,69 @@ User sends natural language → LLM extracts structured data → validate → wr
   → Write to DB → Return confirmation
 ```
 
-On extraction failure, return error with format guidance.
+提取失败时，返回错误并提供格式指导。
 
-### today_plan
+### 今天的计划
 
-Query recent training records (7 days) + user fitness preferences → LLM generates today's suggestion.
+查询近期训练记录（7天）+用户健身偏好→LLM生成今日建议。
 
 ```
 Input: last 7 days training records + fitness preferences
 Output: suggested muscle group, exercises, sets/reps in natural language
 ```
 
-Rule layer guard: if a muscle group hasn't been trained recently, prioritize it to avoid unbalanced LLM suggestions.
+规则层保护：如果某个肌肉群最近没有训练过，则优先考虑它以避免 LLM 建议不平衡。
 
-## Summary Agent
+## 摘要代理
 
-User sends message with chat text → LLM produces structured summary.
+用户发送包含聊天文本的消息 → LLM 生成结构化摘要。
 
-Input: raw chat transcript text.
-Output format:
+输入：原始聊天记录文本。
+输出格式：
 
 ```
 讨论主题：xxx
 关键结论：
-  - 结论1
-  - 结论2
+  - Conclusion 1
+  - Conclusion 2
 待办事项：
-  - @张三 周五前提交方案
+  - @person Task
 决策：xxx
 ```
 
-MVP: no persistence of chat messages. One request, one summary.
+MVP：聊天消息没有持久性。一项要求，一项总结。
 
-## Meal Agent
+## 膳食代理
 
-Input: user `meal` preferences + recent training records.
+输入：用户`meal`偏好+近期训练记录。
 
-LLM generates a full-day meal plan (breakfast, lunch, dinner) with per-item nutritional estimates, informed by:
+LLM生成全天膳食计划（早餐、午餐、晚餐），其中包含每项营养估算，信息包括：
 
-- Body data (height/weight → estimated BMR)
-- Dietary preferences (calorie_target, diet_type, allergies)
-- Recent training (trained → high protein, rest day → maintenance)
+- 身体数据（身高/体重→估计BMR）
+- 饮食偏好（卡路里目标、饮食类型、过敏）
+- 近期训练（训练→高蛋白、休息日→维持）
 
-Output format:
+输出格式：
 
 ```
 早餐 (≈XXX kcal)
-- 食物1 (蛋白质Xg, 碳水Xg, 脂肪Xg)
-- 食物2
+- Food 1 (Protein Xg, Carbs Xg, Fat Xg)
+- Food 2
 午餐 (≈XXX kcal)
 - ...
 晚餐 (≈XXX kcal)
 - ...
 ```
 
-## QA Agent
+## 质量检查代理
 
-Simplest agent: user message → send to LLM with user preferences in system prompt for personalized tone → return response.
+最简单的代理：用户消息→发送给LLM，并在系统提示中显示用户偏好以获取个性化提示音→返回响应。
 
-No RAG. No multi-turn history in MVP.
+没有拉格。没有多次获得 MVP 的历史。
 
-## Request/Response Schema
+## 请求/响应架构
 
-### Request: `POST /api/debug/message`
+### 请求：`POST /api/debug/message`
 
 ```json
 {
@@ -264,7 +265,7 @@ No RAG. No multi-turn history in MVP.
 }
 ```
 
-### Response
+### 回复
 
 ```json
 {
@@ -275,23 +276,23 @@ No RAG. No multi-turn history in MVP.
 }
 ```
 
-`intent` + `confidence` from Intent Router. `response` is the agent's natural language output. `data` carries structured payload (training records, meal plan, summary, etc.).
+来自意图路由器的 `intent` + `confidence`。 `response` 是智能体的自然语言输出。 `data`携带结构化负载（训练记录、膳食计划、总结等）。
 
-## MVP Scope
+## MVP 范围
 
-### Included
-- `POST /api/debug/message` endpoint
-- Intent Router with rules + LLM fallback (6 intents)
-- Fitness: log_training + today_plan
-- Summary: structured chat summarization
-- Meal: contextual daily meal plan generation
-- QA: general question answering
-- SQLite persistence for training records and user preferences
+### 包括
+- `POST /api/debug/message` 端点
+- 具有规则的意图路由器 + LLM 回退（6 个意图）
+- 健身：日志_训练 + 今天_计划
+- 摘要：结构化聊天摘要
+- 膳食：生成上下文每日膳食计划
+- QA：一般问题回答
+- SQLite 持久化训练记录和用户偏好
 
-### Excluded
-- Real WeChat Work callback integration (debug endpoint only)
-- Group bot Webhook push
-- APScheduler scheduled tasks
-- Multi-turn conversation history
-- RAG / knowledge base
-- Multi-user group chat message collection
+### 排除
+- 真正的企业微信回调集成（仅限调试端点）
+- 群机器人 Webhook 推送
+- APScheduler 定时任务
+- 多轮对话历史记录
+- RAG/知识库
+- 多用户群聊消息采集

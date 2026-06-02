@@ -31,7 +31,7 @@ Current implementation baseline:
 - Group chat message passive collection: all group messages saved to DB, trigger keywords ("总结"/"摘要"/"概括"/"汇总") initiate summarization.
 - Preference-aware meal planning and Q&A (MealAgent, QAAgent StateGraphs).
 - Agent registry for centralized intent-to-agent dispatch.
-- Multi-turn conversation memory via LangGraph MemorySaver (in-memory, upgradeable to SqliteSaver).
+- Multi-turn conversation memory via LangGraph MemorySaver (in-memory, per user_id thread).
 - Test fixtures that mock LLM behaviors and use isolated test DB setup.
 
 ## Deferred Work
@@ -39,7 +39,6 @@ Current implementation baseline:
 The README and MVP spec list these as future scope:
 - Group robot webhook pushes for announcements, digests, and notifications (WechatWebhookClient exists, needs scheduler + agent integration).
 - APScheduler jobs for scheduled reminders and daily reports.
-- Persistent conversation memory (SqliteSaver — MemorySaver is the current in-memory placeholder).
 - RAG or knowledge-base integration.
 - Async customer-service message reply for self-built app callback (robot callback already uses active reply via `response_url`; self-built app still uses synchronous passive XML reply with 5-second timeout limitation).
 

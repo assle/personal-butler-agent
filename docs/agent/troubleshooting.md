@@ -1,5 +1,7 @@
 # Troubleshooting
 
+> Known issues and proven diagnostic steps. Load when debugging test failures, LLM errors, or WeChat callback issues.
+
 ## Tests Fail Because `DEEPSEEK_API_KEY` Is Missing
 
 Symptom:

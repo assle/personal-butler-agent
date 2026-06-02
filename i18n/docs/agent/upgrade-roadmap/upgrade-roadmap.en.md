@@ -22,29 +22,16 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 
 ---
 
-## 2. Conversation Memory Persistence
+## 2. Scheduled Tasks
 
-### 2.1 MemorySaver → SqliteSaver
-
-- **Current**: Uses LangGraph `MemorySaver` (in-process memory), conversation history lost on restart
-- **Target**: Upgrade to `SqliteSaver`, persisting checkpoints to SQLite, retaining multi-turn conversation context across restarts
-- **Benefit**: Persistent user conversation history, uninterrupted experience across power loss/restart
-- **Effort**: Medium (replace saver implementation in `src/graph/memory.py`, migrate checkpoint table schema)
-- **Reference**: `docs/agent/decisions.md` ADR-007
-
----
-
-## 3. Scheduled Tasks
-
-### 3.1 APScheduler Timed Push
+### 2.1 APScheduler Timed Push
 
 - **Current**: Group bot webhook push capability implemented (`src/wechat/webhook.py`), but lacks scheduling mechanism
 - **Target**: Integrate APScheduler (already in `pyproject.toml` dependencies), implement daily training plan push, weekly meal reports, etc.
 - **Benefit**: Automated group notifications without manual triggers
 - **Effort**: Medium (new scheduler module, define job functions, start in lifespan)
-- **Dependency**: 2.1 (push content may need context from persistent memory)
 
-### 3.2 Timed Reminders and Digests
+### 2.2 Timed Reminders and Digests
 
 - **Current**: None
 - **Target**: APScheduler-driven personal reminders (hydration, training) and daily/weekly report digests
@@ -52,9 +39,9 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 
 ---
 
-## 4. WeChat Work Capability Enhancement
+## 3. WeChat Work Capability Enhancement
 
-### 4.1 Async Customer Service Message Reply
+### 3.1 Async Customer Service Message Reply
 
 - **Current**: Intelligent robot callback already uses active reply via `response_url` (`src/wechat/robot_router.py`), not subject to 5-second limit. Self-built app callback (`src/wechat/router.py`) still uses synchronous passive XML reply; LLM calls may time out
 - **Target**: Upgrade self-built app callback to async reply as well, via WeChat Work "customer service message" API or webhook push
@@ -62,13 +49,13 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 - **Effort**: Medium (add customer service message API client, restructure self-built app router reply logic)
 - **Note**: Robot callback is already active-reply mode, can serve as reference implementation
 
-### 4.2 Multi-Message Type Support
+### 3.2 Multi-Message Type Support
 
 - **Current**: Only supports text messages (image/voice etc. reply "not supported")
 - **Target**: Support image messages (OCR recognition for training records), voice messages (transcribe then route)
 - **Effort**: Large (requires OCR/ASR service integration)
 
-### 4.3 WeChat Work OAuth User Identity Mapping
+### 3.3 WeChat Work OAuth User Identity Mapping
 
 - **Current**: Uses `FromUserName` (OpenID) as `user_id`
 - **Target**: Obtain real user info via WeChat Work OAuth, establish OpenID ↔ user profile mapping
@@ -77,9 +64,9 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 
 ---
 
-## 5. Knowledge Base & RAG
+## 4. Knowledge Base & RAG
 
-### 5.1 Knowledge Base Integration
+### 4.1 Knowledge Base Integration
 
 - **Current**: QA agent relies entirely on LLM built-in knowledge
 - **Target**: Integrate vector database (e.g., Chroma/PGVector), store fitness knowledge, diet database, historical conversation summaries, enhance answer quality
@@ -88,28 +75,28 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 
 ---
 
-## 6. Engineering Infrastructure
+## 5. Engineering Infrastructure
 
-### 6.1 Dependency Management Standardization
+### 5.1 Dependency Management Standardization
 
 - **Current**: `pytest` and other dev dependencies are in `[project.optional-dependencies]`, not auto-installed by `uv sync`, requiring manual `uv pip install` each time
 - **Target**: Migrate to `[dependency-groups]` or `uv sync --dev` compatible format
 - **Effort**: Small (modify `pyproject.toml`)
 
-### 6.2 Containerized Deployment
+### 5.2 Containerized Deployment
 
 - **Current**: Local `uv run uvicorn` startup, no containerization
 - **Target**: Write Dockerfile, support `docker compose up` one-click startup
 - **Benefit**: Deployment consistency, easier deployment in WeChat Work callback's required public network environment
 - **Effort**: Small (single Dockerfile + compose.yml)
 
-### 6.3 CI/CD
+### 5.3 CI/CD
 
 - **Current**: No continuous integration
 - **Target**: GitHub Actions automated testing + linting, auto-run on PR
 - **Effort**: Small (single file `.github/workflows/test.yml`)
 
-### 6.4 End-to-End Testing
+### 5.4 End-to-End Testing
 
 - **Current**: All tests mock LLM and database
 - **Target**: Add limited end-to-end tests (real SQLite + real DeepSeek calls), manually triggered in CI
@@ -117,9 +104,9 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 
 ---
 
-## 7. Multi-User & Group Chat
+## 6. Multi-User & Group Chat
 
-### 7.1 Multi-User Group Chat Message Collection
+### 6.1 Multi-User Group Chat Message Collection
 
 - **Current**: Implemented — group messages are passively collected into `GroupMessage` table, trigger keyword detection invokes LLM summarization. Supports both self-built app and intelligent robot callback channels
 - **Target**: Enhanced multi-group support, cross-group user identity mapping, per-user/time-period aggregated summaries
@@ -135,4 +122,4 @@ Documents upgradeable items in the current project, ordered by priority. Each en
 | Medium | Estimated 1-3 hours |
 | Large | Estimated half day or more |
 
-Last updated: 2026-05-31 (after intelligent robot callback + response_url active reply)
+Last updated: 2026-06-01 (removed conversation memory persistence item, MemorySaver meets MVP needs; fixed section numbering)

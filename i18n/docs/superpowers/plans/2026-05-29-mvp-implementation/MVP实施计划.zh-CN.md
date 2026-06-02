@@ -1,54 +1,54 @@
-# Personal Butler Agent MVP Implementation Plan
+# Personal Butler AgentMVP实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **对于智能体工作人员：** 所需的子技能：使用 superpowers:subagent-driven-development （推荐）或 superpowers:executing-plans 来逐个任务地实施此计划。步骤使用复选框 (`- [ ]`) 语法进行跟踪。
 
-**Goal:** Build an MVP of the Personal Butler Agent with debug endpoint, intent routing (rules + LLM fallback), and four business agents (Fitness, Summary, Meal, QA) backed by SQLite persistence.
+**目标：** 构建具有调试端点、意图路由（规则 + LLM 回退）和由 SQLite 持久性支持的四个业务代理（Fitness、Summary、Meal、QA）的个人管家代理的 MVP。
 
-**Architecture:** Single-process FastAPI app. POST /api/debug/message receives user messages → IntentRouter classifies via keyword rules then LLM fallback → dispatcher calls the appropriate agent → agent uses LLM client for extraction/generation + SQLAlchemy for persistence → returns structured response.
+**架构：** 单进程 FastAPI 应用。 POST /api/debug/message 接收用户消息 → IntentRouter 通过关键字规则进行分类，然后 LLM 回退 → 调度程序调用适当的代理 → 代理使用 LLM 客户端进行提取/生成 + SQLAlchemy 进行持久化 → 返回结构化响应。
 
-**Tech Stack:** Python 3.13+, FastAPI, SQLAlchemy (async + aiosqlite), Pydantic, OpenAI SDK (pointed at DeepSeek), pytest + pytest-asyncio + httpx, uv.
+**技术堆栈：** Python 3.13+、FastAPI、SQLAlchemy（异步 + aiosqlite）、Pydantic、OpenAI SDK（指向 DeepSeek）、pytest + pytest-asyncio + httpx、uv。
 
 ---
 
-## File Map
+## 文件地图
 
-| File | Responsibility |
+| 文件 | 责任 |
 |------|---------------|
-| `src/main.py` | FastAPI app creation, startup, route registration, agent wiring |
-| `src/config.py` | Pydantic Settings loading from `.env` |
+| `src/main.py` | FastAPI应用创建、启动、路由注册、代理接线 |
+| `src/config.py` | 从 `.env` 加载 Pydantic 设置 |
 | `src/db/base.py` | SQLAlchemy `DeclarativeBase` |
-| `src/db/session.py` | Async engine + session factory + `get_db` dependency |
-| `src/models/training.py` | `TrainingRecord` ORM model |
-| `src/models/preference.py` | `UserPreference` ORM model + default preferences helper |
-| `src/schemas/request.py` | `DebugMessageRequest` Pydantic model |
-| `src/schemas/response.py` | `DebugMessageResponse` + `AgentResponse` dataclass |
-| `src/llm/client.py` | `LLMClient` wrapping `openai.AsyncOpenAI` pointed at DeepSeek |
-| `src/intent/rules.py` | Keyword-based `IntentRule` definitions + `match_rules()` |
-| `src/intent/router.py` | `IntentRouter` — rules first, LLM fallback |
-| `src/agents/base.py` | `BaseAgent` ABC |
-| `src/agents/fitness.py` | `FitnessAgent` — log_training + today_plan |
-| `src/agents/summary.py` | `SummaryAgent` — structured chat summarization |
-| `src/agents/meal.py` | `MealAgent` — contextual daily meal plan |
-| `src/agents/qa.py` | `QAAgent` — general Q&A |
-| `src/router/debug.py` | `POST /api/debug/message` route handler |
-| `tests/conftest.py` | Shared fixtures: test DB, mock LLM client, HTTP client |
-| `tests/test_intent.py` | Intent rules + router tests |
-| `tests/test_fitness.py` | Fitness agent tests |
-| `tests/test_summary.py` | Summary agent tests |
-| `tests/test_meal.py` | Meal agent tests |
-| `tests/test_qa.py` | QA agent tests |
-| `tests/test_api.py` | End-to-end API integration tests |
+| `src/db/session.py` | 异步引擎+会话工厂+`get_db`依赖 |
+| `src/models/training.py` | `TrainingRecord` ORM模型 |
+| `src/models/preference.py` | `UserPreference` ORM模型+默认首选项助手 |
+| `src/schemas/request.py` | `DebugMessageRequest` Pydantic 模型 |
+| `src/schemas/response.py` | `DebugMessageResponse` + `AgentResponse` 数据类 |
+| `src/llm/client.py` | `LLMClient` 包裹 `openai.AsyncOpenAI` 指向 DeepSeek |
+| `src/intent/rules.py` | 基于关键字的 `IntentRule` 定义 + `match_rules()` |
+| `src/intent/router.py` | `IntentRouter` — 规则第一，LLM 后备 |
+| `src/agents/base.py` | `BaseAgent`ABC |
+| `src/agents/fitness.py` | `FitnessAgent` — log_training + Today_plan |
+| `src/agents/summary.py` | `SummaryAgent` — 结构化聊天摘要 |
+| `src/agents/meal.py` | `MealAgent` — 上下文每日膳食计划 |
+| `src/agents/qa.py` | `QAAgent` — 一般问答 |
+| `src/router/debug.py` | `POST /api/debug/message` 路由处理程序 |
+| `tests/conftest.py` | 共享装置：测试数据库、模拟 LLM 客户端、HTTP 客户端 |
+| `tests/test_intent.py` | 意图规则+路由器测试 |
+| `tests/test_fitness.py` | 健身智能体测试 |
+| `tests/test_summary.py` | 智能体测试摘要 |
+| `tests/test_meal.py` | 膳食剂测试 |
+| `tests/test_qa.py` | QA 智能体测试 |
+| `tests/test_api.py` | 端到端API集成测试 |
 
 ---
 
-### Task 1: Project Scaffolding
+### 任务1：项目脚手架
 
-**Files:**
-- Create: `pyproject.toml`
-- Create: `.env.example`
-- Create: `.gitignore`
+**文件：**
+- 创建：`pyproject.toml`
+- 创建：`.env.example`
+- 创建：`.gitignore`
 
-- [ ] **Step 1: Write pyproject.toml**
+- [ ] **第1步：编写pyproject.toml**
 
 ```toml
 [project]
@@ -83,7 +83,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 ```
 
-- [ ] **Step 2: Write .env.example**
+- [ ] **第2步：编写.env.example**
 
 ```
 DEEPSEEK_API_KEY=your-api-key-here
@@ -92,7 +92,7 @@ DEEPSEEK_MODEL=deepseek-chat
 DATABASE_URL=sqlite+aiosqlite:///butler.db
 ```
 
-- [ ] **Step 3: Write .gitignore**
+- [ ] **第3步：写入.gitignore**
 
 ```
 .env
@@ -104,12 +104,12 @@ dist/
 *.egg-info/
 ```
 
-- [ ] **Step 4: Install dependencies**
+- [ ] **第4步：安装依赖项**
 
-Run: `uv sync`
-Expected: all packages installed, uv.lock created
+运行：`uv sync`
+预期：安装所有软件包，创建 uv.lock
 
-- [ ] **Step 5: Create directory structure**
+- [ ] **第五步：创建目录结构**
 
 ```bash
 mkdir -p src/router src/intent src/agents src/models src/schemas src/llm src/db
@@ -125,7 +125,7 @@ touch src/db/__init__.py
 touch tests/__init__.py
 ```
 
-- [ ] **Step 6: Init git and commit**
+- [ ] **第6步：初始化git并提交**
 
 ```bash
 git init
@@ -135,13 +135,13 @@ git commit -m "chore: scaffold project with uv, deps, directory structure"
 
 ---
 
-### Task 2: Config Module
+### 任务2：配置模块
 
-**Files:**
-- Create: `src/config.py`
-- Create: `tests/test_config.py`
+**文件：**
+- 创建：`src/config.py`
+- 创建：`tests/test_config.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_config.py
@@ -177,12 +177,12 @@ def test_settings_use_defaults():
         assert settings.database_url == "sqlite+aiosqlite:///butler.db"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **第 2 步：运行测试以验证其是否失败**
 
-Run: `uv run pytest tests/test_config.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'src.config'`
+运行：`uv run pytest tests/test_config.py -v`
+预期：失败 — `ModuleNotFoundError: No module named 'src.config'`
 
-- [ ] **Step 3: Write config module**
+- [ ] **第三步：编写配置模块**
 
 ```python
 # src/config.py
@@ -201,12 +201,12 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_config.py -v`
-Expected: 2 PASS
+运行：`uv run pytest tests/test_config.py -v`
+预期：2 通过
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/config.py tests/test_config.py
@@ -215,15 +215,15 @@ git commit -m "feat: add config module with pydantic-settings"
 
 ---
 
-### Task 3: Database Layer
+### 任务3：数据库层
 
-**Files:**
-- Create: `src/db/base.py`
-- Create: `src/db/session.py`
-- Create: `tests/conftest.py`
-- Create: `tests/test_db.py`
+**文件：**
+- 创建：`src/db/base.py`
+- 创建：`src/db/session.py`
+- 创建：`tests/conftest.py`
+- 创建：`tests/test_db.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/conftest.py
@@ -275,12 +275,12 @@ async def test_base_metadata_has_tables():
     assert "user_preferences" in table_names
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **第 2 步：运行测试以验证其是否失败**
 
-Run: `uv run pytest tests/test_db.py -v`
-Expected: FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_db.py -v`
+预期：失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write base.py**
+- [ ] **第三步：编写base.py**
 
 ```python
 # src/db/base.py
@@ -291,7 +291,7 @@ class Base(DeclarativeBase):
     pass
 ```
 
-- [ ] **Step 4: Write session.py**
+- [ ] **第四步：编写session.py**
 
 ```python
 # src/db/session.py
@@ -307,7 +307,7 @@ async def get_db():
         yield session
 ```
 
-- [ ] **Step 5: Write ORM models**
+- [ ] **第5步：编写ORM模型**
 
 ```python
 # src/models/training.py
@@ -371,7 +371,7 @@ class UserPreference(Base):
     )
 ```
 
-Make sure models are imported so they register on `Base.metadata`. Add to `src/models/__init__.py`:
+确保模型已导入，以便它们在 `Base.metadata` 上注册。添加到`src/models/__init__.py`：
 
 ```python
 # src/models/__init__.py
@@ -381,12 +381,12 @@ from src.models.preference import UserPreference
 __all__ = ["TrainingRecord", "UserPreference"]
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [ ] **第 6 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_db.py -v`
-Expected: 2 PASS
+运行：`uv run pytest tests/test_db.py -v`
+预期：2 通过
 
-- [ ] **Step 7: Commit**
+- [ ] **第 7 步：承诺**
 
 ```bash
 git add src/db/base.py src/db/session.py src/models/training.py src/models/preference.py src/models/__init__.py tests/conftest.py tests/test_db.py
@@ -395,14 +395,14 @@ git commit -m "feat: add database layer with ORM models"
 
 ---
 
-### Task 4: Pydantic Schemas
+### 任务 4：Pydantic 模式
 
-**Files:**
-- Create: `src/schemas/request.py`
-- Create: `src/schemas/response.py`
-- Create: `tests/test_schemas.py`
+**文件：**
+- 创建：`src/schemas/request.py`
+- 创建：`src/schemas/response.py`
+- 创建：`tests/test_schemas.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_schemas.py
@@ -461,12 +461,12 @@ def test_debug_message_response_data_optional():
     assert resp.data is None
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_schemas.py -v`
-Expected: FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_schemas.py -v`
+预期：失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write request schema**
+- [ ] **第3步：编写请求架构**
 
 ```python
 # src/schemas/request.py
@@ -480,7 +480,7 @@ class DebugMessageRequest(BaseModel):
     timestamp: datetime | None = None
 ```
 
-- [ ] **Step 4: Write response schema**
+- [ ] **第 4 步：编写响应模式**
 
 ```python
 # src/schemas/response.py
@@ -501,12 +501,12 @@ class DebugMessageResponse(BaseModel):
     data: dict | None = None
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **第 5 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_schemas.py -v`
-Expected: 5 PASS
+运行：`uv run pytest tests/test_schemas.py -v`
+预期：5 及格
 
-- [ ] **Step 6: Commit**
+- [ ] **第 6 步：承诺**
 
 ```bash
 git add src/schemas/request.py src/schemas/response.py tests/test_schemas.py
@@ -515,13 +515,13 @@ git commit -m "feat: add Pydantic request and response schemas"
 
 ---
 
-### Task 5: LLM Client
+### 任务 5：LLM 客户
 
-**Files:**
-- Create: `src/llm/client.py`
-- Create: `tests/test_llm.py`
+**文件：**
+- 创建：`src/llm/client.py`
+- 创建：`tests/test_llm.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_llm.py
@@ -564,12 +564,12 @@ async def test_llm_client_chat_returns_content():
         assert result == "Hello, I am an AI."
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **第 2 步：运行测试以验证其是否失败**
 
-Run: `uv run pytest tests/test_llm.py -v`
-Expected: FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_llm.py -v`
+预期：失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write LLM client**
+- [ ] **第3步：编写LLM客户端**
 
 ```python
 # src/llm/client.py
@@ -608,12 +608,12 @@ class LLMClient:
         return await self.chat(messages, model=model, temperature=temperature)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_llm.py -v`
-Expected: 1 PASS
+运行：`uv run pytest tests/test_llm.py -v`
+预期：1 次通过
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/llm/client.py tests/test_llm.py
@@ -622,13 +622,13 @@ git commit -m "feat: add LLM client wrapping OpenAI SDK for DeepSeek"
 
 ---
 
-### Task 6: Intent Rules
+### 任务 6：意图规则
 
-**Files:**
-- Create: `src/intent/rules.py`
-- Create: `tests/test_intent.py`
+**文件：**
+- 创建：`src/intent/rules.py`
+- 创建：`tests/test_intent.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_intent.py
@@ -668,12 +668,12 @@ class TestIntentRules:
         assert match_rules("") is None
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_intent.py -v`
-Expected: 5 FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_intent.py -v`
+预期：5 次失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write intent rules**
+- [ ] **第3步：编写意图规则**
 
 ```python
 # src/intent/rules.py
@@ -717,12 +717,12 @@ def match_rules(message: str) -> str | None:
     return None
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_intent.py -v`
-Expected: 5 PASS
+运行：`uv run pytest tests/test_intent.py -v`
+预期：5 及格
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/intent/rules.py tests/test_intent.py
@@ -731,15 +731,15 @@ git commit -m "feat: add intent rule matching with keywords"
 
 ---
 
-### Task 7: Intent Router
+### 任务 7：意图路由器
 
-**Files:**
-- Create: `src/intent/router.py`
-- Append to: `tests/test_intent.py`
+**文件：**
+- 创建：`src/intent/router.py`
+- 附加到：`tests/test_intent.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
-Append to `tests/test_intent.py`:
+附加到`tests/test_intent.py`：
 
 ```python
 from unittest.mock import AsyncMock, patch
@@ -792,12 +792,12 @@ class TestIntentRouter:
         mock_llm.chat_json.assert_not_called()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_intent.py::TestIntentRouter -v`
-Expected: 4 FAIL — `ModuleNotFoundError` or `ImportError`
+运行：`uv run pytest tests/test_intent.py::TestIntentRouter -v`
+预期：4 失败 — `ModuleNotFoundError` 或 `ImportError`
 
-- [ ] **Step 3: Write intent router**
+- [ ] **第3步：编写意图路由器**
 
 ```python
 # src/intent/router.py
@@ -860,12 +860,12 @@ class IntentRouter:
             return ("unknown", 0.0)
 ```
 
-- [ ] **Step 4: Run all intent tests to verify they pass**
+- [ ] **第 4 步：运行所有意图测试以验证它们通过**
 
-Run: `uv run pytest tests/test_intent.py -v`
-Expected: 9 PASS (5 rules + 4 router)
+运行：`uv run pytest tests/test_intent.py -v`
+预期：9 PASS（5 条规则 + 4 条路由器）
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/intent/router.py tests/test_intent.py
@@ -874,12 +874,12 @@ git commit -m "feat: add intent router with rule-first LLM-fallback"
 
 ---
 
-### Task 8: Agent Base Class
+### 任务 8：代理基类
 
-**Files:**
-- Create: `src/agents/base.py`
+**文件：**
+- 创建：`src/agents/base.py`
 
-- [ ] **Step 1: Write base class**
+- [ ] **第1步：编写基类**
 
 ```python
 # src/agents/base.py
@@ -900,7 +900,7 @@ class BaseAgent(ABC):
         ...
 ```
 
-- [ ] **Step 2: Commit**
+- [ ] **第 2 步：承诺**
 
 ```bash
 git add src/agents/base.py
@@ -909,13 +909,13 @@ git commit -m "feat: add BaseAgent abstract class"
 
 ---
 
-### Task 9: Fitness Agent
+### 任务9：健身代理
 
-**Files:**
-- Create: `src/agents/fitness.py`
-- Create: `tests/test_fitness.py`
+**文件：**
+- 创建：`src/agents/fitness.py`
+- 创建：`tests/test_fitness.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_fitness.py
@@ -1022,12 +1022,12 @@ async def test_today_plan_queries_history_and_generates(db_session, fitness_agen
     mock_llm.chat.assert_called_once()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_fitness.py -v`
-Expected: 2 FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_fitness.py -v`
+预期：2 次失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write fitness agent**
+- [ ] **第3步：编写健身代理**
 
 ```python
 # src/agents/fitness.py
@@ -1147,12 +1147,12 @@ class FitnessAgent(BaseAgent):
         return AgentResponse(reply=reply)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_fitness.py -v`
-Expected: 2 PASS
+运行：`uv run pytest tests/test_fitness.py -v`
+预期：2 通过
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/agents/fitness.py tests/test_fitness.py
@@ -1161,13 +1161,13 @@ git commit -m "feat: add fitness agent with log_training and today_plan"
 
 ---
 
-### Task 10: Summary Agent
+### 任务 10：摘要代理
 
-**Files:**
-- Create: `src/agents/summary.py`
-- Create: `tests/test_summary.py`
+**文件：**
+- 创建：`src/agents/summary.py`
+- 创建：`tests/test_summary.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_summary.py
@@ -1213,12 +1213,12 @@ async def test_summarize_returns_structured_output(db_session, summary_agent, mo
     mock_llm.chat.assert_called_once()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_summary.py -v`
-Expected: 1 FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_summary.py -v`
+预期：1 次失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write summary agent**
+- [ ] **第3步：编写摘要代理**
 
 ```python
 # src/agents/summary.py
@@ -1252,12 +1252,12 @@ class SummaryAgent(BaseAgent):
         return AgentResponse(reply=reply)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_summary.py -v`
-Expected: 1 PASS
+运行：`uv run pytest tests/test_summary.py -v`
+预期：1 次通过
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/agents/summary.py tests/test_summary.py
@@ -1266,13 +1266,13 @@ git commit -m "feat: add summary agent with structured output"
 
 ---
 
-### Task 11: Meal Agent
+### 任务11：膳食代理
 
-**Files:**
-- Create: `src/agents/meal.py`
-- Create: `tests/test_meal.py`
+**文件：**
+- 创建：`src/agents/meal.py`
+- 创建：`tests/test_meal.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_meal.py
@@ -1328,12 +1328,12 @@ async def test_meal_plan_includes_nutrition(db_session, meal_agent, mock_llm):
     mock_llm.chat.assert_called_once()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_meal.py -v`
-Expected: 1 FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_meal.py -v`
+预期：1 次失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write meal agent**
+- [ ] **第三步：编写代餐代理**
 
 ```python
 # src/agents/meal.py
@@ -1396,12 +1396,12 @@ class MealAgent(BaseAgent):
         return AgentResponse(reply=reply)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_meal.py -v`
-Expected: 1 PASS
+运行：`uv run pytest tests/test_meal.py -v`
+预期：1 次通过
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/agents/meal.py tests/test_meal.py
@@ -1410,13 +1410,13 @@ git commit -m "feat: add meal agent with nutritional breakdown"
 
 ---
 
-### Task 12: QA Agent
+### 任务 12：QA 代理
 
-**Files:**
-- Create: `src/agents/qa.py`
-- Create: `tests/test_qa.py`
+**文件：**
+- 创建：`src/agents/qa.py`
+- 创建：`tests/test_qa.py`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **第 1 步：编写失败的测试**
 
 ```python
 # tests/test_qa.py
@@ -1479,12 +1479,12 @@ async def test_qa_without_preferences_works(db_session, qa_agent, mock_llm):
     mock_llm.chat.assert_called_once()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **第 2 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_qa.py -v`
-Expected: 2 FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_qa.py -v`
+预期：2 次失败 — `ModuleNotFoundError`
 
-- [ ] **Step 3: Write QA agent**
+- [ ] **步骤 3：编写 QA 代理**
 
 ```python
 # src/agents/qa.py
@@ -1532,12 +1532,12 @@ class QAAgent(BaseAgent):
         return AgentResponse(reply=reply)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **第 4 步：运行测试以验证其通过**
 
-Run: `uv run pytest tests/test_qa.py -v`
-Expected: 2 PASS
+运行：`uv run pytest tests/test_qa.py -v`
+预期：2 通过
 
-- [ ] **Step 5: Commit**
+- [ ] **第 5 步：承诺**
 
 ```bash
 git add src/agents/qa.py tests/test_qa.py
@@ -1546,17 +1546,17 @@ git commit -m "feat: add QA agent with preference-aware responses"
 
 ---
 
-### Task 13: Debug Router + Main App
+### 任务 13：调试路由器 + 主应用
 
-**Files:**
-- Create: `src/router/debug.py`
-- Create: `src/main.py`
-- Modify: `tests/conftest.py` (add HTTP client fixture)
-- Create: `tests/test_api.py`
+**文件：**
+- 创建：`src/router/debug.py`
+- 创建：`src/main.py`
+- 修改：`tests/conftest.py`（添加HTTP客户端夹具）
+- 创建：`tests/test_api.py`
 
-- [ ] **Step 1: Add HTTP client fixture to conftest**
+- [ ] **第 1 步：将 HTTP 客户端装置添加到 conftest**
 
-Append to `tests/conftest.py`:
+附加到`tests/conftest.py`：
 
 ```python
 import pytest_asyncio
@@ -1572,7 +1572,7 @@ async def http_client():
         yield client
 ```
 
-- [ ] **Step 2: Write the failing API test**
+- [ ] **第 2 步：编写失败的 API 测试**
 
 ```python
 # tests/test_api.py
@@ -1633,12 +1633,12 @@ async def test_debug_endpoint_qa(http_client, db_session):
     assert len(body["response"]) > 0
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [ ] **第 3 步：运行测试以验证它们是否失败**
 
-Run: `uv run pytest tests/test_api.py -v`
-Expected: 2 FAIL — `ModuleNotFoundError`
+运行：`uv run pytest tests/test_api.py -v`
+预期：2 次失败 — `ModuleNotFoundError`
 
-- [ ] **Step 4: Write debug router**
+- [ ] **第4步：编写调试路由器**
 
 ```python
 # src/router/debug.py
@@ -1691,7 +1691,7 @@ def create_debug_router(
     return router
 ```
 
-- [ ] **Step 5: Write main app**
+- [ ] **第五步：编写主应用**
 
 ```python
 # src/main.py
@@ -1737,17 +1737,17 @@ debug_router = create_debug_router(
 app.include_router(debug_router)
 ```
 
-- [ ] **Step 6: Run API tests to verify they pass**
+- [ ] **第 6 步：运行 API 测试以验证其通过**
 
-Run: `uv run pytest tests/test_api.py -v`
-Expected: 2 PASS
+运行：`uv run pytest tests/test_api.py -v`
+预期：2 通过
 
-- [ ] **Step 7: Run all tests to verify nothing is broken**
+- [ ] **第 7 步：运行所有测试以验证没有损坏**
 
-Run: `uv run pytest tests/ -v`
-Expected: all tests PASS
+运行：`uv run pytest tests/ -v`
+预期：所有测试均通过
 
-- [ ] **Step 8: Commit**
+- [ ] **第 8 步：承诺**
 
 ```bash
 git add src/router/debug.py src/main.py tests/conftest.py tests/test_api.py
@@ -1756,12 +1756,12 @@ git commit -m "feat: add debug endpoint and main app wiring"
 
 ---
 
-### Task 14: End-to-End Smoke Test
+### 任务 14：端到端冒烟测试
 
-**Files:**
-- Create: `tests/test_smoke.py`
+**文件：**
+- 创建：`tests/test_smoke.py`
 
-- [ ] **Step 1: Write smoke test**
+- [ ] **第 1 步：编写冒烟测试**
 
 ```python
 # tests/test_smoke.py
@@ -1849,17 +1849,17 @@ async def test_full_flow_meal_and_summary(http_client, db_session):
         assert body["intent"] == "summarize_text"
 ```
 
-- [ ] **Step 2: Run smoke tests**
+- [ ] **第 2 步：运行冒烟测试**
 
-Run: `uv run pytest tests/test_smoke.py -v`
-Expected: 2 PASS
+运行：`uv run pytest tests/test_smoke.py -v`
+预期：2 通过
 
-- [ ] **Step 3: Run full test suite**
+- [ ] **第 3 步：运行完整的测试套件**
 
-Run: `uv run pytest tests/ -v`
-Expected: all tests PASS
+运行：`uv run pytest tests/ -v`
+预期：所有测试均通过
 
-- [ ] **Step 4: Commit**
+- [ ] **第 4 步：承诺**
 
 ```bash
 git add tests/test_smoke.py
@@ -1868,17 +1868,17 @@ git commit -m "test: add end-to-end smoke tests"
 
 ---
 
-### Task 15: Verify App Starts
+### 任务 15：验证应用启动
 
-- [ ] **Step 1: Start the dev server**
+- [ ] **第1步：启动开发服务器**
 
 ```bash
 uv run uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
-Expected: server starts without errors, logs show "Uvicorn running on http://0.0.0.0:8000"
+预期：服务器启动时没有错误，日志显示“Uvicorn running on http://0.0.0.0:8000"
 
-- [ ] **Step 2: Test with curl (in another terminal)**
+- [ ] **第2步：使用curl进行测试（在另一个终端中）**
 
 ```bash
 curl -X POST http://localhost:8000/api/debug/message \
@@ -1886,9 +1886,9 @@ curl -X POST http://localhost:8000/api/debug/message \
   -d '{"user_id":"assle","message":"你好"}'
 ```
 
-Expected: JSON response with `intent`, `confidence`, `response` fields, status 200
+预期：包含 `intent`、`confidence`、`response` 字段、状态 200 的 JSON 响应
 
-- [ ] **Step 3: Commit (if any adjustments needed)**
+- [ ] **第 3 步：提交（如果需要任何调整）**
 
 ```bash
 git add -A

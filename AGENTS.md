@@ -13,23 +13,15 @@
 
 ## Build, Test & Verify
 
-- Install dependencies: `uv sync`
-- Run dev server: `uv run uvicorn src.main:app --host 0.0.0.0 --port 8000`
-- Run all tests: `DEEPSEEK_API_KEY=test uv run pytest -q`
-- Run focused tests: `DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v`
-- Test API manually after starting server:
-  `curl -X POST http://localhost:8000/api/debug/message -H "Content-Type: application/json" -d '{"user_id":"assle","message":"打卡 今天练胸 卧推80kg5组8次"}'`
+For build, test, and verification steps, see `deployment-guide.en.md` in the project root.
 
 ## Code Style & Conventions
 
 - Follow existing Python style in `src/` and `tests/`; keep changes small and local.
-- Use async SQLAlchemy sessions for database work. Do not introduce sync DB access.
-- Keep Pydantic request/response schemas in `src/schemas/`; keep ORM models in `src/models/`.
 - Preserve the current agent boundary: intent routing chooses an intent, AgentRegistry resolves to a graph agent, handle() builds state and runs the StateGraph, returning `AgentResponse`.
-- New agents follow the pattern: `state.py` (TypedDict) + `nodes.py` (async node functions) + `graph.py` (StateGraph assembly + agent class).
-- Prefer deterministic rules for stable intent matches, then LLM fallback for ambiguous messages.
-- Keep tests isolated from real DeepSeek calls by using mock LLM clients and `DEEPSEEK_API_KEY=test`.
 - All functions and methods must include Chinese comments describing: (1) what the function does, (2) input parameters, (3) return value. Every `.py` file must start with a Chinese comment block explaining the file's purpose and overall workflow.
+
+For detailed patterns (async DB, agent structure, testing conventions), load `docs/agent/patterns.md`.
 
 ## Architecture
 
@@ -87,20 +79,28 @@ Read on demand. Load only the docs relevant to the current task.
 
 | `docs/agent/upgrade-roadmap.md` | Upgrade points and improvement priorities | When planning future work or evaluating technical debt |
 
+> `docs/superpowers/` contains completed historical design documents and implementation plans. Reference only when studying project evolution — skip for everyday tasks.
+
 All files are part of the shared project documentation. If you update one root entry file, update the other so `CLAUDE.md` and `AGENTS.md` remain identical.
 
 ### Memory Workflow
+
+**Read:**
 
 1. Session start: read `docs/agent/active-context.md` for continuity.
 2. Before implementation: read `docs/agent/patterns.md` and relevant source files.
 3. Before architecture changes: read `docs/agent/decisions.md`.
 4. When debugging: read `docs/agent/troubleshooting.md`, then verify against current code.
-5. After significant work: update the relevant `docs/agent/*.md` file only if the user asked for project documentation to be maintained or the change would otherwise make the docs misleading.
+5. When touching config, LLM, or DB: read `docs/agent/config-variables.md`.
 
----
+**Write — update the matching doc after:**
 
-## Current MVP Baseline
-
-- Implemented: debug endpoint, rule-first intent router, LangChain ChatOpenAI LLM fallback, four LangGraph StateGraph agents (Fitness/Summary/Meal/QA), AgentRegistry, LangGraph MemorySaver checkpointing, SQLite persistence, WeChat Work self-built app callback (encryption + routing), and group bot webhook push client.
-- Deferred: APScheduler reminders and digests, persistent conversation memory (SqliteSaver), async customer-service message reply, and RAG.
-- Latest verified baseline: `DEEPSEEK_API_KEY=test uv run pytest -q` reports 47 passing tests.
+| Action | Update |
+|--------|--------|
+| Added a new agent, route, or capability | `docs/agent/active-context.md` — add to "What Is Implemented" |
+| Completed an item from upgrade-roadmap | `docs/agent/upgrade-roadmap.md` — remove or mark done |
+| Made or changed an architecture decision | `docs/agent/decisions.md` — add or update ADR |
+| Found and fixed a reproducible issue | `docs/agent/troubleshooting.md` — add symptom + check + fix |
+| Added or changed env vars or config fields | `docs/agent/config-variables.md` — update tables and examples |
+| Established a reusable implementation pattern | `docs/agent/patterns.md` — add pattern section |
+| Modified CLAUDE.md | Copy to `AGENTS.md` to keep them byte-for-byte identical |
