@@ -20,12 +20,23 @@ from langgraph.config import get_config
 from src.models.training import TrainingRecord
 
 EXTRACTION_PROMPT = """从用户消息中提取训练记录。返回 JSON 数组，每条记录包含：
+
+公共字段：
+- training_type: 训练类型，"strength"（力量训练）或 "cardio"（有氧训练）
 - date: 训练日期 YYYY-MM-DD（未指定则用今天）
+- exercise: 动作名称（如卧推、深蹲、爬坡、跑步）
+
+力量训练（training_type="strength"）额外字段：
 - muscle_group: 训练部位（胸/背/腿/肩/臂/核心）
-- exercise: 动作名称
 - sets: 组数（整数）
 - reps: 次数（整数）
 - weight_kg: 重量kg（自重训练可为null）
+
+有氧训练（training_type="cardio"）额外字段：
+- duration_minutes: 时长（分钟，整数）
+- speed: 速度（整数）
+- incline: 坡度（整数）
+- calories: 消耗卡路里（整数）
 
 如果无法提取任何记录，返回空数组 []。
 只返回 JSON，不要有其他文字。"""
@@ -110,9 +121,15 @@ async def validate_records(state: dict) -> dict:
         return {"parsed_items": [], "error": "无法解析训练记录，请确认格式后重试。"}
     valid = []
     for item in items:
-        required = ["muscle_group", "exercise", "sets", "reps"]
-        if not all(k in item for k in required):
-            continue
+        training_type = item.get("training_type", "strength")
+        if training_type == "cardio":
+            required = ["exercise"]
+            if not all(k in item for k in required):
+                continue
+        else:
+            required = ["muscle_group", "exercise", "sets", "reps"]
+            if not all(k in item for k in required):
+                continue
         valid.append(item)
     return {"parsed_items": valid}
 
@@ -135,25 +152,42 @@ async def persist_records(state: dict) -> dict:
     saved = []
     for item in items:
         try:
+            training_type = str(item.get("training_type", "strength"))
             record = TrainingRecord(
                 user_id=state["user_id"],
                 date=str(item.get("date", date.today().isoformat())),
-                muscle_group=str(item["muscle_group"]),
+                training_type=training_type,
                 exercise=str(item["exercise"]),
-                sets=int(item["sets"]),
-                reps=int(item["reps"]),
+                muscle_group=str(item["muscle_group"]) if item.get("muscle_group") else None,
+                sets=int(item["sets"]) if item.get("sets") else None,
+                reps=int(item["reps"]) if item.get("reps") else None,
                 weight_kg=float(item["weight_kg"]) if item.get("weight_kg") is not None else None,
+                duration_minutes=float(item["duration_minutes"]) if item.get("duration_minutes") is not None else None,
+                speed=float(item["speed"]) if item.get("speed") is not None else None,
+                incline=float(item["incline"]) if item.get("incline") is not None else None,
+                calories=float(item["calories"]) if item.get("calories") is not None else None,
             )
         except (ValueError, TypeError):
             continue
         db.add(record)
-        saved.append({
-            "muscle_group": record.muscle_group,
-            "exercise": record.exercise,
-            "sets": record.sets,
-            "reps": record.reps,
-            "weight_kg": record.weight_kg,
-        })
+        if training_type == "cardio":
+            saved.append({
+                "training_type": record.training_type,
+                "exercise": record.exercise,
+                "duration_minutes": record.duration_minutes,
+                "speed": record.speed,
+                "incline": record.incline,
+                "calories": record.calories,
+            })
+        else:
+            saved.append({
+                "training_type": record.training_type,
+                "muscle_group": record.muscle_group,
+                "exercise": record.exercise,
+                "sets": record.sets,
+                "reps": record.reps,
+                "weight_kg": record.weight_kg,
+            })
     await db.flush()
     return {"saved_records": saved}
 
@@ -171,9 +205,26 @@ async def format_log_response(state: dict) -> dict:
     if state.get("error"):
         return {"reply": state["error"]}
     if not saved:
-        return {"reply": "未识别到训练记录。示例格式：打卡 今天练胸 卧推80kg5组8次"}
+        return {"reply": "未识别到训练记录。\n力量训练示例：打卡 今天练胸 卧推80kg5组8次\n有氧训练示例：打卡 爬坡30分钟 坡度13 速度4.6 消耗150卡"}
+    parts = []
+    for r in saved:
+        if r.get("training_type") == "cardio":
+            extras = []
+            if r.get("duration_minutes"):
+                extras.append(f"{int(r['duration_minutes'])}分钟")
+            if r.get("incline"):
+                extras.append(f"坡度{int(r['incline'])}")
+            if r.get("speed"):
+                extras.append(f"速度{int(r['speed'])}")
+            if r.get("calories"):
+                extras.append(f"消耗{int(r['calories'])}卡")
+            extra_str = " " + " ".join(extras) if extras else ""
+            parts.append(f"{r['exercise']}{extra_str}")
+        else:
+            weight_str = f" {int(r['weight_kg'])}kg" if r.get("weight_kg") else ""
+            parts.append(f"{r['exercise']}{weight_str} {r['sets']}×{r['reps']}")
     return {
-        "reply": f"已记录 {len(saved)} 条训练：{'、'.join(r['exercise'] for r in saved)}",
+        "reply": f"已记录 {len(saved)} 条训练：{'、'.join(parts)}",
         "data": {"records": saved},
     }
 
@@ -197,11 +248,24 @@ async def fetch_training_history(state: dict) -> dict:
         .order_by(TrainingRecord.date.desc())
     )
     recent = result.scalars().all()
-    history_text = "\n".join(
-        f"- {r.date}: {r.muscle_group} {r.exercise} {r.sets}×{r.reps}"
-        + (f" {r.weight_kg}kg" if r.weight_kg else "")
-        for r in recent
-    ) if recent else "暂无训练记录"
+    lines = []
+    for r in recent:
+        if r.training_type == "cardio":
+            extras = []
+            if r.duration_minutes:
+                extras.append(f"{int(r.duration_minutes)}分钟")
+            if r.incline:
+                extras.append(f"坡度{int(r.incline)}")
+            if r.speed:
+                extras.append(f"速度{int(r.speed)}")
+            if r.calories:
+                extras.append(f"消耗{int(r.calories)}卡")
+            extra_str = " " + " ".join(extras) if extras else ""
+            lines.append(f"- {r.date}: 有氧 {r.exercise}{extra_str}")
+        else:
+            weight_str = f" {r.weight_kg}kg" if r.weight_kg else ""
+            lines.append(f"- {r.date}: {r.muscle_group} {r.exercise} {r.sets}×{r.reps}{weight_str}")
+    history_text = "\n".join(lines) if recent else "暂无训练记录"
     return {"history_text": history_text}
 
 
