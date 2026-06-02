@@ -38,24 +38,6 @@ DEEPSEEK_API_KEY=test uv run pytest -q
 
 Tests should mock LLM calls and should not depend on the placeholder key being valid.
 
-## WeChat Work Self-Built App
-
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `WECHAT_CORP_ID` | No | `""` | Enterprise CorpID for message encryption/decryption |
-| `WECHAT_TOKEN` | No | `""` | Callback URL verification Token |
-| `WECHAT_ENCODING_AES_KEY` | No | `""` | 43-char Base64 AES key for encrypting/decrypting messages |
-| `WECHAT_AGENT_ID` | No | `""` | Self-built app AgentID |
-
-When `WECHAT_CORP_ID` and `WECHAT_TOKEN` are both set, the `/api/wechat/callback` route is registered. The callback uses **passive encrypted XML reply** (5-second timeout applies).
-
-```env
-WECHAT_CORP_ID=ww1234567890abcdef
-WECHAT_TOKEN=YourRandomToken123
-WECHAT_ENCODING_AES_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-WECHAT_AGENT_ID=1000005
-```
-
 ## 智能机器人长连接模式
 
 | Variable | Required | Default | Purpose |
@@ -80,7 +62,7 @@ WECOM_AIBOT_SECRET=your-bot-secret
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `WECOM_CORP_SECRET` | No | `""` | 自建应用 Secret，用于调用 `/cgi-bin/gettoken` 获取 access_token，进而查询用户详细信息（姓名/部门/头像等） |
+| `WECOM_CORP_SECRET` | No | `""` | 企微 Secret，用于调用 `/cgi-bin/gettoken` 获取 access_token，进而查询用户详细信息（姓名/部门/头像等） |
 
 当 `WECOM_CORP_SECRET` 和 `WECHAT_CORP_ID` 同时设置时，应用启动时初始化 `WeComUserService`，在 Bot 消息处理流程中自动查询用户信息并注入 agent 上下文（user_name / user_department），本地 SQLite 缓存 TTL 24h。
 

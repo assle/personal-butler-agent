@@ -9,7 +9,6 @@ Workflow:
 4. 条件启动 WebSocket 长连接客户端（仅当 WECOM_AIBOT_BOT_ID 已配置）
 5. 条件启动 APScheduler 定时调度器（仅当 SCHEDULER_CRON 和 SCHEDULER_TARGET_ID 已配置）
 6. 注册调试路由（始终可用）
-7. 条件注册企业微信自建应用回调路由（仅当 WECHAT_CORP_ID 和 WECHAT_TOKEN 已配置）
 """
 import asyncio
 import logging
@@ -155,17 +154,3 @@ debug_router = create_debug_router(
     agent_registry=agent_registry,
 )
 app.include_router(debug_router)
-
-# 企业微信自建应用回调路由（仅当配置了 CorpID 和 Token 时注册）
-if settings.wechat_corp_id and settings.wechat_token:
-    from src.wechat.router import create_wechat_router
-
-    wechat_router = create_wechat_router(
-        intent_router=intent_router,
-        agent_registry=agent_registry,
-        corp_id=settings.wechat_corp_id,
-        token=settings.wechat_token,
-        encoding_aes_key=settings.wechat_encoding_aes_key,
-        user_service=wecom_user_service,
-    )
-    app.include_router(wechat_router)

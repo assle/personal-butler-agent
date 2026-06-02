@@ -72,26 +72,6 @@ Check:
 - Check `KNOWN_INTENTS` in `src/intent/router.py`.
 - Add or update tests before changing routing behavior.
 
-## Intelligent Robot Receives Message But No Reply in Group Chat
-
-Symptom:
-- Server logs show message decrypted, parsed, and reply generated successfully.
-- `Robot reply posted: status=200, body={"errcode":40008,"errmsg":"invalid message type"}`.
-- Bot does not send the reply to the group chat.
-
-Check:
-- Confirm the msgtype is `markdown`, not `text`. The intelligent robot's `response_url` only supports `markdown` and `template_card` — `text` is not supported and returns errcode 40008.
-- See `src/wechat/robot_router.py:_post_reply()` for the correct payload structure.
-
-Fix pattern:
-```python
-# Wrong — text not supported by robot response_url
-payload = {"msgtype": "text", "text": {"content": content}}
-
-# Correct — use markdown (or template_card)
-payload = {"msgtype": "markdown", "markdown": {"content": content}}
-```
-
 ## Intelligent Robot Stops Logging New Messages During LLM Reply
 
 Symptom:
@@ -118,20 +98,9 @@ task.add_done_callback(self._handle_message_task_done)
 ## Intelligent Robot Message Fields Are All Empty
 
 Symptom:
-- Logs show `from_user=`, `chat_type=single`, `content=` after decryption, even though the raw decrypted JSON looks correct.
+- Logs show `from_user=`, `chat_type=single`, `content=` after parsing, even though the raw JSON looks correct.
 - Messages are misrouted as private chat instead of group chat.
 
 Check:
-- The intelligent robot uses a different JSON schema than the self-built app:
-  - Robot JSON: `from.userid`, `text.content`, `chatid`, `chattype`, `response_url`
-  - Self-built app: `from_user_name`, `content`, `chat_id`, `chat_type`
-- The robot callback (`src/wechat/robot_router.py`) must parse the nested JSON keys, not the flat self-built app keys.
-
-## Intelligent Robot URL Verification Fails with 403
-
-Symptom:
-- GET URL verification returns 403 with correct Token and EncodingAESKey.
-
-Check:
-- The robot uses `receiveid=""` (empty string) for echostr decryption, not CorpID.
-- Verify the code calls `decrypt(encoding_aes_key, echostr, "")` — using a non-empty CorpID causes `CorpIDMismatch`.
+- The intelligent robot uses nested JSON fields: `from.userid`, `text.content`, `chatid`, `chattype`.
+- Verify `src/wechat/message_handler.py` parses the correct nested JSON keys.
