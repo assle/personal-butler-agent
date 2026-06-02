@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI):
     if scheduler is not None:
         scheduler.shutdown()
     if ws_task is not None:
-        app.state.ws_client.stop()
+        await app.state.ws_client.stop()
         ws_task.cancel()
         try:
             await ws_task

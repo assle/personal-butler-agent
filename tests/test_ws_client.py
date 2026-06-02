@@ -6,6 +6,7 @@ WebSocket 客户端测试
 import json
 import uuid
 import pytest
+import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
@@ -110,6 +111,51 @@ async def test_subscribe_failure_raises(ws_client):
     ws_client._ws = fake_ws
     with pytest.raises(RuntimeError, match="aibot_subscribe failed"):
         await ws_client._subscribe()
+
+
+@pytest.mark.asyncio
+async def test_listen_dispatches_messages_without_blocking_receive(ws_client):
+    """验证消息处理未完成时，_listen 仍能继续接收后续消息"""
+    first = json.dumps({
+        "cmd": "aibot_msg_callback",
+        "headers": {"req_id": "req-1"},
+        "body": {
+            "msgid": "msg-1",
+            "msgtype": "text",
+            "text": {"content": "hello"},
+        },
+    })
+    second = json.dumps({
+        "cmd": "aibot_msg_callback",
+        "headers": {"req_id": "req-2"},
+        "body": {
+            "msgid": "msg-2",
+            "msgtype": "text",
+            "text": {"content": "world"},
+        },
+    })
+    fake_ws = FakeWebSocket(responses=[first, second])
+    ws_client._ws = fake_ws
+    ws_client._running = True
+    started = []
+    first_can_finish = asyncio.Event()
+
+    async def slow_callback(msg, req_id):
+        started.append(req_id)
+        if req_id == "req-1":
+            await first_can_finish.wait()
+
+    ws_client.on_message = slow_callback
+
+    listen_task = asyncio.create_task(ws_client._listen())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert started == ["req-1", "req-2"]
+
+    ws_client._running = False
+    first_can_finish.set()
+    await asyncio.gather(listen_task, return_exceptions=True)
 
 
 @pytest.mark.asyncio

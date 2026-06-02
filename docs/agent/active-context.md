@@ -10,21 +10,21 @@ Current implementation baseline:
 - FastAPI app entry: `src.main:app`
 - Debug route: `src/router/debug.py` — supports chat_type/chat_id for group chat simulation
 - WeChat Work self-built app callback: `src/wechat/router.py` — GET URL verification + POST message receive with AES-256-CBC encryption, CorpID validation, passive encrypted XML reply
-- WeChat Work intelligent robot WebSocket long-connection: `src/wechat/ws_client.py` — 消息接收、回复、主动推送 `aibot_send_msg`（替代 HTTP 回调模式）
+- WeChat Work intelligent robot WebSocket long-connection: `src/wechat/ws_client.py` — 消息接收、非阻塞后台处理、回复、主动推送 `aibot_send_msg`（替代 HTTP 回调模式）
 - Intent routing: `src/intent/rules.py` and `src/intent/router.py`
 - Agents: `FitnessAgent`, `SummaryAgent` (text + group), `MealAgent`, `QAAgent`
 - Agent registry: `src/agents/registry.py` — 7 intent→agent mappings
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek
 - Persistence: `training_records`, `user_preferences`, `group_messages`
 - Multi-turn memory: LangGraph `MemorySaver` checkpointing (in-memory, per user_id thread)
-- Verification baseline: 82 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
+- Verification baseline: 118 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
 - Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_SECRET` for intelligent robot WebSocket long-connection mode (replaces HTTP callback + `response_url` reply); `SCHEDULER_CRON`/`SCHEDULER_MESSAGE`/etc. for APScheduler timed push (alongside existing `WECHAT_CORP_ID` + `WECHAT_TOKEN` + `WECHAT_ENCODING_AES_KEY` for self-built app)
 
 ## What Is Implemented
 
 - Debug API request/response schema (with chat_type/chat_id for group simulation).
 - WeChat Work self-built app callback (AES-256-CBC crypto, XML parsing, passive encrypted XML reply).
-- WeChat Work intelligent robot WebSocket 长连接模式 (消息接收、回复、主动推送 `aibot_send_msg`).
+- WeChat Work intelligent robot WebSocket 长连接模式 (消息接收、非阻塞后台处理、回复、主动推送 `aibot_send_msg`).
 - APScheduler 定时 LLM 推送 (可配置 cron/目标/触发消息，通过长连接模式主动推送).
 - Rule-first classification for known intent keywords.
 - DeepSeek/OpenAI-compatible LLM fallback classification via LangChain ChatOpenAI.

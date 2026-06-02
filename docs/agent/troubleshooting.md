@@ -92,6 +92,29 @@ payload = {"msgtype": "text", "text": {"content": content}}
 payload = {"msgtype": "markdown", "markdown": {"content": content}}
 ```
 
+## Intelligent Robot Stops Logging New Messages During LLM Reply
+
+Symptom:
+- A private chat message receives or is generating a reply.
+- A group chat then @mentions the robot, but server logs do not print a new `WS: msg_callback ...` line until the earlier message finishes.
+- Shutdown may also warn: `RuntimeWarning: coroutine 'WeComWSClient.stop' was never awaited`.
+
+Reason:
+- The WebSocket receive loop must keep calling `recv()`. If `_listen()` directly awaits the long-running message handler, LLM/agent work blocks receipt of subsequent WebSocket frames.
+- `WeComWSClient.stop()` is async and must be awaited during FastAPI lifespan shutdown.
+
+Check:
+- Inspect `src/wechat/ws_client.py:_listen()`. Message callbacks should be scheduled with `asyncio.create_task(...)` and tracked for cleanup, not awaited inline.
+- Inspect `src/main.py:lifespan()`. Shutdown should call `await app.state.ws_client.stop()`.
+
+Fix pattern:
+```python
+# Receive loop stays free to read the next WebSocket frame.
+task = asyncio.create_task(self._on_message(msg, req_id))
+self._message_tasks.add(task)
+task.add_done_callback(self._handle_message_task_done)
+```
+
 ## Intelligent Robot Message Fields Are All Empty
 
 Symptom:

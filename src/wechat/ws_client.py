@@ -46,6 +46,7 @@ class WeComWSClient:
         self._ws: websockets.ClientConnection | None = None
         self._running = False
         self._on_message: OnMessageCallback | None = None
+        self._message_tasks: set[asyncio.Task] = set()
 
     @property
     def on_message(self) -> OnMessageCallback | None:
@@ -84,6 +85,11 @@ class WeComWSClient:
     async def stop(self):
         """停止长连接客户端"""
         self._running = False
+        tasks = list(self._message_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         if self._ws is not None:
             await self._ws.close()
 
@@ -142,11 +148,23 @@ class WeComWSClient:
                     req_id,
                 )
                 if self._on_message is not None:
-                    await self._on_message(msg, req_id)
+                    task = asyncio.create_task(self._on_message(msg, req_id))
+                    self._message_tasks.add(task)
+                    task.add_done_callback(self._handle_message_task_done)
             elif cmd == "aibot_event_callback":
                 logger.info("WS: received event_callback: %s", data.get("body", {}).get("event_type", ""))
             else:
                 logger.debug("WS: unknown cmd: %s", cmd)
+
+    def _handle_message_task_done(self, task: asyncio.Task):
+        """清理消息处理任务，并记录未捕获异常"""
+        self._message_tasks.discard(task)
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.exception("WS: message task failed: %s", e)
 
     async def _heartbeat(self):
         """每 30 秒发送 WebSocket ping 保活"""
