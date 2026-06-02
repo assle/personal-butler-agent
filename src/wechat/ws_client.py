@@ -8,7 +8,7 @@ Workflow:
   3. _listen() 循环接收消息帧，分发给 on_message 回调
   4. send_reply() 通过 aibot_respond_msg 回复消息
   5. push_message() 通过 aibot_send_msg 主动推送消息
-  6. _heartbeat() 每 30s 发送 ping 保活
+  6. 库内置 ping_interval + ping_timeout 保活并检测死连接
   7. 断线后自动指数退避重连（1s → 2s → 4s → 最大 30s）
 """
 import asyncio
@@ -94,23 +94,22 @@ class WeComWSClient:
             await self._ws.close()
 
     async def _connect_and_listen(self):
-        """建立连接、认证、启动心跳、循环接收消息"""
+        """建立连接、认证、循环接收消息
+
+        ping_interval + ping_timeout 配合使用，让库在 pong 超时时
+        立即在 recv() 上抛出 ConnectionClosed，避免 TCP 静默断开后
+        读到残存数据导致 "incorrect masking" / "invalid opcode" 错误。
+        """
         async with websockets.connect(
             "wss://openws.work.weixin.qq.com",
-            ping_interval=None,  # 自己管理心跳
+            ping_interval=20,   # 每 20s 发送 ping 保活
+            ping_timeout=10,    # 10s 内未收到 pong 则认为连接已死
+            close_timeout=5,    # 关闭握手超时 5s
         ) as ws:
             self._ws = ws
             await self._subscribe()
             logger.info("WS: subscribed successfully")
-            heartbeat_task = asyncio.create_task(self._heartbeat())
-            try:
-                await self._listen()
-            finally:
-                heartbeat_task.cancel()
-                try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
+            await self._listen()
 
     async def _subscribe(self):
         """发送 aibot_subscribe 认证请求"""
@@ -165,16 +164,6 @@ class WeComWSClient:
             pass
         except Exception as e:
             logger.exception("WS: message task failed: %s", e)
-
-    async def _heartbeat(self):
-        """每 30 秒发送 WebSocket ping 保活"""
-        while self._running:
-            await asyncio.sleep(30)
-            if self._ws is not None:
-                try:
-                    await self._ws.ping()
-                except websockets.exceptions.ConnectionClosed:
-                    break
 
     async def send_reply(self, req_id: str, content: str) -> bool:
         """回复用户消息（通过 aibot_respond_msg）

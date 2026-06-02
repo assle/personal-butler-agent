@@ -104,3 +104,23 @@ Symptom:
 Check:
 - The intelligent robot uses nested JSON fields: `from.userid`, `text.content`, `chatid`, `chattype`.
 - Verify `src/wechat/message_handler.py` parses the correct nested JSON keys.
+
+## WS 闲置时频繁断连：incorrect masking / invalid opcode
+
+Symptom:
+- 项目闲置一段时间后日志刷出 `WS disconnected: sent 1002 (protocol error) incorrect masking; no close frame received`
+- 或 `WS disconnected: sent 1002 (protocol error) invalid opcode; no close frame received`
+- 每次断连后 30s 自动重连成功，但闲置稍久又复现。
+
+Reason:
+- TCP 连接被中间网络设备（NAT/防火墙/负载均衡器或企微服务器自身）静默断开。
+- 旧实现用自定义心跳发 ping 但不校验 pong，死连接检测不及时。
+- `_listen()` 仍阻塞在 `recv()` 上，当 TCP 已断开时读到残存缓冲数据/RST 包，被 websockets 库误解析为 WebSocket 帧，触发协议错误。
+
+Fix (已应用):
+- `src/wechat/ws_client.py` 中删除自定义 `_heartbeat()`，改用 websockets 库内置的 `ping_interval=20` + `ping_timeout=10`。
+- 库内置机制在 pong 超时时同时在 ping 和 `recv()` 上抛出 `ConnectionClosed`，在读到垃圾帧之前就判定连接死亡并触发重连。
+
+Check:
+- 确认 `_connect_and_listen()` 中 `ping_interval` 和 `ping_timeout` 均已设置且不为 None。
+- 如果企微服务端 pong 响应偏慢导致误断连，适当调大 `ping_timeout`（如 15-20s）。
