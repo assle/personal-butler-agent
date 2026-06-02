@@ -95,3 +95,28 @@ Reasoning:
 Trade-off: The compression prompt is a separate LLM call, adding latency and cost per ~12 exchanges. For the current single-user MVP scale this is negligible. At higher throughput, compression could be deferred to a background job.
 
 Trade-off: The two routers (`src/wechat/router.py` and `src/wechat/robot_router.py`) share some structural similarity (GET URL verification, POST decrypt + signature check). The shared crypto and message-building utilities in `src/wechat/crypto.py` and `src/wechat/messages.py` prevent code duplication at the lower layers while keeping the routing logic separate where it diverges.
+
+## ADR-010: Single TrainingRecord Table for Strength and Cardio
+
+The `training_records` table was extended with nullable cardio columns (`duration_minutes`, `speed`, `incline`, `calories`) rather than creating a separate `cardio_records` table or using table inheritance.
+
+Reasoning:
+- **Unified history query**: A user's training history (`fetch_training_history`) spans both types. A single table with a `training_type` discriminator keeps the query simple — one `SELECT` with `WHERE user_id = ? ORDER BY date DESC`.
+- **Shared fields**: `date`, `exercise`, `user_id`, and `created_at` are common to both types. Nullable type-specific columns avoid duplicating these.
+- **MVP pragmatism**: At the current single-user scale, a separate table would add complexity (UNION queries, dual persistence paths) without meaningful benefit.
+- **LLM extraction coherence**: The `EXTRACTION_PROMPT` returns a unified JSON array where each item declares its `training_type`. Persisting to one table matches this mental model.
+
+Trade-off: Many columns will be NULL depending on training type. For a small-scale MVP this is acceptable. At higher throughput with analytics needs, a separate `cardio_records` table or a normalized schema may be more appropriate.
+
+## ADR-011: 智能机器人长连接模式替代回调模式
+
+智能机器人从 HTTP 回调模式切换到 WebSocket 长连接模式。
+
+Reasoning:
+- **主动推送**: 长连接模式支持 `aibot_send_msg` 主动推送，回调模式仅能通过 `response_url` 被动回复。APScheduler 定时推送依赖此能力。
+- **简化部署**: 长连接模式无需公网 IP/域名/SSL、无需消息加解密，降低部署门槛。
+- **消除 5 秒超时**: WebSocket 长连接无 HTTP 响应超时限制，LLM 处理时长不受限制。
+- **统一通道**: 消息接收、回复、主动推送全部走一条 WebSocket，消除群机器人 webhook 的冗余依赖。
+- **官方演进方向**: 2026 年 3 月企业微信发布长连接模式，这是官方重点迭代方向。
+
+Trade-off: 需要维护 WebSocket 连接（心跳、断线重连），增加了一定的运维复杂度。但这被更简单的部署和统一的消息通道所抵消。

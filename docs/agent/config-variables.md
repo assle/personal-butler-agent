@@ -56,35 +56,44 @@ WECHAT_ENCODING_AES_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 WECHAT_AGENT_ID=1000005
 ```
 
-## WeChat Work Intelligent Robot
+## 智能机器人长连接模式
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `WECHAT_ROBOT_TOKEN` | No | `""` | Intelligent robot callback Token |
-| `WECHAT_ROBOT_ENCODING_AES_KEY` | No | `""` | 43-char Base64 AES key for robot message crypto |
+| `WECOM_AIBOT_BOT_ID` | No | `""` | 智能机器人 BotId，用于长连接鉴权 |
+| `WECOM_AIBOT_SECRET` | No | `""` | 智能机器人 Secret，用于长连接鉴权 |
 
-When `WECHAT_ROBOT_TOKEN` is set, the `/api/wechat/robot/callback` route is registered. The robot callback uses **active reply via `response_url` POST** (no 5-second timeout). The `receiveid` for crypto is empty string `""` (not CorpID).
+当 `WECOM_AIBOT_BOT_ID` 和 `WECOM_AIBOT_SECRET` 同时设置时，应用启动时建立 WebSocket 长连接到企业微信智能机器人网关。长连接模式无需公网 IP/域名/SSL、无需消息加解密，支持消息收发和主动推送（`aibot_send_msg`）。
 
 ```env
-WECHAT_ROBOT_TOKEN=YourRobotToken
-WECHAT_ROBOT_ENCODING_AES_KEY=YourRobotEncodingAESKey
+WECOM_AIBOT_BOT_ID=bot-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+WECOM_AIBOT_SECRET=your-bot-secret
 ```
 
-Key differences from self-built app:
-- Message format: intelligent-robot-specific JSON (`from.userid`, `text.content`, `chatid`, `response_url`)
-- Reply mechanism: POST JSON to `response_url` (only `markdown` and `template_card` msgtypes supported — `text` returns errcode 40008)
-- Crypto receiveid: `""` (empty string) instead of CorpID
+与回调模式的关键差异：
+- 连接方式：WebSocket 长连接替代 HTTP 回调
+- 消息格式：企业微信智能机器人 JSON WebSocket 协议
+- 回复方式：通过 WebSocket 连接下发消息，支持 `aibot_send_msg` 主动推送
+- 部署：无需公网地址，无需 AES 加解密
 
-## WeChat Work Group Bot Webhook
+## APScheduler 定时推送
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `WECHAT_WEBHOOK_URL` | No | `""` | Group bot webhook URL for proactive push |
+| `SCHEDULER_CRON` | No | `""` | Cron 表达式，定义调度频率（例：`0 9 * * 1-5` 表示工作日 9:00） |
+| `SCHEDULER_TARGET_TYPE` | No | `"single"` | 推送目标类型：`single`（单聊）或 `group`（群聊） |
+| `SCHEDULER_TARGET_ID` | No | `""` | 推送目标 ID：单聊时为 `userid`，群聊时为 `chatid` |
+| `SCHEDULER_MESSAGE` | No | `""` | 定时触发消息文本，发送给 LLM 进行意图路由和 agent 处理 |
+| `SCHEDULER_INTENT` | No | `""` | 可选，指定使用的 intent，绕过 intent 路由。为空时自动路由 |
 
-When set, a `WechatWebhookClient` instance is created at app startup. Note: the client is instantiated but not yet called — proactive push scheduling (APScheduler + agent integration) is deferred work (see upgrade-roadmap §3.1).
+当 `SCHEDULER_CRON` 和 `SCHEDULER_MESSAGE` 同时设置且长连接模式已启用时，应用启动时注册 APScheduler 定时任务，按 cron 表达式周期触发 LLM 推送。
 
 ```env
-WECHAT_WEBHOOK_URL=https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxx
+SCHEDULER_CRON=0 9 * * 1-5
+SCHEDULER_TARGET_TYPE=single
+SCHEDULER_TARGET_ID=AssLe
+SCHEDULER_MESSAGE=早安！今天我该做什么训练？
+SCHEDULER_INTENT=
 ```
 
 ## Change Guidance
