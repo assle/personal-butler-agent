@@ -1,5 +1,7 @@
 # Implementation Patterns
 
+> Established code patterns for agents, routing, database, and testing. Load before adding or modifying code.
+
 ## Application Wiring
 
 - `src/main.py` constructs singleton service objects at module load: `LLMClient`, `IntentRouter`, each agent, and `AgentRegistry`.
@@ -62,6 +64,37 @@ agents/<domain>/
 - Use `select(...)` queries with the injected `AsyncSession` from config.
 - Add ORM objects to the session and `flush()` when tests or response data need generated state before route completion.
 - Store extensible user preferences as JSON text under namespace keys such as `fitness` and `meal`.
+
+## Conversation Memory Pattern
+
+Agent `handle()` methods that need cross-turn context follow this pattern:
+
+```python
+async def handle(self, intent, message, user_id, db) -> AgentResponse:
+    memory = ConversationMemory(self._llm)
+    summary, recent = await memory.get_context(user_id, db)
+
+    initial_state = {
+        "intent": intent,
+        "message": message,
+        "user_id": user_id,
+        "conversation_summary": summary,
+        "recent_messages": recent,
+    }
+    config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
+    result = await self._graph.ainvoke(initial_state, config)
+
+    reply = result.get("reply", "")
+    await memory.save_exchange(user_id, message, reply, db)
+    return AgentResponse(reply=reply, data=result.get("data"))
+```
+
+Key rules:
+- Load context **before** ainvoke, save exchange **after** — the reply is only known after graph execution.
+- Not all intents need memory — condition on intent (e.g., `log_training` skips it).
+- State TypedDicts must declare `conversation_summary: Optional[str]` and `recent_messages: list[dict]` for the fields to flow through nodes.
+- In generate nodes, splice summary + recent messages into the LLM messages list before appending the current user message.
+- `ConversationMemory` handles compression transparently — callers only call `get_context` and `save_exchange`.
 
 ## Testing Patterns
 
