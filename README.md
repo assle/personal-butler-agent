@@ -90,10 +90,14 @@ personal_butler_agent/
 │   │   └── qa/              # 同上 pattern
 │   ├── graph/
 │   │   └── memory.py        # LangGraph MemorySaver 共享实例
+│   ├── memory/
+│   │   ├── __init__.py
+│   │   └── conversation.py  # ConversationMemory 对话记忆管理
 │   ├── models/
 │   │   ├── training.py      # 训练记录 ORM
 │   │   ├── preference.py    # 用户偏好 ORM (JSON)
-│   │   └── group_message.py # 群聊消息 ORM（收集 + 触发总结）
+│   │   ├── group_message.py # 群聊消息 ORM（收集 + 触发总结）
+│   │   └── conversation.py  # 对话记忆 ORM（消息 + 摘要压缩）
 │   ├── schemas/
 │   │   ├── request.py       # 请求 Schema
 │   │   └── response.py      # 响应 Schema
@@ -102,7 +106,7 @@ personal_butler_agent/
 │   └── db/
 │       ├── base.py          # SQLAlchemy DeclarativeBase
 │       └── session.py       # 异步引擎 + 会话工厂 + get_db 依赖注入
-├── tests/                   # 88 个测试
+├── tests/                   # 96 个测试
 ├── docs/
 │   ├── agent/               # 项目记忆文档（active-context / patterns / decisions / upgrade-roadmap）
 │   └── superpowers/
@@ -294,7 +298,7 @@ log_training     today_plan
 
 ## 数据库
 
-使用 SQLite 本地文件存储，两张核心表：
+使用 SQLite 本地文件存储，四张核心表：
 
 **training_records** — 训练记录
 
@@ -331,6 +335,27 @@ log_training     today_plan
 
 每个群最多保留 200 条消息，超出自动清理。
 
+**conversation_messages** — 对话消息
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | 自增 |
+| user_id | TEXT NOT NULL | 用户标识 |
+| role | TEXT NOT NULL | 消息角色（user / assistant） |
+| content | TEXT NOT NULL | 消息文本 |
+| created_at | TEXT NOT NULL | ISO 时间戳 |
+
+**conversation_summaries** — 对话压缩摘要
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | INTEGER PK | 自增 |
+| user_id | TEXT NOT NULL UNIQUE | 用户标识 |
+| summary_text | TEXT NOT NULL | LLM 压缩的摘要文本 |
+| last_summarized_at | TEXT NOT NULL | 最后压缩时间 |
+
+每条用户消息超过 24 条时，自动将最早 12 条压缩为一句摘要，保留最近 12 条在表中。
+
 preferences JSON 结构可扩展，新模块只需添加自己的 namespace：
 
 ```json
@@ -351,7 +376,7 @@ preferences JSON 结构可扩展，新模块只需添加自己的 namespace：
 ## 运行测试
 
 ```bash
-# 运行全部测试（88 个）
+# 运行全部测试（96 个）
 DEEPSEEK_API_KEY=test uv run pytest -q
 
 # 运行单个模块
@@ -553,6 +578,30 @@ curl -X POST http://localhost:8000/api/debug/message \
 
 ---
 
+### 6. Agent 人格系统
+
+每个 Agent 注入了独立的性格、说话风格和情感基调，让回复自然有人味。
+
+| Agent | 角色名 | 性格底色 |
+|-------|--------|----------|
+| QA | 小管家 | 细心、温暖、带小幽默，像认识很久的朋友 |
+| Fitness | 铁块教练 | 热血、直接，"再来一组"的劲头，讲安全时切回认真模式 |
+| Meal | 小厨 | 细心、讲究、对食物有热情，像科普博主 |
+| Summary | 会议纪要员 | 客观、条理清晰、抓住重点，不添油加醋 |
+
+---
+
+### 7. 对话记忆系统
+
+QA、Fitness（today_plan）和 Meal 三个 Agent 具备跨轮次对话记忆能力：
+
+- **短期记忆**：最近 6 轮（12 条）消息直接放入 LLM prompt，保持上下文连贯
+- **长期记忆**：超出 24 条消息后，最早 12 条由 LLM 压缩为一句摘要，持久化到 SQLite
+- **智能压缩**：压缩摘要累积更新，保留关键事实和偏好信息
+- **按意图启用**：log_training（单句打卡）和 Summary（每次独立总结）不使用记忆
+
+---
+
 ### 当前限制与后续计划
 
 | 状态 | 功能 | 说明 |
@@ -563,7 +612,8 @@ curl -X POST http://localhost:8000/api/debug/message \
 | 已实现 | 调试端点 | 本地测试全功能可用 |
 | 已实现 | 训练数据持久化 | SQLite 存储，支持历史查询 |
 | 已实现 | 用户偏好管理 | 自动提取并持久化偏好 |
-| 已实现 | 多轮对话记忆 | MemorySaver checkpointing（进程内，重启丢失） |
+| 已实现 | 多轮对话记忆 | 6 轮短期 + LLM 压缩摘要，SQLite 持久化，重启不丢失 |
+| 已实现 | agent 人格系统 | 四个 agent 各有独立角色名、说话风格和情感基调 |
 | 已实现 | 多消息类型支持 | 文本 + 语音（提取企业微信内置识别文本后路由） |
 | 已有客户端未接入 | 群机器人 Webhook 推送 | `WechatWebhookClient` 已实现并通过测试，但尚未与 Agent 和定时任务对接 |
 | 未实现 | APScheduler 定时任务 | 日报推送、训练提醒等定时场景 |

@@ -84,10 +84,14 @@ personal_butler_agent/
 │   │   └── qa/              # Same pattern as above
 │   ├── graph/
 │   │   └── memory.py        # LangGraph MemorySaver shared instance
+│   ├── memory/
+│   │   ├── __init__.py
+│   │   └── conversation.py  # ConversationMemory module
 │   ├── models/
 │   │   ├── training.py      # Training record ORM
 │   │   ├── preference.py    # User preference ORM (JSON)
-│   │   └── group_message.py # Group chat message ORM
+│   │   ├── group_message.py # Group chat message ORM
+│   │   └── conversation.py  # Conversation memory ORM (messages + summaries)
 │   ├── schemas/
 │   │   ├── request.py       # Request schemas
 │   │   └── response.py      # Response schemas
@@ -96,7 +100,7 @@ personal_butler_agent/
 │   └── db/
 │       ├── base.py          # SQLAlchemy DeclarativeBase
 │       └── session.py       # Async engine + session factory + get_db dependency injection
-├── tests/                   # 68 tests
+├── tests/                   # 96 tests
 ├── docs/
 │   ├── agent/               # Project memory docs (active-context / patterns / decisions / upgrade-roadmap)
 │   └── superpowers/
@@ -258,7 +262,7 @@ Adding a new Agent: create `state.py` + `nodes.py` + `graph.py` → register in 
 
 ## Database
 
-SQLite local file storage with three core tables:
+SQLite local file storage with five core tables:
 
 **training_records** — Training records
 
@@ -292,6 +296,27 @@ SQLite local file storage with three core tables:
 | content | TEXT NOT NULL | Message content |
 | create_time | INTEGER NOT NULL | Message timestamp |
 
+**conversation_messages** — Conversation messages
+
+| Column | Type | Description |
+|----|------|------|
+| id | INTEGER PK | Auto-increment |
+| user_id | TEXT NOT NULL INDEXED | User identifier |
+| role | TEXT NOT NULL | Message role (user / assistant) |
+| content | TEXT NOT NULL | Message text |
+| created_at | TEXT NOT NULL | ISO timestamp |
+
+**conversation_summaries** — Conversation compressed summaries
+
+| Column | Type | Description |
+|----|------|------|
+| id | INTEGER PK | Auto-increment |
+| user_id | TEXT NOT NULL UNIQUE | User identifier |
+| summary_text | TEXT NOT NULL | LLM-compressed summary text |
+| last_summarized_at | TEXT NOT NULL | Last compression time |
+
+When a user exceeds 24 messages, the oldest 12 are automatically compressed into a single summary; the most recent 12 remain in the table.
+
 Preferences JSON structure is extensible — new modules add their own namespace:
 
 ```json
@@ -312,7 +337,7 @@ Preferences JSON structure is extensible — new modules add their own namespace
 ## Running Tests
 
 ```bash
-# Run all tests (68)
+# Run all tests (96)
 DEEPSEEK_API_KEY=test uv run pytest -q
 
 # Run a single module
@@ -401,6 +426,30 @@ When none of the above intents match, messages are routed to free-form Q&A via L
 
 ---
 
+### 2. Agent Personality System
+
+Each agent has a distinct character, speaking style, and emotional tone for natural, human-like responses.
+
+| Agent | Persona | Character |
+|-------|---------|-----------|
+| QA | 小管家 (Little Butler) | Warm, attentive, playful — like an old friend |
+| Fitness | 铁块教练 (Iron Coach) | Energetic, direct, pushes hard — switches to serious for safety |
+| Meal | 小厨 (Little Chef) | Meticulous, passionate about food — like a science communicator |
+| Summary | 会议纪要员 (Meeting Secretary) | Objective, clear, to the point — no fluff |
+
+---
+
+### 3. Conversation Memory System
+
+QA, Fitness (today_plan), and Meal agents maintain cross-turn conversation memory:
+
+- **Short-term**: 6 most recent turns (12 messages) kept in LLM prompt for coherent context
+- **Long-term**: When exceeding 24 messages, the oldest 12 are compressed by LLM into a one-sentence summary, persisted to SQLite
+- **Auto-compression**: Summaries accumulate and update, preserving key facts and preferences
+- **Intent-aware**: log_training (one-shot) and Summary agents (independent per call) skip memory
+
+---
+
 ### 2. Debug Endpoint (POST /api/debug/message)
 
 Local development HTTP endpoint for testing the full intent routing and agent pipeline without WeChat Work.
@@ -423,11 +472,11 @@ Supports `chat_type` and `chat_id` fields for simulating group chat scenarios.
 | Implemented | Debug endpoint | Full local testing capability |
 | Implemented | Training data persistence | SQLite storage with history queries |
 | Implemented | User preference management | Auto-extract and persist preferences |
-| Implemented | Multi-turn conversation memory | MemorySaver checkpointing (in-process, lost on restart) |
+| Implemented | Multi-turn conversation memory | 6-turn short-term + LLM-compressed summary, SQLite-persisted, survives restarts |
+| Implemented | Agent personality system | Four agents with distinct personas, speaking styles, and emotional tones |
 | Implemented | Group chat summarization | Passive collection + trigger-based summary |
 | Client exists, not wired | Group bot webhook push | `WechatWebhookClient` implemented and tested, not yet connected to agents and scheduler |
 | Not implemented | APScheduler scheduled tasks | Daily push, training reminders, etc. |
-| Not implemented | Persistent conversation memory | MemorySaver → SqliteSaver, retain context across restarts |
 | Not implemented | Async customer service reply | Overcome WeChat Work passive reply 5-second timeout |
 | Not implemented | RAG knowledge base | Enhanced answers with external knowledge |
 
