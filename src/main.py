@@ -6,12 +6,17 @@ Workflow:
 1. 创建 LLMClient、IntentRouter、各业务 agent 单例
 2. 向 AgentRegistry 注册所有 intent → agent 映射
 3. lifespan 中初始化数据库表结构
-4. 注册调试路由（始终可用）
-5. 条件注册企业微信回调路由（仅当 WECHAT_CORP_ID 和 WECHAT_TOKEN 已配置）
-6. 条件创建企业微信群推送客户端（仅当 WECHAT_WEBHOOK_URL 已配置）
+4. 条件启动 WebSocket 长连接客户端（仅当 WECOM_AIBOT_BOT_ID 已配置）
+5. 条件启动 APScheduler 定时调度器（仅当 SCHEDULER_CRON 和 SCHEDULER_TARGET_ID 已配置）
+6. 注册调试路由（始终可用）
+7. 条件注册企业微信自建应用回调路由（仅当 WECHAT_CORP_ID 和 WECHAT_TOKEN 已配置）
 """
+import asyncio
+import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+
 from src.config import settings
 from src.llm.client import LLMClient
 from src.intent.router import IntentRouter
@@ -21,6 +26,13 @@ from src.agents.meal import MealAgent
 from src.agents.qa import QAAgent
 from src.agents.registry import AgentRegistry
 from src.router.debug import create_debug_router
+
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
+    h = logging.StreamHandler()
+    h.setLevel(logging.INFO)
+    logger.addHandler(h)
 
 llm_client = LLMClient()
 intent_router = IntentRouter(llm_client=llm_client)
@@ -44,18 +56,76 @@ agent_registry.set_fallback(qa_agent)
 async def lifespan(app: FastAPI):
     """FastAPI 生命周期管理
 
-    应用启动时自动创建数据库表结构，关闭时释放连接。
-    所有 agent、router 在模块加载时创建（模块级单例），lifespan 仅管理数据库。
+    应用启动时自动创建数据库表结构，启动 WebSocket 长连接和定时调度器。
+    关闭时释放连接。
 
     参数:
         app: FastAPI 应用实例
     """
     from src.db.base import Base
-    from src.db.session import engine
+    from src.db.session import engine, async_session
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    ws_task = None
+    scheduler = None
+
+    # 启动智能机器人 WebSocket 长连接
+    if settings.wecom_aibot_bot_id:
+        from src.wechat.ws_client import WeComWSClient
+        from src.wechat.message_handler import handle_ws_message
+
+        ws_client = WeComWSClient(
+            bot_id=settings.wecom_aibot_bot_id,
+            secret=settings.wecom_aibot_secret,
+        )
+        app.state.ws_client = ws_client
+
+        async def on_message_callback(msg: dict):
+            async with async_session() as db:
+                try:
+                    await handle_ws_message(
+                        msg, ws_client, intent_router, agent_registry, db,
+                    )
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    logger.exception("WS message handler: unhandled error")
+
+        ws_client.on_message = on_message_callback
+        ws_task = asyncio.create_task(ws_client.run())
+        logger.info("WS client: started")
+
+    # 启动 APScheduler 定时推送（需要 WS 客户端先启动）
+    if settings.scheduler_cron and settings.scheduler_target_id and settings.wecom_aibot_bot_id:
+        from src.scheduler import SchedulerManager
+
+        scheduler = SchedulerManager(
+            ws_client=app.state.ws_client,
+            agent_registry=agent_registry,
+            cron_expression=settings.scheduler_cron,
+            target_type=settings.scheduler_target_type,
+            target_id=settings.scheduler_target_id,
+            message=settings.scheduler_message,
+            intent=settings.scheduler_intent,
+            db_session_factory=async_session,
+        )
+        scheduler.start()
+        app.state.scheduler = scheduler
+
     yield
+
+    # 关闭
+    if scheduler is not None:
+        scheduler.shutdown()
+    if ws_task is not None:
+        app.state.ws_client.stop()
+        ws_task.cancel()
+        try:
+            await ws_task
+        except asyncio.CancelledError:
+            pass
     await engine.dispose()
 
 
@@ -68,7 +138,7 @@ debug_router = create_debug_router(
 )
 app.include_router(debug_router)
 
-# 企业微信回调路由（仅当配置了 CorpID 和 Token 时注册）
+# 企业微信自建应用回调路由（仅当配置了 CorpID 和 Token 时注册）
 if settings.wechat_corp_id and settings.wechat_token:
     from src.wechat.router import create_wechat_router
 
@@ -80,22 +150,3 @@ if settings.wechat_corp_id and settings.wechat_token:
         encoding_aes_key=settings.wechat_encoding_aes_key,
     )
     app.include_router(wechat_router)
-
-# 企业微信智能机器人回调路由（仅当配置了机器人 Token 时注册）
-if settings.wechat_robot_token:
-    from src.wechat.robot_router import create_robot_router
-
-    robot_router = create_robot_router(
-        intent_router=intent_router,
-        agent_registry=agent_registry,
-        token=settings.wechat_robot_token,
-        encoding_aes_key=settings.wechat_robot_encoding_aes_key,
-    )
-    app.include_router(robot_router)
-
-# 企业微信群推送客户端（仅当配置了 Webhook URL 时创建）
-_webhook_client = None
-if settings.wechat_webhook_url:
-    from src.wechat.webhook import WechatWebhookClient
-
-    _webhook_client = WechatWebhookClient(settings.wechat_webhook_url)
