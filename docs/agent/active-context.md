@@ -38,13 +38,14 @@ Current implementation baseline:
 - Voice message support: WeChat Work built-in voice recognition text extracted from XML `<Recognition>` (self-built app) and JSON `voice.content` (intelligent robot), routed through existing intent pipeline. Empty recognition silently ignored.
 - Agent personality: each agent (QA/小管家, Fitness/铁块教练, Meal/小厨, Summary/会议纪要员) has a distinct persona with defined character, speaking style, and emotional tone.
 - Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite; QA, Fitness(today_plan), and Meal agents maintain cross-turn context.
+- Stage 1 knowledge-base RAG: SQLite-backed public/user/group scoped knowledge documents and chunks, local `.md`/`.txt` import CLI, scoped retrieval service, and QAAgent knowledge-context injection.
 
 ## Deferred Work
 
 The README and MVP spec list these as future scope:
 - Group robot webhook pushes for announcements, digests, and notifications (WechatWebhookClient class is implemented and tested; `_webhook_client` is created at startup but never called — needs APScheduler + agent integration to become operational).
 - APScheduler jobs for scheduled reminders and daily reports.
-- RAG or knowledge-base integration.
+- RAG Stage 2/3: hybrid vector retrieval, PDF/web imports, file upload UI, index rebuild operations, and broader Fitness/Meal/Summary integration.
 - Async customer-service message reply for self-built app callback (robot callback already uses active reply via `response_url`; self-built app still uses synchronous passive XML reply with 5-second timeout limitation).
 
 ## Working Guidance

@@ -103,3 +103,14 @@ Key rules:
 - Use in-memory SQLite or isolated async engines in fixtures.
 - Prefer focused module tests plus API smoke tests when adding behavior.
 - Graph agents are tested through `handle()` — the same interface as before, so existing test patterns remain valid.
+
+## Knowledge Base Pattern
+
+Knowledge retrieval is centralized in `src/knowledge/service.py`.
+
+- Agents must call `KnowledgeService.search()` instead of querying `knowledge_chunks` directly.
+- `search()` owns scope filtering: private chat can see `public + user`, group chat can see `public + group`.
+- Group chat does not read the speaker's user-private knowledge unless a future explicit opt-in is added.
+- Agents pass domain allowlists such as `["global", "qa"]`; they do not hard-code SQL filters.
+- `KnowledgeService.ingest()` owns validation, checksum deduplication, chunking, and ORM writes.
+- Stage 1 imports use `scripts/ingest_knowledge.py` for local `.md` / `.txt` files.

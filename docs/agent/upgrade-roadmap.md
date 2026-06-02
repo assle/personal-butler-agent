@@ -70,10 +70,10 @@
 
 ### 4.1 知识库集成
 
-- **当前**: QA agent 完全依赖 LLM 内置知识
-- **目标**: 接入向量数据库（如 Chroma/PGVector），存储健身知识、饮食数据库、历史对话摘要，增强回答质量
-- **收益**: 回答更专业、更个性化，减少 LLM 幻觉
-- **工作量**: 大（需要选择向量数据库、设计 embedding pipeline、改造 QA agent）
+- **当前**: Stage 1 已支持 SQLite 知识库、public/user/group scope 隔离、QAAgent RAG 注入、本地 `.md`/`.txt` 导入脚本。
+- **下一步**: 接入混合检索（FTS + embedding）、PDF/网页导入、文件上传 UI，并逐步扩展到 FitnessAgent 和 MealAgent。
+- **收益**: 回答更专业、更个性化，减少 LLM 幻觉，同时保留多用户/多群聊知识隔离。
+- **剩余工作量**: 中到大（主要取决于向量数据库、文件管理和后台索引重建需求）。
 
 ---
 
