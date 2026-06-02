@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     wechat_encoding_aes_key: str = ""
     wechat_agent_id: str = ""
 
+    # 企业微信服务端 API 密钥（用于获取 access_token，调用用户信息等接口）
+    wecom_corp_secret: str = ""
+
     # 企业微信智能机器人长连接模式配置
     wecom_aibot_bot_id: str = ""
     wecom_aibot_secret: str = ""
