@@ -127,6 +127,7 @@ async def lifespan(app: FastAPI):
             message=settings.scheduler_message,
             intent=settings.scheduler_intent,
             db_session_factory=async_session,
+            intent_router=intent_router,
         )
         scheduler.start()
         app.state.scheduler = scheduler
