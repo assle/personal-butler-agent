@@ -2,5 +2,6 @@
 from src.models.training import TrainingRecord
 from src.models.preference import UserPreference
 from src.models.group_message import GroupMessage
+from src.models.conversation import ConversationMessage, ConversationSummary
 
-__all__ = ["TrainingRecord", "UserPreference", "GroupMessage"]
+__all__ = ["TrainingRecord", "UserPreference", "GroupMessage", "ConversationMessage", "ConversationSummary"]
