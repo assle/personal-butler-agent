@@ -120,3 +120,16 @@ Reasoning:
 - **官方演进方向**: 2026 年 3 月企业微信发布长连接模式，这是官方重点迭代方向。
 
 Trade-off: 需要维护 WebSocket 连接（心跳、断线重连），增加了一定的运维复杂度。但这被更简单的部署和统一的消息通道所抵消。
+
+## ADR-012: 企微用户身份映射 — SQLite 缓存 + 服务端 API
+
+通过 `corp_id` + `corp_secret` 调用企微 `/cgi-bin/user/get` 获取用户详细信息（姓名/部门/头像等），缓存到本地 SQLite（TTL 24h），在消息处理流程中注入 agent extra_state。
+
+Reasoning:
+- **不依赖网页 OAuth**: Bot 消息回调中已有 `userid`，无需用户主动授权即可查询基本信息。网页 OAuth 路径需要用户手动触发且仅适用于 Web 入口。
+- **SQLite 缓存而非实时查询**: 用户信息变化频率低，24h TTL 大幅减少 API 调用次数（每次消息都实时查询会触发企微 API 频率限制）。过期数据在 API 失败时作为降级回退。
+- **独立 service 模块**: `WeComTokenManager` + `WeComUserService` 遵循项目的 service 层模式，WS 和 HTTP 两条消息路径复用同一套逻辑，避免代码重复。
+- **access_token 内存缓存**: token 7200s TTL，提前 5 分钟刷新，`asyncio.Lock` 防并发刷新风暴，避免每次用户查询都调 `gettoken`。
+- **可选配置**: `WECOM_CORP_SECRET` 未配置时整套功能静默跳过，不影响现有消息流程。
+
+Trade-off: 用户信息不够实时（最长 24h 延迟），但姓名/部门/头像等信息变化频次远低于消息交互频次。如果需要实时数据，可将 TTL 调短或提供手动刷新接口。
