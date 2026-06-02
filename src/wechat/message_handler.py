@@ -34,6 +34,7 @@ async def handle_ws_message(
     intent_router: IntentRouter,
     agent_registry: AgentRegistry,
     db: AsyncSession,
+    user_service=None,
 ):
     """处理从 WebSocket 收到的消息回调
 
@@ -44,6 +45,7 @@ async def handle_ws_message(
         intent_router: 意图路由器
         agent_registry: agent 注册表
         db: 数据库异步会话
+        user_service: 可选，企微用户信息服务，用于注入用户上下文
     """
     from_user = msg.get("from", {}).get("userid", "")
     msg_type = msg.get("msgtype", "text")
@@ -64,6 +66,19 @@ async def handle_ws_message(
         "WS handler: msg_type=%s, from_user=%s, chat_type=%s, chat_id=%s, content=%s",
         msg_type, from_user, chat_type, chat_id, content[:200],
     )
+
+    # 构建 extra_state（用户上下文 + 会话上下文）
+    extra_state: dict = {"chat_type": chat_type, "chat_id": chat_id or None}
+
+    # 查询企微用户信息注入 agent 上下文
+    if user_service is not None and from_user:
+        try:
+            user_info = await user_service.get_user(from_user, db)
+            if user_info is not None:
+                extra_state["user_name"] = user_info.name
+                extra_state["user_department"] = user_info.department
+        except Exception as e:
+            logger.warning("WS handler: failed to get user info for %s: %s", from_user, e)
 
     # 群聊消息处理
     is_group_trigger = False
@@ -89,7 +104,7 @@ async def handle_ws_message(
             try:
                 result = await agent.handle(
                     "summarize_group", content, from_user, db,
-                    extra_state={"chat_id": chat_id, "chat_type": "group"},
+                    extra_state=extra_state,
                 )
                 reply_text = result.reply
             except Exception as e:
@@ -107,7 +122,7 @@ async def handle_ws_message(
                 try:
                     result = await agent.handle(
                         intent, content, from_user, db,
-                        extra_state={"chat_type": chat_type, "chat_id": chat_id or None},
+                        extra_state=extra_state,
                     )
                     reply_text = result.reply
                 except Exception as e:
