@@ -29,6 +29,7 @@ from src.agents.fitness.nodes import (
 )
 from src.llm.client import LLMClient
 from src.schemas.response import AgentResponse
+from src.memory.conversation import ConversationMemory
 from src.graph.memory import checkpointer as _checkpointer
 
 
@@ -110,11 +111,25 @@ class FitnessAgent:
         返回:
             AgentResponse: 包含自然语言回复和可选结构化数据的响应
         """
+        memory = ConversationMemory(self._llm)
+
+        # 仅 today_plan 路径加载记忆上下文
+        summary = None
+        recent = []
+        if intent == "today_plan":
+            summary, recent = await memory.get_context(user_id, db)
+
         initial_state: dict = {
             "intent": intent,
             "message": message,
             "user_id": user_id,
+            "conversation_summary": summary,
+            "recent_messages": recent,
         }
         config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
         result = await self._graph.ainvoke(initial_state, config)
-        return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
+
+        reply = result.get("reply", "")
+        if intent == "today_plan":
+            await memory.save_exchange(user_id, message, reply, db)
+        return AgentResponse(reply=reply, data=result.get("data"))

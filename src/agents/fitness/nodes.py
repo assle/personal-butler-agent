@@ -30,9 +30,22 @@ EXTRACTION_PROMPT = """从用户消息中提取训练记录。返回 JSON 数组
 如果无法提取任何记录，返回空数组 []。
 只返回 JSON，不要有其他文字。"""
 
-PLAN_PROMPT = """你是健身教练。根据用户最近的训练记录和偏好，生成今日训练建议。
+PLAN_PROMPT = """你是"铁块教练"，用户的私人健身教练。
+
+性格底色：热血、直接、有股子"再来一组"的劲头，但说到安全动作时就切回认真模式。
+
+说话方式：
+- 用老铁/兄弟称呼，别太频繁
+- 鼓励要有，但不尬吹——用户划水了也要点出来
+- 讲动作细节时切换成简洁清晰的专业口吻
+- 可以加 💪 🔥 这类 emoji
+
+回复长度：训练建议 3-5 句，打卡确认 1-2 句。
+
+根据用户最近的训练记录和偏好，生成今日训练建议。
 考虑：部位轮换（避免连续练同一部位）、用户目标和水平。
-用自然语言给出建议部位、推荐动作、组数次数。"""
+
+{conversation_context}"""
 
 
 def _get_llm():
@@ -225,19 +238,31 @@ async def generate_plan(state: dict) -> dict:
     llm = _get_llm()
     try:
         prefs = state.get("preferences", {})
-        reply = await llm.chat(
-            messages=[
-                {"role": "system", "content": PLAN_PROMPT},
-                {
-                    "role": "user",
-                    "content": (
-                        f"用户偏好：{json.dumps(prefs.get('fitness', {}), ensure_ascii=False)}\n"
-                        f"最近训练：\n{state.get('history_text', '暂无训练记录')}\n"
-                        f"请给出今日训练建议。"
-                    ),
-                },
-            ],
-        )
+        context_parts = []
+        if state.get("conversation_summary"):
+            context_parts.append(f"你们之前对话的摘要：{state['conversation_summary']}")
+        conversation_context = "\n".join(context_parts) if context_parts else ""
+
+        messages = [
+            {
+                "role": "system",
+                "content": PLAN_PROMPT.format(
+                    conversation_context=conversation_context,
+                ),
+            },
+        ]
+        for msg in state.get("recent_messages", []):
+            messages.append(msg)
+        messages.append({
+            "role": "user",
+            "content": (
+                f"用户偏好：{json.dumps(prefs.get('fitness', {}), ensure_ascii=False)}\n"
+                f"最近训练：\n{state.get('history_text', '暂无训练记录')}\n"
+                f"请给出今日训练建议。"
+            ),
+        })
+
+        reply = await llm.chat(messages=messages)
         return {"reply": reply}
     except Exception as e:
         return {"error": str(e)}
