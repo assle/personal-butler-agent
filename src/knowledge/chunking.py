@@ -44,7 +44,12 @@ def chunk_text(text: str, max_chars: int = 800) -> list[KnowledgeChunkInput]:
 
         candidate_parts = [*current_parts, paragraph]
         candidate = "\n\n".join(candidate_parts)
-        if current_parts and len(candidate) > max_chars:
+        is_heading_context_only = (
+            len(current_parts) == 1
+            and current_parts[0] == current_heading
+            and not paragraph.startswith("#")
+        )
+        if current_parts and len(candidate) > max_chars and not is_heading_context_only:
             chunks.append("\n\n".join(current_parts))
             current_parts = []
             if current_heading and not paragraph.startswith("#"):

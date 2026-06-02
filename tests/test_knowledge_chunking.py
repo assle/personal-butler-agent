@@ -46,6 +46,28 @@ def test_chunk_text_splits_long_paragraph_groups():
     assert chunks[2].content == "第三段内容继续很长。"
 
 
+def test_chunk_text_does_not_emit_heading_only_chunk_on_first_overflow():
+    """验证标题和首段正文超长时不会生成仅标题 chunk
+
+    参数:
+        无
+
+    返回:
+        None；通过断言确认正文 chunk 保留标题上下文
+    """
+    heading = "# 健身原则"
+    body = "逐步增加负荷并保持动作标准。"
+    text = f"{heading}\n\n{body}"
+
+    chunks = chunk_text(text, max_chars=8)
+
+    assert all(chunk.content != heading for chunk in chunks)
+    assert any(
+        heading in chunk.content and body in chunk.content
+        for chunk in chunks
+    )
+
+
 def test_chunk_text_drops_blank_input():
     """验证空白输入不会生成 chunk
 
