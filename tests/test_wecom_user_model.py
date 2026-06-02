@@ -3,18 +3,17 @@ WeComUser ORM 模型测试
 验证表结构创建、字段唯一约束、is_fresh 缓存判断
 """
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from src.models.wecom_user import WeComUser
 
 
-@pytest.mark.asyncio
 async def test_create_wecom_user(db_session):
     """测试创建 WeComUser 记录并查询"""
     user = WeComUser(userid="zhangsan", name="张三")
     db_session.add(user)
     await db_session.flush()
 
-    from sqlalchemy import select
     result = await db_session.execute(
         select(WeComUser).where(WeComUser.userid == "zhangsan")
     )
@@ -24,7 +23,6 @@ async def test_create_wecom_user(db_session):
     assert found.last_synced_at is not None
 
 
-@pytest.mark.asyncio
 async def test_wecom_user_unique_constraint(db_session):
     """测试 userid 唯一约束"""
     user1 = WeComUser(userid="zhangsan", name="张三")
