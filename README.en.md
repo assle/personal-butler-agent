@@ -7,25 +7,26 @@ An AI personal butler system based on WeChat Work — manage fitness, meals, gro
 ## Architecture Overview
 
 ```
-User → WeChat Work Self-Built App → FastAPI Callback → Intent Router (Rules + LLM)
-                                                           ↓
-                                                     Agent Registry
-                                                           ↓
-                                           ┌───────┬───────┼───────┬────────┐
-                                           ↓       ↓       ↓       ↓        ↓
-                                        Fitness Summary  Meal     QA   (Extensible)
-                                           ↓       ↓       ↓       ↓
-                                           └───────┴───────┴───────┘
-                                                     │
-                                               StateGraph Engine
-                                            (LangGraph + MemorySaver)
-                                                     │
-                                                 SQLite Database
-                                                     │
-                                           ┌─────────┴──────────┐
-                                           ↓                    ↓
-                                    Self-Built App         Group Bot
-                                    Private Reply         Webhook Push
+User → WeChat Work Self-Built App ─┐
+                                    ├→ FastAPI / WS Wiring → Intent Router (Rules + LLM)
+User → WeChat Work AI Bot WS ───────┘                         ↓
+                                                        Agent Registry
+                                                              ↓
+                                              ┌───────┬───────┼───────┬────────┐
+                                              ↓       ↓       ↓       ↓        ↓
+                                           Fitness Summary  Meal     QA   (Extensible)
+                                              ↓       ↓       ↓       ↓
+                                              └───────┴───────┴───────┘
+                                                        │
+                                                  StateGraph Engine
+                                               (LangGraph + MemorySaver)
+                                                        │
+                                                    SQLite Database
+                                                        │
+                                              ┌─────────┴──────────┐
+                                              ↓                    ↓
+                                      Self-Built App Reply   AI Bot WebSocket
+                                      (Encrypted XML)        (Reply + Push)
 ```
 
 **Seven-layer Design:**
@@ -33,7 +34,7 @@ User → WeChat Work Self-Built App → FastAPI Callback → Intent Router (Rule
 | Layer | Technology | Description |
 |----|------|------|
 | Self-Built App | WeChat Work | Interaction entry point, receives user commands |
-| Group Bot | Webhook | Announcements, daily reports, notifications pushed to groups |
+| AI Bot | WeChat Work WebSocket long connection | Private chat, group @mentions, non-blocking message handling, and proactive push |
 | Agent Orchestration | LangGraph StateGraph | State machine driven, multi-step reasoning, conditional routing |
 | LLM | LangChain ChatOpenAI → DeepSeek | Intent understanding, content generation, structured extraction |
 | Rule Engine | Keyword Matching | Deterministic routing, zero cost |
@@ -60,15 +61,17 @@ User → WeChat Work Self-Built App → FastAPI Callback → Intent Router (Rule
 ```
 personal_butler_agent/
 ├── src/
-│   ├── main.py              # FastAPI app entry + AgentRegistry + conditional WeChat Work route startup
+│   ├── main.py              # FastAPI app entry + AgentRegistry + route / WS / scheduler startup
 │   ├── config.py            # .env configuration loader (LLM / DB / WeChat Work)
 │   ├── router/
 │   │   └── debug.py         # POST /api/debug/message (local debug endpoint)
 │   ├── wechat/              # WeChat Work integration module
 │   │   ├── crypto.py        # AES-256-CBC encrypt/decrypt + SHA1 signature verification
 │   │   ├── messages.py      # XML parse/build + message dataclasses
-│   │   ├── webhook.py       # Group bot webhook push client
-│   │   └── router.py        # GET/POST /api/wechat/callback
+│   │   ├── router.py        # GET/POST /api/wechat/callback
+│   │   ├── message_handler.py # AI bot WS message handler
+│   │   └── ws_client.py     # AI bot WebSocket long-connection client
+│   ├── scheduler/           # APScheduler LLM push jobs
 │   ├── intent/
 │   │   ├── rules.py         # Keyword rule matching
 │   │   └── router.py        # Rule-first + LLM fallback routing
@@ -97,10 +100,11 @@ personal_butler_agent/
 │   │   └── response.py      # Response schemas
 │   ├── llm/
 │   │   └── client.py        # ChatOpenAI wrapper (DeepSeek-compatible)
+│   ├── knowledge/           # Stage 1 SQLite knowledge retrieval
 │   └── db/
 │       ├── base.py          # SQLAlchemy DeclarativeBase
 │       └── session.py       # Async engine + session factory + get_db dependency injection
-├── tests/                   # 96 tests
+├── tests/                   # 118 tests
 ├── docs/
 │   ├── agent/               # Project memory docs (active-context / patterns / decisions / upgrade-roadmap)
 │   └── superpowers/
@@ -245,10 +249,12 @@ Adding a new Agent: create `state.py` + `nodes.py` + `graph.py` → register in 
 - Encryption: AES-256-CBC + PKCS#7 padding + SHA1 signature verification
 - Callback URL, Token, and EncodingAESKey are configured in WeChat Work admin console
 
-### Group Bot Webhook
+### AI Bot WebSocket Long Connection
 
-- `WechatWebhookClient` pushes text/markdown messages to group webhook URLs via HTTP POST
-- Client instance auto-created when `WECHAT_WEBHOOK_URL` is configured
+- User sends a private message to the AI bot or @mentions it in a group -> WeChat Work sends `aibot_msg_callback` over WebSocket
+- The app dispatches message handling in background tasks, so LLM calls do not block the WebSocket receive loop
+- Replies are sent with `aibot_respond_msg` while preserving the original `headers.req_id`
+- Scheduled pushes run through APScheduler and send results with `aibot_send_msg` to a userid or chatid
 
 ### Configuration Variables
 
@@ -258,7 +264,13 @@ Adding a new Agent: create `state.py` + `nodes.py` + `graph.py` → register in 
 | `WECHAT_TOKEN` | Callback required | URL verification Token |
 | `WECHAT_ENCODING_AES_KEY` | Callback required | Message encrypt/decrypt AES key |
 | `WECHAT_AGENT_ID` | No | Application AgentId |
-| `WECHAT_WEBHOOK_URL` | Push required | Group bot webhook URL |
+| `WECOM_AIBOT_BOT_ID` | AI bot required | AI bot BotID; enables the WebSocket long connection |
+| `WECOM_AIBOT_SECRET` | AI bot required | AI bot long-connection Secret |
+| `SCHEDULER_CRON` | Scheduled push optional | Cron expression, for example `0 9 * * 1-5` |
+| `SCHEDULER_TARGET_TYPE` | Scheduled push optional | Push target type: `single` or `group` |
+| `SCHEDULER_TARGET_ID` | Scheduled push optional | Single-chat userid or group chatid |
+| `SCHEDULER_MESSAGE` | Scheduled push optional | Message passed to the agent on schedule |
+| `SCHEDULER_INTENT` | Scheduled push optional | Optional intent; blank means automatic routing |
 
 ## Database
 
@@ -337,7 +349,7 @@ Preferences JSON structure is extensible — new modules add their own namespace
 ## Running Tests
 
 ```bash
-# Run all tests (96)
+# Run all tests (118)
 DEEPSEEK_API_KEY=test uv run pytest -q
 
 # Run a single module
@@ -469,16 +481,17 @@ Supports `chat_type` and `chat_id` fields for simulating group chat scenarios.
 | Status | Feature | Description |
 |------|------|------|
 | Implemented | Self-built app private chat Q&A | All intents fully functional |
+| Implemented | AI bot private chat + group @mentions | WebSocket long-connection replies, markdown, text/voice support, non-blocking message handling |
+| Implemented | APScheduler scheduled push | Cron triggers the agent pipeline and pushes via `aibot_send_msg` |
 | Implemented | Debug endpoint | Full local testing capability |
 | Implemented | Training data persistence | SQLite storage with history queries |
 | Implemented | User preference management | Auto-extract and persist preferences |
 | Implemented | Multi-turn conversation memory | 6-turn short-term + LLM-compressed summary, SQLite-persisted, survives restarts |
 | Implemented | Agent personality system | Four agents with distinct personas, speaking styles, and emotional tones |
 | Implemented | Group chat summarization | Passive collection + trigger-based summary |
-| Client exists, not wired | Group bot webhook push | `WechatWebhookClient` implemented and tested, not yet connected to agents and scheduler |
-| Not implemented | APScheduler scheduled tasks | Daily push, training reminders, etc. |
+| Implemented | RAG Stage 1 knowledge base | SQLite document/chunk storage, local `.md`/`.txt` import, QAAgent retrieval injection |
 | Not implemented | Async customer service reply | Overcome WeChat Work passive reply 5-second timeout |
-| Not implemented | RAG knowledge base | Enhanced answers with external knowledge |
+| Not implemented | RAG Stage 2/3 | Vector/hybrid retrieval, PDF/web imports, file upload, index rebuild |
 
 See [`docs/agent/upgrade-roadmap.md`](docs/agent/upgrade-roadmap.md) for details.
 
