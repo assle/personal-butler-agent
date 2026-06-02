@@ -41,6 +41,7 @@ async def test_log_training_extracts_and_saves(db_session, fitness_agent, mock_l
     """
     records_json = json.dumps([
         {
+            "training_type": "strength",
             "date": "2026-05-29",
             "muscle_group": "胸",
             "exercise": "卧推",
@@ -49,6 +50,7 @@ async def test_log_training_extracts_and_saves(db_session, fitness_agent, mock_l
             "weight_kg": 80.0,
         },
         {
+            "training_type": "strength",
             "date": "2026-05-29",
             "muscle_group": "胸",
             "exercise": "飞鸟",
@@ -76,6 +78,54 @@ async def test_log_training_extracts_and_saves(db_session, fitness_agent, mock_l
     assert records[0].muscle_group == "胸"
     assert records[0].exercise == "卧推"
     assert records[0].weight_kg == 80.0
+
+
+@pytest.mark.asyncio
+async def test_log_training_cardio_extracts_and_saves(db_session, fitness_agent, mock_llm):
+    """验证 log_training 意图对有氧训练的支持：LLM 提取 → 入库 → 回复
+
+    模拟 LLM 返回 1 条有氧训练记录 → 验证数据库写入 → 验证回复包含有氧信息。
+
+    参数:
+        db_session: 数据库会话 fixture
+        fitness_agent: FitnessAgent fixture
+        mock_llm: mock LLM 客户端 fixture
+    """
+    records_json = json.dumps([
+        {
+            "training_type": "cardio",
+            "date": "2026-06-01",
+            "exercise": "爬坡",
+            "duration_minutes": 30,
+            "speed": 4.6,
+            "incline": 13,
+            "calories": 150,
+        },
+    ])
+    mock_llm.chat_json.return_value = records_json
+
+    result = await fitness_agent.handle(
+        intent="log_training",
+        message="打卡 昨天练了爬坡，坡度13，速度4.6，时间30分钟 消耗150卡",
+        user_id="assle",
+        db=db_session,
+    )
+
+    assert "已记录" in result.reply
+    assert "爬坡" in result.reply
+    assert len(result.data["records"]) == 1
+    assert result.data["records"][0]["training_type"] == "cardio"
+    assert result.data["records"][0]["calories"] == 150
+
+    stmt = select(TrainingRecord).where(TrainingRecord.user_id == "assle")
+    db_result = await db_session.execute(stmt)
+    records = db_result.scalars().all()
+    assert len(records) == 1
+    assert records[0].training_type == "cardio"
+    assert records[0].exercise == "爬坡"
+    assert records[0].duration_minutes == 30
+    assert records[0].incline == 13
+    assert records[0].calories == 150
 
 
 @pytest.mark.asyncio
