@@ -35,3 +35,9 @@ class MealState(TypedDict, total=False):
 
     error: Optional[str]
     """执行过程中的错误信息"""
+
+    conversation_summary: Optional[str]
+    """早期对话的压缩摘要文本"""
+
+    recent_messages: list[dict]
+    """最近6轮对话消息列表"""

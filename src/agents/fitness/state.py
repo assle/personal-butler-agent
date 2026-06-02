@@ -45,3 +45,9 @@ class FitnessState(TypedDict, total=False):
 
     error: Optional[str]
     """执行过程中的错误信息，非空时触发错误处理节点"""
+
+    conversation_summary: Optional[str]
+    """早期对话的压缩摘要文本"""
+
+    recent_messages: list[dict]
+    """最近6轮对话消息列表"""
