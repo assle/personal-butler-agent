@@ -412,3 +412,64 @@ async def test_scheduler_intent_count_mismatch(mock_ws, mock_registry, mock_db_f
             intent="today_plan|make_meal_plan|qa",  # 3 个意图 vs 2 个目标
             db_session_factory=mock_db_factory,
         )
+
+
+@pytest.mark.asyncio
+async def test_scheduler_empty_intent_without_router(mock_ws, mock_registry, mock_db_factory):
+    """验证 intent 为空且未提供 intent_router 时，跳过目标不崩溃"""
+    from src.scheduler import SchedulerManager
+
+    # 不提供 intent_router
+    mgr = SchedulerManager(
+        ws_client=mock_ws,
+        agent_registry=mock_registry,
+        cron_expression="0 9 * * *",
+        target_type="single",
+        target_id="user1",
+        message="test",
+        intent="",
+        db_session_factory=mock_db_factory,
+        # intent_router=None (default)
+    )
+
+    await mgr._scheduled_push()
+    # 不应崩溃，不应推送
+    mock_ws.push_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_mixed_explicit_and_auto_intent(mock_ws, mock_registry, mock_db_factory, mock_router):
+    """验证混合 intent：第一个目标走指定 agent，第二个目标走自动路由"""
+    from src.scheduler import SchedulerManager
+    from src.schemas.response import AgentResponse
+    from unittest.mock import AsyncMock
+
+    mock_agent = AsyncMock()
+    mock_agent.handle.return_value = AgentResponse(reply="OK", data=None)
+    mock_registry.register("today_plan", mock_agent)
+    mock_registry.register("qa", mock_agent)
+
+    mgr = SchedulerManager(
+        ws_client=mock_ws,
+        agent_registry=mock_registry,
+        cron_expression="0 9 * * *",
+        target_type="single|single",
+        target_id="user1|user2",
+        message="今天练什么？|今天吃什么？",
+        intent="today_plan|",  # 第一个指定，第二个自动路由
+        db_session_factory=mock_db_factory,
+        intent_router=mock_router,
+    )
+
+    await mgr._scheduled_push()
+
+    # intent_router 只对第二个目标调用（第一个 intent 已有值）
+    mock_router.route.assert_called_once_with("今天吃什么？")
+
+    assert mock_agent.handle.call_count == 2
+    # 第一个：直接使用 today_plan
+    assert mock_agent.handle.call_args_list[0].kwargs["intent"] == "today_plan"
+    # 第二个：router 返回 "qa"
+    assert mock_agent.handle.call_args_list[1].kwargs["intent"] == "qa"
+
+    assert mock_ws.push_message.call_count == 2

@@ -51,8 +51,6 @@ class SchedulerManager:
         self._ws = ws_client
         self._agent_registry = agent_registry
         self._cron = cron_expression
-        self._message = message
-        self._intent = intent
         self._db_session_factory = db_session_factory
         self._intent_router = intent_router
         self._scheduler = AsyncIOScheduler()
