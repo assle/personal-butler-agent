@@ -17,8 +17,8 @@ Current implementation baseline:
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek
 - Persistence: `training_records`, `user_preferences`, `group_messages`
 - Multi-turn memory: LangGraph `MemorySaver` checkpointing (in-memory, per user_id thread)
-- Verification baseline: 118 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
-- Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_SECRET` for intelligent robot WebSocket long-connection mode (replaces HTTP callback + `response_url` reply); `SCHEDULER_CRON`/`SCHEDULER_MESSAGE`/etc. for APScheduler timed push (alongside existing `WECHAT_CORP_ID` + `WECHAT_TOKEN` + `WECHAT_ENCODING_AES_KEY` for self-built app)
+- Verification baseline: 132 tests passing with `DEEPSEEK_API_KEY=test uv run pytest -q`
+- Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_SECRET` for intelligent robot WebSocket long-connection mode (replaces HTTP callback + `response_url` reply); `SCHEDULER_CRON`/`SCHEDULER_MESSAGE`/etc. for APScheduler timed push (alongside existing `WECHAT_CORP_ID` + `WECHAT_TOKEN` + `WECHAT_ENCODING_AES_KEY` for self-built app); `WECOM_CORP_SECRET` for server API access_token / user info queries (paired with `WECHAT_CORP_ID`)
 
 ## What Is Implemented
 
@@ -40,6 +40,7 @@ Current implementation baseline:
 - Agent personality: each agent (QA/小管家, Fitness/铁块教练, Meal/小厨, Summary/会议纪要员) has a distinct persona with defined character, speaking style, and emotional tone.
 - Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite; QA, Fitness(today_plan), and Meal agents maintain cross-turn context.
 - Stage 1 knowledge-base RAG: SQLite-backed public/user/group scoped knowledge documents and chunks, local `.md`/`.txt` import CLI, scoped retrieval service, and QAAgent knowledge-context injection.
+- WeChat Work user identity mapping: `WeComTokenManager` (access_token caching with asyncio.Lock, 5-minute early refresh), `WeComUserService` (user info query + SQLite caching with 24h TTL, graceful degradation to stale cache on API failure), `WeComUser` ORM model. Inject `user_name` / `user_department` into agent extra_state for personalized replies. Requires `WECOM_CORP_SECRET` + `WECHAT_CORP_ID` both configured; silently skipped when not set.
 
 ## Deferred Work
 
