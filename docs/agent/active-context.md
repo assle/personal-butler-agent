@@ -36,6 +36,8 @@ Current implementation baseline:
 - Multi-turn conversation memory via LangGraph MemorySaver (in-memory, per user_id thread).
 - Test fixtures that mock LLM behaviors and use isolated test DB setup.
 - Voice message support: WeChat Work built-in voice recognition text extracted from XML `<Recognition>` (self-built app) and JSON `voice.content` (intelligent robot), routed through existing intent pipeline. Empty recognition silently ignored.
+- Agent personality: each agent (QA/小管家, Fitness/铁块教练, Meal/小厨, Summary/会议纪要员) has a distinct persona with defined character, speaking style, and emotional tone.
+- Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite; QA, Fitness(today_plan), and Meal agents maintain cross-turn context.
 
 ## Deferred Work
 
