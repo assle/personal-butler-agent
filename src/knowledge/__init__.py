@@ -5,10 +5,12 @@ from src.knowledge.schemas import (
     KnowledgeIngestRequest,
 )
 from src.knowledge.chunking import chunk_text
+from src.knowledge.service import KnowledgeService
 
 __all__ = [
     "KnowledgeChunkInput",
     "KnowledgeChunkResult",
     "KnowledgeIngestRequest",
+    "KnowledgeService",
     "chunk_text",
 ]
