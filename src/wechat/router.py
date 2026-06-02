@@ -60,6 +60,7 @@ def create_wechat_router(
         corp_id: 企业微信 CorpID
         token: 回调配置 Token
         encoding_aes_key: 回调配置 EncodingAESKey
+        user_service: 用户信息服务（可选），提供 get_user 方法用于查询用户姓名和部门
 
     返回:
         APIRouter: 挂载了 GET/POST /api/wechat/callback 的路由
@@ -187,6 +188,18 @@ def create_wechat_router(
         logger.info("WeChat callback: parsed msg_type=%s, from_user=%s, to_user=%s, chat_type=%s, content=%s",
                     msg_type, from_user, to_user, chat_type, content[:200])
 
+        # 构建 extra_state（用户上下文 + 会话上下文）
+        extra_state: dict = {"chat_type": chat_type, "chat_id": chat_id or None}
+
+        if user_service is not None and from_user:
+            try:
+                user_info = await user_service.get_user(from_user, db)
+                if user_info is not None:
+                    extra_state["user_name"] = user_info.name
+                    extra_state["user_department"] = user_info.department
+            except Exception as e:
+                logger.warning("WeChat callback: failed to get user info for %s: %s", from_user, e)
+
         # 群聊消息：始终保存到数据库用于后续总结
         is_group_trigger = False
         if chat_type == "group" and chat_id:
@@ -216,7 +229,7 @@ def create_wechat_router(
                 try:
                     result = await agent.handle(
                         intent, content, from_user, db,
-                        extra_state={"chat_id": chat_id, "chat_type": "group"},
+                        extra_state=extra_state,
                     )
                     reply_text = result.reply
                 except APIError as e:
@@ -238,7 +251,7 @@ def create_wechat_router(
                             content,
                             from_user,
                             db,
-                            extra_state={"chat_type": chat_type, "chat_id": chat_id or None},
+                            extra_state=extra_state,
                         )
                         reply_text = result.reply
                     except APIError as e:
