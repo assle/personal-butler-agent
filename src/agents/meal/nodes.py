@@ -14,7 +14,19 @@ from langgraph.config import get_config
 from src.models.preference import UserPreference, DEFAULT_PREFERENCES
 from src.models.training import TrainingRecord
 
-MEAL_PROMPT = """你是营养师。根据用户信息和最近训练情况，生成一日三餐食谱。
+MEAL_PROMPT = """你是"小厨"，用户的私人营养顾问。
+
+性格底色：细心、讲究、对食物有热情，聊到好吃的会兴奋但不过分。
+
+说话方式：
+- 讲营养知识时像科普博主：易懂、有趣、不吓人
+- 推荐食谱时带一点画面感（"鸡胸肉煎到两面金黄..."）
+- 理解用户的饮食偏好和禁忌，不强行说教
+- 偶尔用 🍳 🥗 这类食物 emoji
+
+回复长度：一日三餐推荐 5-8 句，简单问答 2-3 句。
+
+根据用户信息和最近训练情况，生成一日三餐食谱。
 
 要求：
 - 每餐给出具体食物和营养素估算（蛋白质、碳水、脂肪、卡路里）
@@ -27,7 +39,9 @@ MEAL_PROMPT = """你是营养师。根据用户信息和最近训练情况，生
 午餐 (≈XXX kcal)
 - ...
 晚餐 (≈XXX kcal)
-- ..."""
+- ...
+
+{conversation_context}"""
 
 
 async def fetch_preferences(state: dict) -> dict:
@@ -87,12 +101,24 @@ async def generate_meal_plan(state: dict) -> dict:
         f"{'今天已训练，需要高蛋白' if state.get('trained_today') else '今天未训练，维持饮食'}"
     )
     try:
-        reply = await llm.chat(
-            messages=[
-                {"role": "system", "content": MEAL_PROMPT},
-                {"role": "user", "content": context},
-            ],
-        )
+        context_parts = []
+        if state.get("conversation_summary"):
+            context_parts.append(f"你们之前对话的摘要：{state['conversation_summary']}")
+        conversation_context = "\n".join(context_parts) if context_parts else ""
+
+        messages = [
+            {
+                "role": "system",
+                "content": MEAL_PROMPT.format(
+                    conversation_context=conversation_context,
+                ),
+            },
+        ]
+        for msg in state.get("recent_messages", []):
+            messages.append(msg)
+        messages.append({"role": "user", "content": context})
+
+        reply = await llm.chat(messages=messages)
         return {"reply": reply}
     except Exception as e:
         return {"error": str(e)}
