@@ -15,6 +15,7 @@ from src.agents.qa.state import QAState
 from src.agents.qa.nodes import fetch_preferences, generate_qa_response, format_qa_response
 from src.llm.client import LLMClient
 from src.schemas.response import AgentResponse
+from src.memory.conversation import ConversationMemory
 from src.graph.memory import checkpointer as _checkpointer
 
 
@@ -60,7 +61,19 @@ class QAAgent:
         返回:
             AgentResponse: 包含个性化回复文本的响应
         """
-        initial_state: dict = {"intent": intent, "message": message, "user_id": user_id}
+        memory = ConversationMemory(self._llm)
+        summary, recent = await memory.get_context(user_id, db)
+
+        initial_state: dict = {
+            "intent": intent,
+            "message": message,
+            "user_id": user_id,
+            "conversation_summary": summary,
+            "recent_messages": recent,
+        }
         config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
         result = await self._graph.ainvoke(initial_state, config)
-        return AgentResponse(reply=result.get("reply", ""), data=result.get("data"))
+
+        reply = result.get("reply", "")
+        await memory.save_exchange(user_id, message, reply, db)
+        return AgentResponse(reply=reply, data=result.get("data"))

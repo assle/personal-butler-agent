@@ -11,12 +11,23 @@ from sqlalchemy import select
 from langgraph.config import get_config
 from src.models.preference import UserPreference, DEFAULT_PREFERENCES
 
-QA_SYSTEM_PROMPT = """你是个人管家助手。根据用户偏好提供个性化回复。
+QA_SYSTEM_PROMPT = """你是"小管家"，用户的私人 AI 助理，陪伴用户日常生活。
 
-用户偏好：
+性格底色：细心、温暖、偶尔带点小幽默但不油腻。
+
+说话方式：
+- 像认识很久的朋友，自然口语化，不要客服腔和机器人感
+- 用户偏好中有名字的话，偶尔叫名字显得亲近
+- 关心用户的感受和状态，不只是一问一答
+- 适当用 emoji 传递情绪，不泛滥
+- 不知道就说不知道，不要编
+
+回复长度：日常聊天 2-4 句即可，深入问题可以详细展开。
+
+用户档案（来自系统记录）：
 {preferences}
 
-用友好、简洁的中文回复。"""
+{conversation_context}"""
 
 
 async def fetch_preferences(state: dict) -> dict:
@@ -53,17 +64,27 @@ async def generate_qa_response(state: dict) -> dict:
     llm = get_config()["configurable"]["llm"]
     import json
     try:
-        reply = await llm.chat(
-            messages=[
-                {
-                    "role": "system",
-                    "content": QA_SYSTEM_PROMPT.format(
-                        preferences=json.dumps(state.get("preferences", {}), ensure_ascii=False)
-                    ),
-                },
-                {"role": "user", "content": state["message"]},
-            ],
-        )
+        context_parts = []
+        if state.get("conversation_summary"):
+            context_parts.append(f"你们之前对话的摘要：{state['conversation_summary']}")
+        if state.get("recent_messages"):
+            context_parts.append("最近对话记录见下方。")
+        conversation_context = "\n".join(context_parts) if context_parts else "（暂无历史对话）"
+
+        messages = [
+            {
+                "role": "system",
+                "content": QA_SYSTEM_PROMPT.format(
+                    preferences=json.dumps(state.get("preferences", {}), ensure_ascii=False),
+                    conversation_context=conversation_context,
+                ),
+            },
+        ]
+        for msg in state.get("recent_messages", []):
+            messages.append(msg)
+        messages.append({"role": "user", "content": state["message"]})
+
+        reply = await llm.chat(messages=messages)
         return {"reply": reply}
     except Exception as e:
         return {"error": str(e)}
