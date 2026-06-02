@@ -217,3 +217,27 @@ async def test_domain_filter_blocks_unrelated_chunks(db_session):
     )
 
     assert results == []
+
+
+def test_ingest_request_rejects_invalid_private_scope():
+    """验证私有知识缺少 scope_id 时会被拒绝
+
+    参数:
+        无
+
+    返回:
+        None；通过断言确认非法导入请求抛出 ValueError
+    """
+    service = KnowledgeService()
+    request = KnowledgeIngestRequest(
+        title="非法资料",
+        source="invalid.md",
+        content="这份资料缺少用户或群聊 ID。",
+        scope_type="user",
+        scope_id=None,
+        domain="qa",
+        created_by="user_a",
+    )
+
+    with pytest.raises(ValueError, match="Private knowledge must have scope_id"):
+        service._validate_request(request)
