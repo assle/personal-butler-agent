@@ -35,3 +35,15 @@ class QAState(TypedDict, total=False):
 
     recent_messages: list[dict]
     """最近6轮对话消息列表，每条为 {"role": "user"|"assistant", "content": "..."}"""
+
+    chat_type: str
+    """会话类型："single" 或 "group"，用于知识库 scope 过滤"""
+
+    chat_id: Optional[str]
+    """群聊 ID，群聊知识库检索时使用"""
+
+    knowledge_context: list[dict]
+    """知识库检索结果列表，用于注入 LLM prompt"""
+
+    knowledge_error: Optional[str]
+    """知识库检索错误信息；存在时不阻断 QA 回复"""

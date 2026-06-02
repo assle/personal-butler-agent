@@ -9,6 +9,7 @@ Workflow:
 import json
 from sqlalchemy import select
 from langgraph.config import get_config
+from src.knowledge.service import KnowledgeService
 from src.models.preference import UserPreference, DEFAULT_PREFERENCES
 
 QA_SYSTEM_PROMPT = """你是"小管家"，用户的私人 AI 助理，陪伴用户日常生活。
@@ -26,6 +27,8 @@ QA_SYSTEM_PROMPT = """你是"小管家"，用户的私人 AI 助理，陪伴用�
 
 用户档案（来自系统记录）：
 {preferences}
+
+{knowledge_context}
 
 {conversation_context}"""
 
@@ -52,6 +55,63 @@ async def fetch_preferences(state: dict) -> dict:
     return {"preferences": preferences_summary}
 
 
+def _format_knowledge_context(items: list[dict]) -> str:
+    """格式化知识库检索结果为 prompt 文本
+
+    参数:
+        items: 知识库检索结果字典列表
+
+    返回:
+        str: 可直接注入 system prompt 的知识库上下文
+    """
+    if not items:
+        return "（暂无可参考的知识库资料）"
+    blocks = ["以下是可参考的知识库资料。优先使用这些资料回答；资料不足时要明确说不知道，不要编造。"]
+    for index, item in enumerate(items, start=1):
+        blocks.append(
+            f"[{index}] {item['title']} - {item['source']}\n{item['content']}"
+        )
+    return "\n\n".join(blocks)
+
+
+async def retrieve_knowledge(state: dict) -> dict:
+    """检索 QA 可用的知识库资料
+
+    参数:
+        state: 包含 message、user_id、chat_type、chat_id 的当前状态
+
+    返回:
+        dict: {"knowledge_context": [...]} 或 {"knowledge_error": "...", "knowledge_context": []}
+    """
+    db = get_config()["configurable"]["db"]
+    service = KnowledgeService()
+    try:
+        results = await service.search(
+            query=state["message"],
+            user_id=state["user_id"],
+            db=db,
+            chat_type=state.get("chat_type", "single"),
+            chat_id=state.get("chat_id"),
+            domains=["global", "qa"],
+            limit=5,
+        )
+        return {
+            "knowledge_context": [
+                {
+                    "content": item.content,
+                    "title": item.title,
+                    "source": item.source,
+                    "score": item.score,
+                    "scope_type": item.scope_type,
+                    "domain": item.domain,
+                }
+                for item in results
+            ]
+        }
+    except Exception as e:
+        return {"knowledge_error": str(e), "knowledge_context": []}
+
+
 async def generate_qa_response(state: dict) -> dict:
     """调用 LLM 生成个性化问答回复
 
@@ -62,7 +122,6 @@ async def generate_qa_response(state: dict) -> dict:
         dict: {"reply": LLM 生成的回复文本} 或 {"error": 错误信息}
     """
     llm = get_config()["configurable"]["llm"]
-    import json
     try:
         context_parts = []
         if state.get("conversation_summary"):
@@ -76,6 +135,9 @@ async def generate_qa_response(state: dict) -> dict:
                 "role": "system",
                 "content": QA_SYSTEM_PROMPT.format(
                     preferences=json.dumps(state.get("preferences", {}), ensure_ascii=False),
+                    knowledge_context=_format_knowledge_context(
+                        state.get("knowledge_context", [])
+                    ),
                     conversation_context=conversation_context,
                 ),
             },

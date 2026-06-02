@@ -203,4 +203,15 @@ class KnowledgeService:
             if term
         ]
         matched = sum(1 for term in terms if term in haystack)
-        return float(matched)
+        if matched > 0:
+            return float(matched)
+
+        compact_query = "".join(
+            char for char in normalized_query if char.isalnum() or "\u4e00" <= char <= "\u9fff"
+        )
+        bigrams = {
+            compact_query[index:index + 2]
+            for index in range(max(0, len(compact_query) - 1))
+        }
+        bigram_matches = sum(1 for bigram in bigrams if bigram in haystack)
+        return float(bigram_matches) / 10.0

@@ -99,7 +99,14 @@ class FitnessAgent:
 
         return builder.compile(checkpointer=_checkpointer)
 
-    async def handle(self, intent: str, message: str, user_id: str, db) -> AgentResponse:
+    async def handle(
+        self,
+        intent: str,
+        message: str,
+        user_id: str,
+        db,
+        extra_state: dict | None = None,
+    ) -> AgentResponse:
         """处理用户消息的入口方法
 
         参数:
@@ -107,6 +114,7 @@ class FitnessAgent:
             message: 用户原始消息文本
             user_id: 用户唯一标识
             db: SQLAlchemy 异步数据库会话
+            extra_state: 可选，路由层传入的额外上下文；当前健身 agent 不使用
 
         返回:
             AgentResponse: 包含自然语言回复和可选结构化数据的响应
