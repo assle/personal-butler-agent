@@ -6,11 +6,9 @@ Workflow:
 1. 创建 LLMClient、IntentRouter、各业务 agent 单例
 2. 向 AgentRegistry 注册所有 intent → agent 映射
 3. lifespan 中初始化数据库表结构
-4. 条件启动 WebSocket 长连接客户端（仅当 WECOM_AIBOT_BOT_ID 已配置）
-5. 条件启动 APScheduler 定时调度器（仅当 SCHEDULER_CRON 和 SCHEDULER_TARGET_ID 已配置）
-6. 注册调试路由（始终可用）
+4. 注册调试路由和智能机器人 URL 回调路由
+5. URL 回调模式不再启动 WebSocket 长连接客户端
 """
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -50,100 +48,28 @@ agent_registry.register("qa", qa_agent)
 agent_registry.register("unknown", qa_agent)
 agent_registry.set_fallback(qa_agent)
 
-# wecom_user_service: 可在 lifespan 中初始化为 WeComUserService 实例
-wecom_user_service = None
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI 生命周期管理
 
-    应用启动时自动创建数据库表结构，启动 WebSocket 长连接和定时调度器。
-    关闭时释放连接。
+    应用启动时自动创建数据库表结构。URL 回调模式下不再启动 WebSocket 长连接。
 
     参数:
         app: FastAPI 应用实例
     """
     from src.db.base import Base
-    from src.db.session import engine, async_session
+    from src.db.session import engine
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # 初始化企微用户信息服务（需要 corp_id 和 corp_secret 同时配置）
-    wecom_user_service = None
-    if settings.wecom_corp_secret and settings.wechat_corp_id:
-        from src.wecom.token_manager import WeComTokenManager
-        from src.wecom.user_service import WeComUserService
-
-        token_manager = WeComTokenManager(
-            corp_id=settings.wechat_corp_id,
-            corp_secret=settings.wecom_corp_secret,
-        )
-        wecom_user_service = WeComUserService(token_manager=token_manager)
-        app.state.wecom_user_service = wecom_user_service
-        logger.info("WeComUserService: initialized")
-
-    ws_task = None
-    scheduler = None
-
-    # 启动智能机器人 WebSocket 长连接
-    if settings.wecom_aibot_bot_id:
-        from src.wechat.ws_client import WeComWSClient
-        from src.wechat.message_handler import handle_ws_message
-
-        ws_client = WeComWSClient(
-            bot_id=settings.wecom_aibot_bot_id,
-            secret=settings.wecom_aibot_secret,
-        )
-        app.state.ws_client = ws_client
-
-        async def on_message_callback(msg: dict, req_id: str):
-            async with async_session() as db:
-                try:
-                    await handle_ws_message(
-                        msg, req_id, ws_client, intent_router, agent_registry, db,
-                        user_service=wecom_user_service,
-                    )
-                    await db.commit()
-                except Exception:
-                    await db.rollback()
-                    logger.exception("WS message handler: unhandled error")
-
-        ws_client.on_message = on_message_callback
-        ws_task = asyncio.create_task(ws_client.run())
-        logger.info("WS client: started")
-
-    # 启动 APScheduler 定时推送（需要 WS 客户端先启动）
-    if settings.scheduler_cron and settings.scheduler_target_id and settings.wecom_aibot_bot_id:
-        from src.scheduler import SchedulerManager
-
-        scheduler = SchedulerManager(
-            ws_client=app.state.ws_client,
-            agent_registry=agent_registry,
-            cron_expression=settings.scheduler_cron,
-            target_type=settings.scheduler_target_type,
-            target_id=settings.scheduler_target_id,
-            message=settings.scheduler_message,
-            intent=settings.scheduler_intent,
-            db_session_factory=async_session,
-            intent_router=intent_router,
-        )
-        scheduler.start()
-        app.state.scheduler = scheduler
+    if settings.wecom_aibot_secret:
+        logger.warning("WECOM_AIBOT_SECRET is ignored in URL callback mode")
+    if settings.scheduler_cron and settings.scheduler_target_id:
+        logger.warning("Scheduler push is disabled in URL callback mode because WebSocket is not started")
 
     yield
 
-    # 关闭
-    if scheduler is not None:
-        scheduler.shutdown()
-    if ws_task is not None:
-        await app.state.ws_client.stop()
-        ws_task.cancel()
-        try:
-            await ws_task
-        except asyncio.CancelledError:
-            pass
     await engine.dispose()
 
 
@@ -155,3 +81,20 @@ debug_router = create_debug_router(
     agent_registry=agent_registry,
 )
 app.include_router(debug_router)
+
+# 智能机器人 URL 回调路由（Token + EncodingAESKey 配置完整时注册）
+if settings.wecom_aibot_token and settings.wecom_aibot_encoding_aes_key:
+    from src.db.session import async_session
+    from src.wechat.callback_router import create_aibot_callback_router
+
+    app.include_router(
+        create_aibot_callback_router(
+            token=settings.wecom_aibot_token,
+            encoding_aes_key=settings.wecom_aibot_encoding_aes_key,
+            receive_id=settings.wecom_aibot_bot_id,
+            intent_router=intent_router,
+            agent_registry=agent_registry,
+            db_session_factory=async_session,
+        )
+    )
+    logger.info("AIBot callback route: registered")

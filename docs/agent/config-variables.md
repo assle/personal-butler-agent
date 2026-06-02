@@ -38,37 +38,33 @@ DEEPSEEK_API_KEY=test uv run pytest -q
 
 Tests should mock LLM calls and should not depend on the placeholder key being valid.
 
-## 智能机器人长连接模式
+## 智能机器人 URL 回调模式
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `WECOM_AIBOT_BOT_ID` | No | `""` | 智能机器人 BotId，用于长连接鉴权 |
-| `WECOM_AIBOT_SECRET` | No | `""` | 智能机器人 Secret，用于长连接鉴权 |
+| `WECOM_AIBOT_BOT_ID` | No | `""` | 智能机器人 BotID，用于消息体 `aibotid` 校验 |
+| `WECOM_AIBOT_TOKEN` | No | `""` | 智能机器人 URL 回调 Token，用于签名校验 |
+| `WECOM_AIBOT_ENCODING_AES_KEY` | No | `""` | 智能机器人 URL 回调 EncodingAESKey，用于消息加解密 |
 
-当 `WECOM_AIBOT_BOT_ID` 和 `WECOM_AIBOT_SECRET` 同时设置时，应用启动时建立 WebSocket 长连接到企业微信智能机器人网关。长连接模式无需公网 IP/域名/SSL、无需消息加解密，支持消息收发和主动推送（`aibot_send_msg`）。
+当 `WECOM_AIBOT_TOKEN` 和 `WECOM_AIBOT_ENCODING_AES_KEY` 同时设置时，应用注册 `GET/POST /api/wechat/aibot/callback`。企业微信后台 URL 配置为：
+
+```text
+https://<你的域名>/api/wechat/aibot/callback
+```
+
+URL 回调模式需要公网 HTTPS、Token 和 EncodingAESKey。应用收到消息后先写入 `inbound_messages`，再后台处理并通过消息体中的 `response_url` 发送 markdown 回复。
 
 ```env
 WECOM_AIBOT_BOT_ID=bot-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-WECOM_AIBOT_SECRET=your-bot-secret
+WECOM_AIBOT_TOKEN=your-callback-token
+WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
 ```
 
-与回调模式的关键差异：
-- 连接方式：WebSocket 长连接替代 HTTP 回调
-- 消息格式：企业微信智能机器人 JSON WebSocket 协议
-- 回复方式：通过 WebSocket 连接下发消息，支持 `aibot_send_msg` 主动推送
-- 部署：无需公网地址，无需 AES 加解密
-
-## 企业微信服务端 API
-
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `WECOM_CORP_SECRET` | No | `""` | 企微 Secret，用于调用 `/cgi-bin/gettoken` 获取 access_token，进而查询用户详细信息（姓名/部门/头像等） |
-
-当 `WECOM_CORP_SECRET` 和 `WECHAT_CORP_ID` 同时设置时，应用启动时初始化 `WeComUserService`，在 Bot 消息处理流程中自动查询用户信息并注入 agent 上下文（user_name / user_department），本地 SQLite 缓存 TTL 24h。
-
-```env
-WECOM_CORP_SECRET=your-app-secret
-```
+关键差异：
+- 入站方式：企业微信通过 HTTP POST 回调公网 URL，而不是应用主动维持 WebSocket
+- 消息可靠性：回调路由按 `msgid` 幂等落库，便于去重和失败追踪
+- 回复方式：通过消息里的临时 `response_url` 被动回复
+- 主动推送：当前不启动 WebSocket，因此 `aibot_send_msg` 和 APScheduler 主动推送暂不可用
 
 ## APScheduler 定时推送
 
@@ -82,7 +78,7 @@ WECOM_CORP_SECRET=your-app-secret
 
 所有四个字段 `TARGET_TYPE`、`TARGET_ID`、`MESSAGE`、`INTENT` 均使用 `|` 分隔，按位置配对。单值格式（无 `|`）保持向前兼容。
 
-当 `SCHEDULER_CRON`、`SCHEDULER_TARGET_ID` 同时设置且长连接模式已启用时，应用启动时注册 APScheduler 定时任务，按 cron 表达式周期触发 LLM 推送。
+当前 URL 回调模式不启动 WebSocket，因此即使 `SCHEDULER_CRON`、`SCHEDULER_TARGET_ID` 已设置，应用也不会启动 APScheduler 主动推送。后续如恢复定时提醒，需要重新设计独立主动发送通道。
 
 ```env
 # 单目标（与原有格式兼容）

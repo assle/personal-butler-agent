@@ -26,9 +26,10 @@
 
 ## 二、定时调度
 
-### 2.1 APScheduler 定时推送 ✅
+### 2.1 APScheduler 定时推送
 
-- **当前**: 已实现。通过智能机器人 WebSocket 长连接模式的 `aibot_send_msg` 主动推送能力，配合 APScheduler 实现可配置的定时 LLM 推送（支持 cron 表达式、目标类型/ID、触发消息）。`src/scheduler/` 在 lifespan 中启动，定时任务通过 WebSocket 连接下发消息到指定的单聊或群聊。
+- **当前**: URL 回调模式下暂时关闭。历史实现依赖智能机器人 WebSocket 长连接的 `aibot_send_msg` 主动推送；切到 URL 回调后，应用不再启动 WebSocket，因此 `src/scheduler/` 保留但不在 lifespan 中启动。
+- **目标**: 重新设计可靠主动推送通道，避免与 URL 回调入站可靠性目标冲突。
 - **收益**: 自动化群组通知，无需手动触发
 
 ### 2.2 定时提醒和摘要
@@ -114,4 +115,4 @@
 | 中 | 预计 1-3 小时 |
 | 大 | 预计半天以上 |
 
-最后更新: 2026-06-02（APScheduler 定时推送已完成，智能机器人升级为长连接模式；更新相关渠道引用）
+最后更新: 2026-06-02（智能机器人从 WebSocket 长连接入站切换为 URL 回调入站；APScheduler 主动推送暂时关闭）

@@ -7,9 +7,8 @@
 ## 架构概览
 
 ```
-用户 → 企业微信自建应用 ─┐
-                         ├→ FastAPI 回调接口 → Intent Router (规则 + LLM)
-用户 → 企业微信智能机器人长连接 ─┘                        ↓
+用户 → 企业微信智能机器人 URL 回调 → FastAPI 回调接口 → Intent Router (规则 + LLM)
+                                                                     ↓
                                                   Agent Registry
                                                          ↓
                                          ┌───────┬───────┼───────┬────────┐
@@ -23,10 +22,9 @@
                                                    │
                                                SQLite 数据库
                                                    │
-                                         ┌─────────┴──────────┐
-                                         ↓                    ↓
-                                  自建应用回复       智能机器人 WS
-                                  (加密 XML)       (回复 + 主动推送)
+                                                   ↓
+                                             智能机器人回调
+                                            (response_url 回复)
                                          ↓
                                    企业微信用户/群聊
 ```
@@ -35,8 +33,7 @@
 
 | 层 | 技术 | 说明 |
 |----|------|------|
-| 自建应用 | 企业微信 | 交互入口，接收用户指令 |
-| 智能机器人 | 企业微信 WebSocket 长连接 | 第二条消息入口，支持私聊、群聊 @、非阻塞消息处理和主动推送 |
+| 智能机器人 | 企业微信 URL 回调 | 交互入口，支持私聊、群聊 @、入站落库、后台处理和 response_url 回复 |
 | Agent 编排 | LangGraph StateGraph | 状态机驱动，多步推理，条件路由 |
 | LLM | LangChain ChatOpenAI → DeepSeek | 意图理解、内容生成、结构化提取 |
 | 规则模块 | 关键词匹配 | 确定性路由，零成本 |
@@ -63,17 +60,17 @@
 ```
 personal_butler_agent/
 ├── src/
-│   ├── main.py              # FastAPI 应用入口 + AgentRegistry 注册 + 条件启动企业微信路由/长连接/调度器
+│   ├── main.py              # FastAPI 应用入口 + AgentRegistry 注册 + 条件注册企业微信 URL 回调
 │   ├── config.py            # .env 配置加载（LLM / DB / 企业微信）
 │   ├── router/
 │   │   └── debug.py         # POST /api/debug/message（本地调试端点）
 │   ├── wechat/              # 企业微信集成模块
-│   │   ├── crypto.py        # AES-256-CBC 加解密 + SHA1 签名验证
-│   │   ├── messages.py      # XML 解析/构建 + 消息数据类
-│   │   ├── router.py        # GET/POST /api/wechat/callback（自建应用）
-│   │   ├── message_handler.py # 智能机器人 WS 消息处理
-│   │   └── ws_client.py     # 智能机器人 WebSocket 长连接客户端
-│   ├── scheduler/           # APScheduler 定时 LLM 推送
+│   │   ├── callback_crypto.py  # 智能机器人 URL 回调 AES 解密 + SHA1 签名验证
+│   │   ├── callback_router.py  # GET/POST /api/wechat/aibot/callback
+│   │   ├── callback_inbox.py   # 入站消息 msgid 幂等落库
+│   │   ├── callback_handler.py # 意图路由 → agent → response_url 回复
+│   │   └── ws_client.py        # 旧 WebSocket 长连接兼容模块（main.py 不启动）
+│   ├── scheduler/           # APScheduler 定时推送模块（URL 回调模式暂不启动）
 │   ├── intent/
 │   │   ├── rules.py         # 关键词规则匹配
 │   │   └── router.py        # 规则优先 + LLM 兜底路由
@@ -106,7 +103,7 @@ personal_butler_agent/
 │   └── db/
 │       ├── base.py          # SQLAlchemy DeclarativeBase
 │       └── session.py       # 异步引擎 + 会话工厂 + get_db 依赖注入
-├── tests/                   # 118 个测试
+├── tests/                   # pytest 测试
 ├── docs/
 │   ├── agent/               # 项目记忆文档（active-context / patterns / decisions / upgrade-roadmap）
 │   └── superpowers/
@@ -189,40 +186,35 @@ curl -X POST http://localhost:8000/api/debug/message \
 | response | string | 回复文本 |
 | data | object | 结构化数据（可选） |
 
-### GET/POST /api/wechat/callback
+### 企业微信智能机器人 URL 回调
 
-企业微信自建应用回调。**仅当 `.env` 中 `WECHAT_CORP_ID` 和 `WECHAT_TOKEN` 均配置时注册。**
-
-| 方法 | 用途 | 说明 |
-|------|------|------|
-| GET | URL 验证 | 企业微信后台配置回调 URL 时触发，验证签名并解密 echostr |
-| POST | 消息接收 | 用户在企业微信中发送消息时触发，解密 → 意图路由 → agent 回复 → 加密返回 |
-
-详细设计见 `docs/superpowers/specs/2026-05-30-wechat-work-integration-design.md`。
-
-### 企业微信智能机器人 WebSocket 长连接
-
-智能机器人不再暴露 HTTP 回调端点。**当 `.env` 中 `WECOM_AIBOT_BOT_ID` 和 `WECOM_AIBOT_SECRET` 均配置时，应用启动时自动建立 WebSocket 长连接。**
+智能机器人通过 URL 回调接入。**当 `.env` 中 `WECOM_AIBOT_TOKEN` 和 `WECOM_AIBOT_ENCODING_AES_KEY` 均配置时，应用注册 `/api/wechat/aibot/callback`。**
 
 | 能力 | 说明 |
 |------|------|
-| 消息接收 | 通过 `aibot_msg_callback` 接收私聊和群聊 @消息 |
-| 被动回复 | 通过 `aibot_respond_msg` 透传原始 `headers.req_id` 回复消息 |
-| 主动推送 | 通过 `aibot_send_msg` 向单聊或群聊推送 APScheduler 生成的内容 |
-| 并发处理 | 收到消息后后台 task 处理，WebSocket 接收循环继续读取后续消息 |
+| 消息接收 | 企业微信 POST 到 `/api/wechat/aibot/callback` |
+| 入站可靠性 | 按 `msgid` 写入 `inbound_messages`，重复回调幂等去重 |
+| 被动回复 | agent 处理完成后通过消息体里的 `response_url` 发送 markdown 回复 |
+| 主动推送 | URL 回调模式暂不启动 WebSocket，因此 APScheduler 主动推送暂不可用 |
 
-与自建应用回调的关键区别：
-- 连接方式为 WebSocket 长连接，无需公网回调 URL、Token 或 EncodingAESKey
-- 消息格式为企业微信智能机器人 JSON WebSocket 协议
-- 回复和主动推送都通过同一条长连接下发，支持 markdown 格式
+后台配置 URL：
+
+```text
+https://<你的域名>/api/wechat/aibot/callback
+```
+
+与旧 WebSocket 长连接的关键区别：
+- 连接方式为 HTTPS URL 回调，需要公网域名、Token 和 EncodingAESKey
+- 应用收到消息后先落库再后台处理，减少断线窗口导致的入站丢失
+- 回复走临时 `response_url`，不再通过 `aibot_respond_msg` 长连接回复
 
 ### 消息类型支持
 
-| 消息类型 | 自建应用 | 智能机器人 | 说明 |
-|----------|----------|------------|------|
-| 文本 | 支持 | 支持 | 意图路由 → agent 回复 |
-| 语音 | 支持 | 支持 | 提取企业微信内置识别文本后当文本路由；识别为空时静默忽略 |
-| 其他 | 暂不支持 | 暂不支持 | 回复"暂不支持该消息类型" |
+| 消息类型 | 智能机器人 | 说明 |
+|----------|------------|------|
+| 文本 | 支持 | 意图路由 → agent 回复 |
+| 语音 | 支持 | 提取企业微信内置识别文本后当文本路由；识别为空时静默忽略 |
+| 其他 | 暂不支持 | 回复"暂不支持该消息类型" |
 
 ## 支持的意图
 
@@ -268,29 +260,21 @@ log_training     today_plan
 
 ## 企业微信集成
 
-### 自建应用回调
+### 智能机器人 URL 回调
 
-- 用户在企业微信中给自建应用发消息 → 企业微信 POST 加密 XML 到 `/api/wechat/callback`
-- 加密方案：AES-256-CBC + PKCS#7 padding + SHA1 签名验证
-- 回调 URL 和 Token/EncodingAESKey 在企业微信管理后台配置
-- 回复方式：被动加密 XML 返回（受 5 秒超时限制）
-
-### 智能机器人长连接
-
-- 用户在企业微信中给智能机器人发私聊或在群里 @机器人 → 企业微信通过 WebSocket 下发 `aibot_msg_callback`
-- 应用在后台 task 中完成意图路由和 agent 处理，避免 LLM 调用阻塞 WebSocket 接收循环
-- 回复方式：通过 `aibot_respond_msg` 透传原始 `headers.req_id` 下发 markdown 消息
-- 主动推送：APScheduler 到点触发 agent，处理结果通过 `aibot_send_msg` 推送到指定 userid 或 chatid
+- 用户在企业微信中给智能机器人发私聊或在群里 @机器人 → 企业微信 POST 到 `/api/wechat/aibot/callback`
+- 应用先按 `msgid` 写入 `inbound_messages`，重复回调不重复处理
+- 应用在后台 task 中完成意图路由和 agent 处理，避免 LLM 调用阻塞 HTTP 成功响应
+- 回复方式：通过消息体中的临时 `response_url` 下发 markdown 消息
+- 主动推送：URL 回调模式暂不启动 WebSocket，APScheduler 主动推送暂不可用
 
 ### 配置变量
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `WECHAT_CORP_ID` | 自建应用必需 | 企业 CorpID |
-| `WECHAT_TOKEN` | 自建应用必需 | URL 验证 Token |
-| `WECHAT_ENCODING_AES_KEY` | 自建应用必需 | 消息加解密 AES 密钥 |
-| `WECOM_AIBOT_BOT_ID` | 智能机器人必需 | 智能机器人 BotID，启用 WebSocket 长连接 |
-| `WECOM_AIBOT_SECRET` | 智能机器人必需 | 智能机器人长连接 Secret |
+| `WECOM_AIBOT_BOT_ID` | 智能机器人必需 | 智能机器人 BotID，用于消息体 `aibotid` 校验 |
+| `WECOM_AIBOT_TOKEN` | 智能机器人必需 | URL 回调 Token |
+| `WECOM_AIBOT_ENCODING_AES_KEY` | 智能机器人必需 | URL 回调 EncodingAESKey |
 | `SCHEDULER_CRON` | 定时推送可选 | cron 表达式，例如 `0 9 * * 1-5` |
 | `SCHEDULER_TARGET_TYPE` | 定时推送可选 | 推送目标类型：`single` 或 `group` |
 | `SCHEDULER_TARGET_ID` | 定时推送可选 | 单聊 userid 或群聊 chatid |
@@ -383,8 +367,8 @@ DEEPSEEK_API_KEY=test uv run pytest -q
 # 运行单个模块
 DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py -v
 
-# 运行企业微信模块测试
-DEEPSEEK_API_KEY=test uv run pytest tests/test_wechat_crypto.py tests/test_wechat_messages.py -v
+# 运行智能机器人回调模块测试
+DEEPSEEK_API_KEY=test uv run pytest tests/test_aibot_callback.py -v
 ```
 
 ## 已实现功能
@@ -393,20 +377,20 @@ DEEPSEEK_API_KEY=test uv run pytest tests/test_wechat_crypto.py tests/test_wecha
 
 ---
 
-### 1. 自建应用私聊问答
+### 1. 智能机器人私聊问答
 
-用户在企业微信中向自建应用发送消息，应用经过「解密 → 意图识别 → LLM 处理 → 加密回复」链路，返回 AI 生成的回答。
+用户在企业微信中向智能机器人发送消息，应用经过「URL 回调 → 入站落库 → 意图识别 → LLM 处理 → response_url 回复」链路，返回 AI 生成的回答。
 
 **使用方式：**
 
-1. 在企业微信管理后台创建自建应用，配置回调 URL 为 `https://<你的域名>/api/wechat/callback`
-2. 在 `.env` 中填入企业微信配置：
+1. 在企业微信管理后台创建智能机器人，配置回调 URL 为 `https://<你的域名>/api/wechat/aibot/callback`
+2. 在 `.env` 中填入智能机器人配置：
    ```bash
-   WECHAT_CORP_ID=ww1234567890abcdef      # 企业 CorpID
-   WECHAT_TOKEN=your_token_here           # 回调 Token
-   WECHAT_ENCODING_AES_KEY=your_aes_key   # 43 位 EncodingAESKey
+   WECOM_AIBOT_BOT_ID=bot-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   WECOM_AIBOT_TOKEN=your-callback-token
+   WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
    ```
-3. 重启服务，在企业微信中找到该自建应用，发送消息即可
+3. 重启服务，在企业微信中找到该智能机器人，发送消息即可
 
 **已接入的五种意图及调用示例：**
 
@@ -529,25 +513,26 @@ curl -X POST http://localhost:8000/api/debug/message \
 
 ### 3. 智能机器人私聊 + 群聊 @回复
 
-通过企业微信智能机器人 WebSocket 长连接接入，用户可以在私聊中与机器人对话，或在群聊中 @机器人 触发回复。
+通过企业微信智能机器人 URL 回调接入，用户可以在私聊中与机器人对话，或在群聊中 @机器人 触发回复。
 
-**与自建应用的关键区别：**
-- 消息格式为企业微信智能机器人 JSON WebSocket 协议（非 XML）
-- 无需公网回调 URL、Token 或 EncodingAESKey；应用启动后主动建立长连接
-- 回复通过 `aibot_respond_msg` 透传原消息 `headers.req_id`
-- 消息处理运行在后台 task 中，不会因为 LLM 调用阻塞 WebSocket 接收循环
+**关键点：**
+- 需要公网 HTTPS 回调 URL、Token 和 EncodingAESKey
+- 回调消息先按 `msgid` 落 SQLite，再后台运行 agent
+- 回复通过消息体中的临时 `response_url`
+- 消息处理运行在后台 task 中，不会因为 LLM 调用阻塞 HTTP 回调成功响应
 - 支持 markdown 格式回复
 - 群聊消息自动收集到 SQLite，发送"总结"/"摘要"等触发词时自动生成群聊摘要
 
 **使用方式：**
 
-1. 在企业微信管理后台创建智能机器人，获取 BotID 和 Secret。
-2. 在 `.env` 中填入智能机器人配置：
+1. 在企业微信管理后台创建智能机器人，配置 URL 为 `https://<你的域名>/api/wechat/aibot/callback`。
+2. 在 `.env` 中填入智能机器人 URL 回调配置：
    ```bash
    WECOM_AIBOT_BOT_ID=bot-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   WECOM_AIBOT_SECRET=your-bot-secret
+   WECOM_AIBOT_TOKEN=your-callback-token
+   WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
    ```
-3. 重启服务，日志出现 `WS: subscribed successfully` 后即可在私聊或群聊中与机器人交互。
+3. 重启服务，URL 验证通过后即可在私聊或群聊中与机器人交互。
 
 ---
 
@@ -568,14 +553,13 @@ curl -X POST http://localhost:8000/api/debug/message \
 
 ### 5. 语音消息支持
 
-自建应用和智能机器人都支持语音消息 —— 系统提取企业微信内置的语音识别文本后，当作普通文本走完整的意图路由和 agent 管线。
+智能机器人支持语音消息 —— 系统提取企业微信内置的语音识别文本后，当作普通文本走完整的意图路由和 agent 管线。
 
 **处理逻辑：**
 - 语音识别文本非空 → 正常路由（训练打卡、问训练计划、总结等全部支持）
 - 语音识别文本为空 → 静默忽略，不调用 LLM，不回复
 
 **支持场景：**
-- 自建应用私聊：发送语音 → 识别文本 → 意图路由 → agent 回复
 - 智能机器人私聊：发送语音 → 同上
 - 智能机器人群聊 @：发送语音 → 识别文本 → 存 DB → 触发词检测（识别文本中包含"总结"等关键词时触发）
 
@@ -609,10 +593,9 @@ QA、Fitness（today_plan）和 Meal 三个 Agent 具备跨轮次对话记忆能
 
 | 状态 | 功能 | 说明 |
 |------|------|------|
-| 已实现 | 自建应用私聊问答 | 五种意图完整可用，支持文本和语音 |
-| 已实现 | 智能机器人私聊 + 群聊 @ | WebSocket 长连接回复，markdown 格式，支持文本和语音，消息后台处理不阻塞接收循环 |
+| 已实现 | 智能机器人私聊 + 群聊 @ | URL 回调入站，msgid 幂等落库，response_url 回复，支持文本和语音 |
 | 已实现 | 群聊消息收集 + 触发总结 | 自动存 DB，触发词生成结构化摘要 |
-| 已实现 | APScheduler 定时推送 | cron 触发 agent 管线，通过 `aibot_send_msg` 推送到单聊或群聊 |
+| 暂停 | APScheduler 定时推送 | URL 回调模式不启动 WebSocket，主动推送通道需重新设计 |
 | 已实现 | 调试端点 | 本地测试全功能可用 |
 | 已实现 | 训练数据持久化 | SQLite 存储，支持历史查询 |
 | 已实现 | 用户偏好管理 | 自动提取并持久化偏好 |
@@ -620,7 +603,6 @@ QA、Fitness（today_plan）和 Meal 三个 Agent 具备跨轮次对话记忆能
 | 已实现 | agent 人格系统 | 四个 agent 各有独立角色名、说话风格和情感基调 |
 | 已实现 | 多消息类型支持 | 文本 + 语音（提取企业微信内置识别文本后路由） |
 | 已实现 | RAG Stage 1 知识库 | SQLite 文档/分块存储，本地 `.md`/`.txt` 导入，QAAgent 检索注入 |
-| 未实现 | 客服消息异步回复 | 突破自建应用被动回复的 5 秒超时限制 |
 | 未实现 | RAG Stage 2/3 | 向量/混合检索、PDF/web 导入、文件上传与索引重建 |
 
 详见 [`docs/agent/upgrade-roadmap.md`](docs/agent/upgrade-roadmap.md)。

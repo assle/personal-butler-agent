@@ -69,15 +69,20 @@ Reasoning:
 - Simple agents (QA, Summary) stay simple with a linear graph. Complex agents (Fitness) gain conditional routing between sub-intents.
 - The `handle()` interface remains identical — callers (routes, tests, schedulers) are unaffected.
 
-## ADR-008: 仅使用智能机器人 WebSocket 长连接模式
+## ADR-008: 智能机器人 URL 回调作为可靠入站通道
 
-项目仅使用智能机器人 WebSocket 长连接模式进行消息收发，不再使用自建应用 HTTP 回调模式。
+项目使用智能机器人 URL 回调模式作为消息入站通道。WebSocket 长连接代码保留为兼容模块，但 `src/main.py` 不再启动长连接。
 
 Reasoning:
-- **主动推送**: 长连接模式支持 `aibot_send_msg` 主动推送，回调模式仅能通过 `response_url` 被动回复。APScheduler 定时推送依赖此能力。
-- **简化部署**: 长连接模式无需公网 IP/域名/SSL、无需消息加解密，降低部署门槛。
-- **消除 5 秒超时**: WebSocket 长连接无 HTTP 响应超时限制，LLM 处理时长不受限制。
-- **统一通道**: 消息接收、回复、主动推送全部走一条 WebSocket，消除冗余依赖。
+- **避免 WS 离线窗口丢入站消息**: 长连接断线重连期间，用户消息可能不会进入应用。URL 回调由企微主动投递到公网 HTTPS 服务，入站可靠性更符合“消息不丢”的目标。
+- **先落库再处理**: 回调路由按 `msgid` 写入 `inbound_messages`，重复回调幂等去重，HTTP 立即返回成功，后台再运行 LLM/agent。
+- **回复不阻塞回调**: agent 处理完成后通过消息体里的 `response_url` 发送 markdown 回复，避免 LLM 调用占用 HTTP 回调响应时间。
+- **可观测和可补偿**: `pending/processing/processed/failed` 状态让失败消息可查询，后续可增加启动扫描和人工重放。
+
+Trade-off:
+- URL 回调重新需要公网域名、HTTPS、Token 和 EncodingAESKey。
+- `aibot_send_msg` 主动推送依赖 WebSocket；切到 URL 回调后，APScheduler 定时主动推送暂时关闭。
+- 当前只保证“入站已接收可追踪”，不承诺在 response_url 过期或长时间宕机后仍能原通道回复。
 
 ## ADR-009: Sliding Window + LLM-Compressed Conversation Memory
 
@@ -104,31 +109,27 @@ Reasoning:
 
 Trade-off: Many columns will be NULL depending on training type. For a small-scale MVP this is acceptable. At higher throughput with analytics needs, a separate `cardio_records` table or a normalized schema may be more appropriate.
 
-## ADR-011: 智能机器人长连接模式替代回调模式
+## ADR-011: 智能机器人 URL 回调替代长连接入站
 
-智能机器人从 HTTP 回调模式切换到 WebSocket 长连接模式。
-
-Reasoning:
-- **主动推送**: 长连接模式支持 `aibot_send_msg` 主动推送，回调模式仅能通过 `response_url` 被动回复。APScheduler 定时推送依赖此能力。
-- **简化部署**: 长连接模式无需公网 IP/域名/SSL、无需消息加解密，降低部署门槛。
-- **消除 5 秒超时**: WebSocket 长连接无 HTTP 响应超时限制，LLM 处理时长不受限制。
-- **统一通道**: 消息接收、回复、主动推送全部走一条 WebSocket，消除群机器人 webhook 的冗余依赖。
-- **官方演进方向**: 2026 年 3 月企业微信发布长连接模式，这是官方重点迭代方向。
-
-Trade-off: 需要维护 WebSocket 连接（心跳、断线重连），增加了一定的运维复杂度。但这被更简单的部署和统一的消息通道所抵消。
-
-## ADR-012: 企微用户身份映射 — SQLite 缓存 + 服务端 API
-
-通过 `corp_id` + `corp_secret` 调用企微 `/cgi-bin/user/get` 获取用户详细信息（姓名/部门/头像等），缓存到本地 SQLite（TTL 24h），在消息处理流程中注入 agent extra_state。
+智能机器人从 WebSocket 长连接入站切换到 URL 回调入站。
 
 Reasoning:
-- **不依赖网页 OAuth**: Bot 消息回调中已有 `userid`，无需用户主动授权即可查询基本信息。网页 OAuth 路径需要用户手动触发且仅适用于 Web 入口。
-- **SQLite 缓存而非实时查询**: 用户信息变化频率低，24h TTL 大幅减少 API 调用次数（每次消息都实时查询会触发企微 API 频率限制）。过期数据在 API 失败时作为降级回退。
-- **独立 service 模块**: `WeComTokenManager` + `WeComUserService` 遵循项目的 service 层模式，WS 和 HTTP 两条消息路径复用同一套逻辑，避免代码重复。
-- **access_token 内存缓存**: token 7200s TTL，提前 5 分钟刷新，`asyncio.Lock` 防并发刷新风暴，避免每次用户查询都调 `gettoken`。
-- **可选配置**: `WECOM_CORP_SECRET` 未配置时整套功能静默跳过，不影响现有消息流程。
+- **用户目标改变**: 当前优先级从“部署简单 + 主动推送”转为“入站消息尽量不丢”。
+- **WS 天然存在断线窗口**: 即便快速重连，也不能保证断线瞬间发送的消息一定送达应用。
+- **URL 回调可由企微重试**: 应用收到后先持久化，降低进程内存任务失败导致消息不可追踪的风险。
 
-Trade-off: 用户信息不够实时（最长 24h 延迟），但姓名/部门/头像等信息变化频次远低于消息交互频次。如果需要实时数据，可将 TTL 调短或提供手动刷新接口。
+Trade-off: 需要公网 HTTPS 部署；主动推送暂时不可用；如果要恢复定时推送，需要重新设计独立的主动发送通道。
+
+## ADR-012: 移除自建应用服务端 API 依赖
+
+智能机器人 URL 回调模式只保留 `WECOM_AIBOT_BOT_ID`、`WECOM_AIBOT_TOKEN` 和 `WECOM_AIBOT_ENCODING_AES_KEY`。项目不再暴露 `WECOM_CORP_ID` / `WECOM_CORP_SECRET`，也不再初始化基于自建应用 Secret 的用户信息查询服务。
+
+Reasoning:
+- **配置来源一致**: 智能机器人后台没有自建应用 Secret，保留该字段会误导部署。
+- **集成边界更清晰**: 当前目标是可靠接收消息并通过 `response_url` 被动回复，不混入自建应用服务端 API。
+- **降低启动依赖**: 应用启动不再需要额外 access_token 链路，减少配置失败面。
+
+Trade-off: agent 上下文只使用回调消息中的 `userid`、`chatid` 等基础字段，不再查询用户姓名、部门、头像。若未来确实需要用户详情，应作为单独的自建应用/OAuth 集成重新设计。
 
 ## ADR-013: 调度器多目标逗号分隔配置
 

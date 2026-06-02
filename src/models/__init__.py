@@ -4,7 +4,7 @@ from src.models.preference import UserPreference
 from src.models.group_message import GroupMessage
 from src.models.conversation import ConversationMessage, ConversationSummary
 from src.models.knowledge import KnowledgeDocument, KnowledgeChunk
-from src.models.wecom_user import WeComUser
+from src.models.inbound_message import InboundMessage
 
 __all__ = [
     "TrainingRecord",
@@ -14,5 +14,5 @@ __all__ = [
     "ConversationSummary",
     "KnowledgeDocument",
     "KnowledgeChunk",
-    "WeComUser",
+    "InboundMessage",
 ]

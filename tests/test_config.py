@@ -20,15 +20,21 @@ def test_settings_loads_from_env():
         "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
         "DEEPSEEK_MODEL": "deepseek-chat",
         "DATABASE_URL": "sqlite+aiosqlite:///test.db",
+        "WECOM_AIBOT_BOT_ID": "bot-1",
+        "WECOM_AIBOT_TOKEN": "token-1",
+        "WECOM_AIBOT_ENCODING_AES_KEY": "aes-key-1",
     }
     with patch.dict(os.environ, env_vars, clear=True):
         from src.config import Settings
 
-        settings = Settings()
+        settings = Settings(_env_file=None)
         assert settings.deepseek_api_key == "sk-test-key"
         assert settings.deepseek_base_url == "https://api.deepseek.com"
         assert settings.deepseek_model == "deepseek-chat"
         assert settings.database_url == "sqlite+aiosqlite:///test.db"
+        assert settings.wecom_aibot_bot_id == "bot-1"
+        assert settings.wecom_aibot_token == "token-1"
+        assert settings.wecom_aibot_encoding_aes_key == "aes-key-1"
 
 
 def test_settings_use_defaults():
@@ -40,7 +46,35 @@ def test_settings_use_defaults():
     with patch.dict(os.environ, env_vars, clear=True):
         from src.config import Settings
 
-        settings = Settings()
+        settings = Settings(_env_file=None)
         assert settings.deepseek_base_url == "https://api.deepseek.com"
         assert settings.deepseek_model == "deepseek-chat"
         assert settings.database_url == "sqlite+aiosqlite:///butler.db"
+        assert settings.wecom_aibot_bot_id == ""
+        assert settings.wecom_aibot_token == ""
+        assert settings.wecom_aibot_encoding_aes_key == ""
+
+
+def test_legacy_self_built_app_env_is_ignored():
+    """验证旧自建应用环境变量不再被 Settings 暴露
+
+    旧的 WECHAT_* 回调配置和 WECOM_CORP_* 服务端 API 配置已删除，
+    避免误以为智能机器人 URL 回调需要自建应用 Secret。
+    """
+    env_vars = {
+        "DEEPSEEK_API_KEY": "sk-test-key",
+        "WECHAT_CORP_ID": "ww-legacy",
+        "WECHAT_TOKEN": "legacy-token",
+        "WECHAT_ENCODING_AES_KEY": "legacy-aes-key",
+        "WECOM_CORP_ID": "ww-corp",
+        "WECOM_CORP_SECRET": "corp-secret",
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+        assert not hasattr(settings, "wechat_corp_id")
+        assert not hasattr(settings, "wechat_token")
+        assert not hasattr(settings, "wechat_encoding_aes_key")
+        assert not hasattr(settings, "wecom_corp_id")
+        assert not hasattr(settings, "wecom_corp_secret")

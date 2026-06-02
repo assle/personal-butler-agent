@@ -22,15 +22,12 @@ class Settings(BaseSettings):
     # SQLite 数据库配置
     database_url: str = "sqlite+aiosqlite:///butler.db"
 
-    # 企业微信 CorpID（用于服务端 API 调用，如获取用户信息等）
-    wechat_corp_id: str = ""
-
-    # 企业微信服务端 API 密钥（用于获取 access_token，调用用户信息等接口）
-    # 需要同时配置 wechat_corp_id 才会生效
-    wecom_corp_secret: str = ""
-
-    # 企业微信智能机器人长连接模式配置
+    # 企业微信智能机器人 URL 回调模式配置
     wecom_aibot_bot_id: str = ""
+    wecom_aibot_token: str = ""
+    wecom_aibot_encoding_aes_key: str = ""
+
+    # 兼容旧长连接配置；URL 回调模式不再使用该字段
     wecom_aibot_secret: str = ""
 
     # 定时推送配置

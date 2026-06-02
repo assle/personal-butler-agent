@@ -9,7 +9,7 @@ Workflow:
   4. send_reply() 通过 aibot_respond_msg 回复消息
   5. push_message() 通过 aibot_send_msg 主动推送消息
   6. 库内置 ping_interval + ping_timeout 保活并检测死连接
-  7. 断线后自动指数退避重连（1s → 2s → 4s → 最大 30s）
+  7. 断线后自动重连；未成功订阅前指数退避，成功订阅后的掉线快速重连
 """
 import asyncio
 import json
@@ -45,6 +45,8 @@ class WeComWSClient:
         self._secret = secret
         self._ws: websockets.ClientConnection | None = None
         self._running = False
+        self._connected = False
+        self._connection_established_for_attempt = False
         self._on_message: OnMessageCallback | None = None
         self._message_tasks: set[asyncio.Task] = set()
 
@@ -78,6 +80,10 @@ class WeComWSClient:
                     OSError) as e:
                 if not self._running:
                     break
+                if self._connected or self._connection_established_for_attempt:
+                    retry_delay = 1
+                self._connected = False
+                self._connection_established_for_attempt = False
                 logger.warning("WS disconnected: %s, reconnecting in %ds...", e, retry_delay)
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 30)
@@ -100,6 +106,8 @@ class WeComWSClient:
         立即在 recv() 上抛出 ConnectionClosed，避免 TCP 静默断开后
         读到残存数据导致 "incorrect masking" / "invalid opcode" 错误。
         """
+        self._connected = False
+        self._connection_established_for_attempt = False
         async with websockets.connect(
             "wss://openws.work.weixin.qq.com",
             ping_interval=20,   # 每 20s 发送 ping 保活
@@ -107,9 +115,15 @@ class WeComWSClient:
             close_timeout=5,    # 关闭握手超时 5s
         ) as ws:
             self._ws = ws
-            await self._subscribe()
-            logger.info("WS: subscribed successfully")
-            await self._listen()
+            try:
+                await self._subscribe()
+                self._connected = True
+                self._connection_established_for_attempt = True
+                logger.info("WS: subscribed successfully")
+                await self._listen()
+            finally:
+                self._connected = False
+                self._ws = None
 
     async def _subscribe(self):
         """发送 aibot_subscribe 认证请求"""
@@ -175,7 +189,7 @@ class WeComWSClient:
         返回:
             bool: 发送成功返回 True
         """
-        if self._ws is None:
+        if self._ws is None or not self._connected:
             logger.warning("WS: send_reply called but not connected")
             return False
         try:
@@ -211,7 +225,7 @@ class WeComWSClient:
         返回:
             bool: 发送成功返回 True
         """
-        if self._ws is None:
+        if self._ws is None or not self._connected:
             logger.warning("WS: push_message called but not connected")
             return False
         try:

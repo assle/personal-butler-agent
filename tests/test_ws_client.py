@@ -56,6 +56,33 @@ async def test_stop_when_not_connected(ws_client):
     await ws_client.stop()
 
 
+@pytest.mark.asyncio
+async def test_run_uses_fast_retry_after_established_connection_drops(ws_client, monkeypatch):
+    """验证已成功订阅后的断线使用快速重连，避免长时间离线"""
+    attempts = 0
+    sleeps = []
+
+    async def fake_connect_and_listen():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("network unreachable before subscribe")
+        if attempts in (2, 3):
+            ws_client._connected = True
+            raise OSError("idle connection dropped after subscribe")
+        ws_client._running = False
+
+    async def fake_sleep(delay):
+        sleeps.append(delay)
+
+    monkeypatch.setattr(ws_client, "_connect_and_listen", fake_connect_and_listen)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+    await ws_client.run()
+
+    assert sleeps == [1, 1, 1]
+
+
 class FakeWebSocket:
     """模拟 websocket 连接，记录发出的消息并可控地返回接收消息"""
     def __init__(self, responses=None):
@@ -163,6 +190,7 @@ async def test_send_reply_sends_correct_payload(ws_client):
     """验证 send_reply 发送正确的回复消息格式"""
     fake_ws = FakeWebSocket()
     ws_client._ws = fake_ws
+    ws_client._connected = True
 
     ok = await ws_client.send_reply("original-req-id", "hello world")
     assert ok is True
@@ -180,6 +208,7 @@ async def test_push_message_to_user(ws_client):
     """验证 push_message 向用户推送的格式"""
     fake_ws = FakeWebSocket()
     ws_client._ws = fake_ws
+    ws_client._connected = True
 
     ok = await ws_client.push_message("single", "user1", "markdown", "test push")
     assert ok is True
@@ -194,6 +223,7 @@ async def test_push_message_to_group(ws_client):
     """验证 push_message 向群聊推送的格式"""
     fake_ws = FakeWebSocket()
     ws_client._ws = fake_ws
+    ws_client._connected = True
 
     ok = await ws_client.push_message("group", "chat-99", "markdown", "group push")
     assert ok is True

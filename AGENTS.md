@@ -9,7 +9,7 @@
 - Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, SQLite, Pydantic v2, uv, pytest
 - Purpose: AI personal butler for WeChat Work style natural-language workflows: fitness logging and plans, meal planning, group-chat summaries, and personalized Q&A.
 - Runtime entry: `src.main:app`
-- Current interfaces: `POST /api/debug/message` for local debug; `GET/POST /api/wechat/callback` for WeChat Work self-built app message routing.
+- Current interfaces: `POST /api/debug/message` for local debug; `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing.
 
 ## Build, Test & Verify
 
@@ -26,8 +26,8 @@ For detailed patterns (async DB, agent structure, testing conventions), load `do
 ## Architecture
 
 - `src/main.py`: FastAPI app, lifespan DB initialization, singleton wiring, AgentRegistry registration.
-- `src/router/`: API routes — debug message endpoint and conditional WeChat callback router.
-- `src/wechat/`: WeChat Work integration — AES-256-CBC crypto, XML message parsing, group bot webhook push client.
+- `src/router/`: API routes — debug message endpoint.
+- `src/wechat/`: WeChat Work intelligent robot integration — URL callback crypto, callback router, inbound inbox, response_url reply handling, and legacy WebSocket compatibility module.
 - `src/intent/`: rule-first intent classification with LLM fallback.
 - `src/agents/`: business agents for fitness, summary, meal, and Q&A — each a LangGraph StateGraph package.
 - `src/agents/registry.py`: central intent-to-agent mapping; new agents register here.
