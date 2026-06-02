@@ -50,6 +50,7 @@ def create_wechat_router(
     corp_id: str,
     token: str,
     encoding_aes_key: str,
+    user_service=None,
 ) -> APIRouter:
     """创建企业微信回调路由
 

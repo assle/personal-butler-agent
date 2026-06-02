@@ -51,6 +51,9 @@ agent_registry.register("qa", qa_agent)
 agent_registry.register("unknown", qa_agent)
 agent_registry.set_fallback(qa_agent)
 
+# wecom_user_service: 可在 lifespan 中初始化为 WeComUserService 实例
+wecom_user_service = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,6 +70,20 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # 初始化企微用户信息服务（需要 corp_id 和 corp_secret 同时配置）
+    wecom_user_service = None
+    if settings.wecom_corp_secret and settings.wechat_corp_id:
+        from src.wecom.token_manager import WeComTokenManager
+        from src.wecom.user_service import WeComUserService
+
+        token_manager = WeComTokenManager(
+            corp_id=settings.wechat_corp_id,
+            corp_secret=settings.wecom_corp_secret,
+        )
+        wecom_user_service = WeComUserService(token_manager=token_manager)
+        app.state.wecom_user_service = wecom_user_service
+        logger.info("WeComUserService: initialized")
 
     ws_task = None
     scheduler = None
@@ -87,6 +104,7 @@ async def lifespan(app: FastAPI):
                 try:
                     await handle_ws_message(
                         msg, req_id, ws_client, intent_router, agent_registry, db,
+                        user_service=wecom_user_service,
                     )
                     await db.commit()
                 except Exception:
@@ -148,5 +166,6 @@ if settings.wechat_corp_id and settings.wechat_token:
         corp_id=settings.wechat_corp_id,
         token=settings.wechat_token,
         encoding_aes_key=settings.wechat_encoding_aes_key,
+        user_service=wecom_user_service,
     )
     app.include_router(wechat_router)
