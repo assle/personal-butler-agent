@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """应用配置类，所有字段从 .env 文件自动加载"""
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     # DeepSeek LLM 配置
     deepseek_api_key: str
@@ -28,12 +28,16 @@ class Settings(BaseSettings):
     wechat_encoding_aes_key: str = ""
     wechat_agent_id: str = ""
 
-    # 企业微信智能机器人 API 模式配置（回调消息加解密，receiveid 为空字符串）
-    wechat_robot_token: str = ""
-    wechat_robot_encoding_aes_key: str = ""
+    # 企业微信智能机器人长连接模式配置
+    wecom_aibot_bot_id: str = ""
+    wecom_aibot_secret: str = ""
 
-    # 企业微信群机器人 Webhook 推送地址
-    wechat_webhook_url: str = ""
+    # 定时推送配置
+    scheduler_cron: str = "0 9 * * *"
+    scheduler_target_type: str = "single"
+    scheduler_target_id: str = ""
+    scheduler_message: str = "今日训练建议"
+    scheduler_intent: str = "today_plan"
 
 
 settings = Settings()

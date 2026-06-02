@@ -16,6 +16,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "python-dotenv>=1.0.0",
     "greenlet>=3.5.1",
+    "websockets>=16.0",
 ]
 
 [project.optional-dependencies]
