@@ -5,6 +5,7 @@
 测试范围:
   - 默认关闭或禁用时不发起 HTTP 请求并返回空列表
   - Tavily 响应被归一化为 SearchResult
+  - malformed 响应结构降级为空列表
   - HTTP 请求失败时降级为空列表且不抛异常
 """
 import httpx
@@ -124,3 +125,27 @@ async def test_search_http_error_returns_empty_list():
 
     assert results == []
     assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_search_malformed_response_returns_empty_list():
+    """验证供应商返回非字典结构时降级为空列表
+
+    输入参数为普通查询文本；当底层 post_json 返回 list 等异常结构时，返回值应为空列表且不抛异常。
+    """
+
+    async def post_json(url: str, payload: dict, timeout: int) -> list[str]:
+        return ["bad"]
+
+    service = WebSearchService(
+        enabled=True,
+        provider="tavily",
+        api_key="tvly-test",
+        max_results=3,
+        timeout_seconds=6,
+        post_json=post_json,
+    )
+
+    results = await service.search("今天北京天气")
+
+    assert results == []

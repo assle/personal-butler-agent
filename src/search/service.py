@@ -17,7 +17,7 @@ from src.config import settings
 from src.search.schemas import SearchResult
 
 
-PostJson = Callable[[str, dict, int], Awaitable[dict]]
+PostJson = Callable[[str, dict, int], Awaitable[object]]
 
 logger = logging.getLogger(__name__)
 
@@ -86,13 +86,13 @@ class WebSearchService:
         }
         try:
             response = await self._post(url, payload, self._timeout_seconds)
-        except httpx.HTTPError:
-            logger.info("联网搜索 HTTP 请求失败，已降级为空结果", exc_info=True)
+        except (httpx.HTTPError, ValueError):
+            logger.info("联网搜索请求或响应解析失败，已降级为空结果", exc_info=True)
             return []
 
         return self._parse_results(response)
 
-    async def _post(self, url: str, payload: dict, timeout: int) -> dict:
+    async def _post(self, url: str, payload: dict, timeout: int) -> object:
         """发送 JSON POST 请求
 
         参数:
@@ -100,7 +100,7 @@ class WebSearchService:
           payload: JSON 请求体
           timeout: 请求超时时间，单位秒
         返回值:
-          响应 JSON 字典
+          解码后的响应 JSON 对象
         """
         if self._post_json is not None:
             return await self._post_json(url, payload, timeout)
@@ -110,14 +110,17 @@ class WebSearchService:
             response.raise_for_status()
             return response.json()
 
-    def _parse_results(self, response: dict) -> list[SearchResult]:
+    def _parse_results(self, response: object) -> list[SearchResult]:
         """解析供应商响应为统一搜索结果
 
         参数:
-          response: Tavily 返回的 JSON 字典
+          response: Tavily 返回的 JSON 对象
         返回值:
           最多 max_results 条 SearchResult
         """
+        if not isinstance(response, dict):
+            return []
+
         raw_results = response.get("results", [])
         if not isinstance(raw_results, list):
             return []
