@@ -136,4 +136,4 @@ class ButlerAgent:
             reply = "LLM 服务暂时不可用，请稍后重试。"
 
         await memory.save_exchange(user_id, message, reply, db)
-        return AgentResponse(reply=reply, data={"intent": intent})
+        return AgentResponse(reply=reply, data={"intent": "butler"})

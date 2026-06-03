@@ -129,6 +129,26 @@ async def test_butler_agent_returns_direct_llm_reply(db_session):
 
 
 @pytest.mark.asyncio
+async def test_butler_agent_keeps_response_intent_stable_for_compat_callers(db_session):
+    """验证兼容调用传入其他 intent 时仍返回 butler intent
+
+    参数:
+        db_session: 测试数据库会话 fixture
+
+    返回:
+        None
+    """
+    llm = FakeToolCallingLLM([AIMessage(content="我来处理。")])
+    web_search_service = AsyncMock()
+    agent = _build_agent(llm, web_search_service)
+
+    result = await agent.handle("qa", "你好", "assle", db_session)
+
+    assert result.reply == "我来处理。"
+    assert result.data == {"intent": "butler"}
+
+
+@pytest.mark.asyncio
 async def test_butler_agent_runs_search_web_tool_call_loop(db_session):
     """验证小管家能执行 search_web 工具调用并返回最终回复
 
