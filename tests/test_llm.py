@@ -6,7 +6,7 @@ LLM 客户端测试
   - chat 方法调用 ainvoke 并返回 AIMessage 内容
 """
 import os
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage
 
@@ -33,3 +33,54 @@ async def test_llm_client_chat_returns_content():
                 messages=[{"role": "user", "content": "Hi"}],
             )
             assert result == "Hello, I am an AI."
+
+
+@pytest.mark.asyncio
+async def test_llm_client_ainvoke_messages_returns_message_object():
+    """验证 LLMClient.ainvoke_messages() 返回原始 LangChain 消息对象
+
+    返回:
+        None；通过断言确认工具调用场景可以保留 AIMessage 元数据
+    """
+    mock_message = AIMessage(content="final answer")
+
+    env_vars = {"DEEPSEEK_API_KEY": "sk-test-key"}
+    with patch.dict(os.environ, env_vars, clear=True):
+        with patch("src.llm.client.ChatOpenAI") as mock_chat_openai_cls:
+            mock_model = AsyncMock()
+            mock_model.ainvoke = AsyncMock(return_value=mock_message)
+            mock_chat_openai_cls.return_value = mock_model
+
+            from src.llm.client import LLMClient
+
+            llm = LLMClient()
+            result = await llm.ainvoke_messages(
+                messages=[{"role": "user", "content": "Hi"}],
+            )
+
+            assert result is mock_message
+            mock_model.ainvoke.assert_awaited_once()
+
+
+def test_llm_client_bind_tools_delegates_to_chat_model():
+    """验证 LLMClient.bind_tools() 透传到底层 ChatOpenAI 实例
+
+    返回:
+        None；通过断言确认 ButlerAgent 可以获取绑定工具后的 runnable
+    """
+    env_vars = {"DEEPSEEK_API_KEY": "sk-test-key"}
+    with patch.dict(os.environ, env_vars, clear=True):
+        with patch("src.llm.client.ChatOpenAI") as mock_chat_openai_cls:
+            mock_model = MagicMock()
+            bound_model = object()
+            mock_model.bind_tools.return_value = bound_model
+            mock_chat_openai_cls.return_value = mock_model
+
+            from src.llm.client import LLMClient
+
+            llm = LLMClient()
+            tools = [lambda query: query]
+            result = llm.bind_tools(tools)
+
+            assert result is bound_model
+            mock_model.bind_tools.assert_called_once_with(tools)
