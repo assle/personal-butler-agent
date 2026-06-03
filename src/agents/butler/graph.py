@@ -8,6 +8,7 @@ Workflow:
   → extract_reply → END（无工具调用时输出最终回复）
 """
 from langgraph.graph import END, START, StateGraph
+from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from src.agents.butler.nodes import build_initial_messages, call_model, extract_reply
@@ -132,6 +133,8 @@ class ButlerAgent:
         try:
             result = await self._graph.ainvoke(initial_state, config)
             reply = result.get("reply", "") or "我暂时没有生成有效回复。"
+        except GraphRecursionError:
+            reply = "这次工具调用太多了，我先停一下，请把需求拆小一点。"
         except Exception:
             reply = "LLM 服务暂时不可用，请稍后重试。"
 

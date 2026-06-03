@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from langchain_core.messages import AIMessage, ToolCall
+from langgraph.errors import GraphRecursionError
 
 from src.agents.butler.graph import ButlerAgent
 from src.schemas.response import AgentResponse
@@ -145,6 +146,44 @@ async def test_butler_agent_keeps_response_intent_stable_for_compat_callers(db_s
     result = await agent.handle("qa", "你好", "assle", db_session)
 
     assert result.reply == "我来处理。"
+    assert result.data == {"intent": "butler"}
+
+
+@pytest.mark.asyncio
+async def test_butler_agent_returns_specific_reply_on_recursion_overflow(
+    db_session,
+    monkeypatch,
+):
+    """验证工具调用超过递归限制时返回指定用户提示
+
+    参数:
+        db_session: 测试数据库会话 fixture
+        monkeypatch: pytest monkeypatch fixture，用于模拟图递归溢出
+
+    返回:
+        None
+    """
+    llm = FakeToolCallingLLM([])
+    web_search_service = AsyncMock()
+    agent = _build_agent(llm, web_search_service)
+
+    async def raise_recursion_overflow(*args, **kwargs):
+        """模拟 LangGraph 递归限制异常
+
+        参数:
+            *args: ainvoke() 的位置参数
+            **kwargs: ainvoke() 的关键字参数
+
+        返回:
+            None；总是抛出 GraphRecursionError
+        """
+        raise GraphRecursionError("recursion limit reached")
+
+    monkeypatch.setattr(agent._graph, "ainvoke", raise_recursion_overflow)
+
+    result = await agent.handle("butler", "一直搜索", "assle", db_session)
+
+    assert result.reply == "这次工具调用太多了，我先停一下，请把需求拆小一点。"
     assert result.data == {"intent": "butler"}
 
 
