@@ -1,19 +1,72 @@
 """
 群聊总结功能端到端集成测试
-验证完整的 "发送群聊消息 → 静默收集 → 触发总结 → 结构化回复" 流程
+验证完整的 "发送群聊消息 → 静默收集 → ButlerAgent 调用群聊总结工具 → 结构化回复" 流程
 
 测试范围:
   - 非触发群聊消息：静默保存到 DB，返回 collect_group 意图
-  - 触发群聊消息：通过 summarize_group 生成结构化摘要
+  - 触发群聊消息：通过 ButlerAgent 的 summarize_group_chat 工具生成结构化摘要
   - 不同群聊之间的消息隔离
   - LLM 收到的 prompt 包含群聊消息内容
 """
-import json
 from unittest.mock import patch
 
 import pytest
+from langchain_core.messages import AIMessage, ToolCall
 
 import src.main
+
+
+class FakeBoundToolModel:
+    """测试用绑定工具模型，按顺序返回预设 AIMessage"""
+
+    def __init__(self, responses: list[AIMessage]):
+        """初始化假模型
+
+        参数:
+            responses: 每次 ainvoke() 要返回的 AIMessage 列表
+
+        返回:
+            None
+        """
+        self._responses = list(responses)
+
+    async def ainvoke(self, messages):
+        """返回下一条预设 AIMessage
+
+        参数:
+            messages: ButlerAgent 传给模型的消息列表
+
+        返回:
+            AIMessage: 预设响应
+        """
+        return self._responses.pop(0)
+
+
+def _group_summary_model(trigger_message: str, final_reply: str) -> FakeBoundToolModel:
+    """构造触发群聊总结工具的假模型
+
+    参数:
+        trigger_message: 用户触发总结的消息
+        final_reply: ButlerAgent 最终回复
+
+    返回:
+        FakeBoundToolModel: 两轮响应，先调用工具再返回最终回复
+    """
+    return FakeBoundToolModel(
+        [
+            AIMessage(
+                content="",
+                tool_calls=[
+                    ToolCall(
+                        name="summarize_group_chat",
+                        args={"message": trigger_message},
+                        id="call-1",
+                    )
+                ],
+            ),
+            AIMessage(content=final_reply),
+        ]
+    )
 
 
 @pytest.mark.asyncio
@@ -71,6 +124,10 @@ async def test_e2e_group_silent_collect_and_summarize(http_client, db_session):
 
     with patch.object(
         src.main.llm_client,
+        "bind_tools",
+        return_value=_group_summary_model("总结一下群消息", mock_summary),
+    ), patch.object(
+        src.main.llm_client,
         "chat",
         return_value=mock_summary,
     ) as mock_chat:
@@ -86,7 +143,7 @@ async def test_e2e_group_silent_collect_and_summarize(http_client, db_session):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["intent"] == "summarize_group"
+    assert body["intent"] == "butler"
     assert body["confidence"] == 1.0
     assert "讨论主题" in body["response"]
     assert "关键结论" in body["response"]
@@ -144,10 +201,15 @@ async def test_e2e_group_isolation(http_client, db_session):
         )
 
     # 群 B 触发总结
+    summary = "讨论主题：周末团建\n关键结论：\n  - 去爬山\n待办事项：\n  - 无\n决策：去爬山\n未解决的问题：无"
     with patch.object(
         src.main.llm_client,
+        "bind_tools",
+        return_value=_group_summary_model("总结一下群消息", summary),
+    ), patch.object(
+        src.main.llm_client,
         "chat",
-        return_value="讨论主题：周末团建\n关键结论：\n  - 去爬山\n待办事项：\n  - 无\n决策：去爬山\n未解决的问题：无",
+        return_value=summary,
     ) as mock_chat:
         await http_client.post(
             "/api/debug/message",
@@ -189,10 +251,15 @@ async def test_e2e_trigger_keyword_variants(http_client, db_session):
 
     keywords = ["总结一下最近的消息", "摘要", "概括一下", "汇总"]
     for trigger_msg in keywords:
+        summary = "讨论主题：需求评审\n关键结论：\n  - 通过了\n待办事项：\n  - 无\n决策：已通过\n未解决的问题：无"
         with patch.object(
             src.main.llm_client,
+            "bind_tools",
+            return_value=_group_summary_model(trigger_msg, summary),
+        ), patch.object(
+            src.main.llm_client,
             "chat",
-            return_value="讨论主题：需求评审\n关键结论：\n  - 通过了\n待办事项：\n  - 无\n决策：已通过\n未解决的问题：无",
+            return_value=summary,
         ):
             response = await http_client.post(
                 "/api/debug/message",
@@ -206,7 +273,7 @@ async def test_e2e_trigger_keyword_variants(http_client, db_session):
 
         assert response.status_code == 200
         body = response.json()
-        assert body["intent"] == "summarize_group", f"Failed for trigger: {trigger_msg}"
+        assert body["intent"] == "butler", f"Failed for trigger: {trigger_msg}"
         assert len(body["response"]) > 0
 
 
@@ -223,6 +290,13 @@ async def test_e2e_group_no_messages(http_client, db_session):
     """
     with patch.object(
         src.main.llm_client,
+        "bind_tools",
+        return_value=_group_summary_model(
+            "总结一下群消息",
+            "暂无最近的群聊消息可供总结",
+        ),
+    ), patch.object(
+        src.main.llm_client,
         "chat",
         return_value="暂无最近的群聊消息可供总结",
     ):
@@ -238,5 +312,5 @@ async def test_e2e_group_no_messages(http_client, db_session):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["intent"] == "summarize_group"
+    assert body["intent"] == "butler"
     assert len(body["response"]) > 0
