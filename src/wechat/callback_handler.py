@@ -1,10 +1,10 @@
 """
 智能机器人 URL 回调消息处理器
-复用现有意图路由和 agent 管线，最终通过 response_url 发送被动回复
+将可回复消息交给 ButlerAgent 处理，最终通过 response_url 发送被动回复
 
 Workflow:
 1. handle_callback_message() 接收已解析的智能机器人消息体
-2. 文本/语音消息走 IntentRouter + AgentRegistry；群聊非触发消息仅入库不回复
+2. 文本/语音消息走 ButlerAgent；群聊非触发消息仅入库不回复
 3. 处理结果构造成 markdown 消息体
 4. ResponseUrlReplyClient 将消息 POST 到企业微信提供的 response_url
 """
@@ -17,6 +17,7 @@ from collections.abc import Awaitable, Callable
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.agents.butler import ButlerAgent
 from src.agents.registry import AgentRegistry
 from src.intent.router import IntentRouter
 
@@ -74,6 +75,7 @@ async def handle_callback_message(
     reply_client: ResponseUrlReplyClient,
     intent_router: IntentRouter,
     agent_registry: AgentRegistry,
+    butler_agent: ButlerAgent,
     db: AsyncSession,
 ):
     """处理智能机器人 URL 回调消息
@@ -81,8 +83,9 @@ async def handle_callback_message(
     参数:
         msg: 智能机器人消息体，包含 from/text/chatid/response_url 等字段
         reply_client: response_url 回复客户端
-        intent_router: 意图路由器
-        agent_registry: agent 注册表
+        intent_router: 兼容保留的意图路由器，可回复消息不再直接使用
+        agent_registry: 兼容保留的 agent 注册表，可回复消息不再直接使用
+        butler_agent: 小管家总控 agent，用于处理可回复文本和语音消息
         db: 数据库异步会话
     """
     from_user = msg.get("from", {}).get("userid", "")
@@ -120,6 +123,7 @@ async def handle_callback_message(
         db=db,
         intent_router=intent_router,
         agent_registry=agent_registry,
+        butler_agent=butler_agent,
         extra_state=extra_state,
         is_group_trigger=is_group_trigger,
     )
@@ -149,6 +153,7 @@ async def _build_reply_text(
     db: AsyncSession,
     intent_router: IntentRouter,
     agent_registry: AgentRegistry,
+    butler_agent: ButlerAgent,
     extra_state: dict,
     is_group_trigger: bool,
 ) -> str:
@@ -159,8 +164,9 @@ async def _build_reply_text(
         content: 消息文本
         from_user: 发送者 userid
         db: 数据库异步会话
-        intent_router: 意图路由器
-        agent_registry: agent 注册表
+        intent_router: 兼容保留的意图路由器，可回复消息不再直接使用
+        agent_registry: 兼容保留的 agent 注册表，可回复消息不再直接使用
+        butler_agent: 小管家总控 agent
         extra_state: agent 额外上下文
         is_group_trigger: 是否为群聊总结触发消息
 
@@ -169,31 +175,14 @@ async def _build_reply_text(
     """
     if msg_type not in ("text", "voice"):
         return "暂不支持该消息类型"
-    if is_group_trigger:
-        agent = agent_registry.get("summarize_group")
-        if agent is None:
-            return "抱歉，无法处理该消息"
-        try:
-            result = await agent.handle("summarize_group", content, from_user, db, extra_state=extra_state)
-            return result.reply
-        except Exception as e:
-            logger.exception("AIBot callback: group summary agent error: %s", e)
-            return "抱歉，处理消息时遇到错误"
     try:
-        intent, _confidence = await intent_router.route(content)
-        logger.info("AIBot callback handler: intent=%s", intent)
-        agent = agent_registry.get(intent)
-        if agent is None:
-            return "抱歉，无法处理该消息"
-        try:
-            result = await agent.handle(intent, content, from_user, db, extra_state=extra_state)
-            return result.reply
-        except Exception as e:
-            logger.exception("AIBot callback: agent error: %s", e)
-            return "LLM 服务暂时不可用，请稍后重试。"
+        if is_group_trigger:
+            logger.info("AIBot callback handler: group trigger routed to butler")
+        result = await butler_agent.handle("butler", content, from_user, db, extra_state=extra_state)
+        return result.reply
     except Exception as e:
-        logger.exception("AIBot callback: unexpected error: %s", e)
-        return "抱歉，处理消息时遇到错误"
+        logger.exception("AIBot callback: butler agent error: %s", e)
+        return "LLM 服务暂时不可用，请稍后重试。"
 
 
 def _is_summarize_trigger(content: str) -> bool:

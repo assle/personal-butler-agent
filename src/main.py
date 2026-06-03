@@ -108,6 +108,7 @@ if settings.wecom_aibot_token and settings.wecom_aibot_encoding_aes_key:
             receive_id=settings.wecom_aibot_bot_id,
             intent_router=intent_router,
             agent_registry=agent_registry,
+            butler_agent=butler_agent,
             db_session_factory=async_session,
         )
     )

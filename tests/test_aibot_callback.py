@@ -40,6 +40,20 @@ def mock_agent_registry():
     return registry
 
 
+@pytest.fixture
+def mock_butler_agent():
+    """创建测试用 ButlerAgent
+
+    返回:
+        AsyncMock: handle() 固定返回小管家回复
+    """
+    from src.schemas.response import AgentResponse
+
+    agent = AsyncMock()
+    agent.handle.return_value = AgentResponse(reply="mock butler reply", data={"intent": "butler"})
+    return agent
+
+
 def _valid_encoding_aes_key() -> str:
     """生成测试用 43 位 EncodingAESKey
 
@@ -111,6 +125,7 @@ async def test_handle_callback_message_posts_reply_to_response_url(
     db_session,
     mock_intent_router,
     mock_agent_registry,
+    mock_butler_agent,
 ):
     """验证 URL 回调消息处理完成后通过 response_url 回复
 
@@ -118,6 +133,7 @@ async def test_handle_callback_message_posts_reply_to_response_url(
         db_session: 测试数据库会话
         mock_intent_router: 模拟意图路由器
         mock_agent_registry: 模拟 agent 注册表
+        mock_butler_agent: 模拟 ButlerAgent
     """
     from src.wechat.callback_handler import ResponseUrlReplyClient, handle_callback_message
 
@@ -152,23 +168,89 @@ async def test_handle_callback_message_posts_reply_to_response_url(
         reply_client,
         mock_intent_router,
         mock_agent_registry,
+        mock_butler_agent,
         db_session,
     )
 
     assert posted == [
         (
             "https://example.test/respond",
-            {"msgtype": "markdown", "markdown": {"content": "mock reply"}},
+            {"msgtype": "markdown", "markdown": {"content": "mock butler reply"}},
         )
     ]
+    mock_butler_agent.handle.assert_awaited_once_with(
+        "butler",
+        "今天练什么",
+        "user1",
+        db_session,
+        extra_state={"chat_type": "single", "chat_id": None},
+    )
 
 
 @pytest.mark.asyncio
-async def test_callback_router_accepts_encrypted_json_and_records_message(db_session):
+async def test_handle_callback_message_group_non_trigger_does_not_call_butler(
+    db_session,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
+    """验证群聊非触发消息只保存不回复，也不调用 ButlerAgent
+
+    参数:
+        db_session: 测试数据库会话
+        mock_intent_router: 模拟意图路由器
+        mock_agent_registry: 模拟 agent 注册表
+        mock_butler_agent: 模拟 ButlerAgent
+    """
+    from src.wechat.callback_handler import ResponseUrlReplyClient, handle_callback_message
+
+    posted = []
+
+    async def fake_post_json(url: str, payload: dict) -> bool:
+        """记录待发送的 response_url 请求
+
+        参数:
+            url: 企业微信回调里的临时回复 URL
+            payload: 要发送的消息体
+
+        返回:
+            bool: 模拟发送成功
+        """
+        posted.append((url, payload))
+        return True
+
+    reply_client = ResponseUrlReplyClient(post_json=fake_post_json)
+    msg = {
+        "msgid": "msg-group-1",
+        "aibotid": "bot-1",
+        "msgtype": "text",
+        "from": {"userid": "user1"},
+        "text": {"content": "今天午饭很好吃"},
+        "chattype": "group",
+        "chatid": "group-1",
+        "response_url": "https://example.test/respond",
+    }
+
+    await handle_callback_message(
+        msg,
+        reply_client,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
+
+    assert posted == []
+    mock_butler_agent.handle.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_callback_router_accepts_encrypted_json_and_records_message(db_session, mock_butler_agent):
     """验证 HTTP 回调路由可以解密 JSON 帧并先落库再返回 success
 
     参数:
         db_session: 测试数据库会话
+        mock_butler_agent: 模拟 ButlerAgent
     """
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
@@ -193,6 +275,7 @@ async def test_callback_router_accepts_encrypted_json_and_records_message(db_ses
             receive_id="bot-1",
             intent_router=AsyncMock(),
             agent_registry=AsyncMock(),
+            butler_agent=mock_butler_agent,
             db_session_factory=db_session_factory,
             reply_client=AsyncMock(),
         )
@@ -233,11 +316,15 @@ async def test_callback_router_accepts_encrypted_json_and_records_message(db_ses
 
 
 @pytest.mark.asyncio
-async def test_callback_router_accepts_message_when_crypto_receive_id_differs_from_bot_id(db_session):
+async def test_callback_router_accepts_message_when_crypto_receive_id_differs_from_bot_id(
+    db_session,
+    mock_butler_agent,
+):
     """验证智能机器人用消息体 aibotid 校验 BotID，而不把密文尾部 receive_id 当 BotID
 
     参数:
         db_session: 测试数据库会话
+        mock_butler_agent: 模拟 ButlerAgent
     """
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
@@ -262,6 +349,7 @@ async def test_callback_router_accepts_message_when_crypto_receive_id_differs_fr
             receive_id="bot-1",
             intent_router=AsyncMock(),
             agent_registry=AsyncMock(),
+            butler_agent=mock_butler_agent,
             db_session_factory=db_session_factory,
             reply_client=AsyncMock(),
         )
