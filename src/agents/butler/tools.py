@@ -148,7 +148,7 @@ def create_butler_tools(context: ButlerToolContext) -> list[Any]:
         返回:
             str: 饮食 agent 生成的餐食计划
         """
-        return await _call_agent(context.meal_agent, "meal_plan", message)
+        return await _call_agent(context.meal_agent, "make_meal_plan", message)
 
     @tool
     async def summarize_text(text: str) -> str:
@@ -160,7 +160,7 @@ def create_butler_tools(context: ButlerToolContext) -> list[Any]:
         返回:
             str: 摘要 agent 生成的文本摘要
         """
-        return await _call_agent(context.summary_agent, "summarize", text)
+        return await _call_agent(context.summary_agent, "summarize_text", text)
 
     @tool
     async def summarize_group_chat(message: str) -> str:
@@ -172,7 +172,7 @@ def create_butler_tools(context: ButlerToolContext) -> list[Any]:
         返回:
             str: 摘要 agent 生成的群聊摘要
         """
-        return await _call_agent(context.summary_agent, "summarize", message)
+        return await _call_agent(context.summary_agent, "summarize_group", message)
 
     @tool
     async def search_local_knowledge(query: str) -> str:

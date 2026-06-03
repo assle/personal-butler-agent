@@ -101,6 +101,85 @@ async def test_log_training_reads_runtime_context_and_calls_fitness_agent(db_ses
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tool_name", "input_payload", "agent_name", "expected_intent", "expected_message"),
+    [
+        (
+            "get_today_training_plan",
+            {"message": "今天练什么"},
+            "fitness_agent",
+            "today_plan",
+            "今天练什么",
+        ),
+        (
+            "make_meal_plan",
+            {"message": "今天吃什么"},
+            "meal_agent",
+            "make_meal_plan",
+            "今天吃什么",
+        ),
+        (
+            "summarize_text",
+            {"text": "会议决定周五上线。"},
+            "summary_agent",
+            "summarize_text",
+            "会议决定周五上线。",
+        ),
+        (
+            "summarize_group_chat",
+            {"message": "总结一下群聊"},
+            "summary_agent",
+            "summarize_group",
+            "总结一下群聊",
+        ),
+    ],
+)
+async def test_domain_tools_forward_existing_intent_conventions(
+    db_session,
+    tool_name,
+    input_payload,
+    agent_name,
+    expected_intent,
+    expected_message,
+):
+    """验证领域工具转发项目既有 intent 命名约定
+
+    参数:
+        db_session: 测试数据库会话 fixture
+        tool_name: 要调用的 Butler 工具名称
+        input_payload: 传给工具的业务参数
+        agent_name: 应被调用的上下文 agent 字段名
+        expected_intent: 期望转发给 agent.handle() 的 intent
+        expected_message: 期望转发给 agent.handle() 的消息文本
+
+    返回:
+        None
+    """
+    fitness_agent = FakeAgent(reply="fitness ok")
+    meal_agent = FakeAgent(reply="meal ok")
+    summary_agent = FakeAgent(reply="summary ok")
+    context = ButlerToolContext(
+        fitness_agent=fitness_agent,
+        meal_agent=meal_agent,
+        summary_agent=summary_agent,
+        knowledge_service=AsyncMock(),
+        web_search_service=AsyncMock(),
+    )
+    tool = _tool_by_name(create_butler_tools(context), tool_name)
+
+    await tool.ainvoke(input_payload, config=_runtime_config(db_session))
+
+    expected_agent = getattr(context, agent_name)
+    expected_agent.handle.assert_awaited_once_with(
+        expected_intent,
+        expected_message,
+        "assle",
+        db_session,
+        extra_state={"chat_type": "single", "chat_id": None},
+    )
+
+
+@pytest.mark.asyncio
 async def test_search_web_formats_search_results(db_session):
     """验证联网搜索工具格式化 SearchResult
 
