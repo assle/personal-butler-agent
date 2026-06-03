@@ -34,6 +34,14 @@ def mock_agent_registry():
 
 @pytest.fixture
 def mock_butler_agent():
+    """创建测试用 ButlerAgent mock
+
+    参数:
+        无；pytest 直接调用该 fixture
+
+    返回:
+        AsyncMock: handle() 固定返回 mock butler 回复的对象
+    """
     from src.schemas.response import AgentResponse
     agent = AsyncMock()
     agent.handle.return_value = AgentResponse(reply="mock butler reply", data={"intent": "butler"})
