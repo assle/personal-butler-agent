@@ -3,8 +3,8 @@
 提供 POST /api/debug/message 端点，模拟企业微信消息回调用于本地开发测试
 
 在总流程中的位置:
-  用户请求 → POST /api/debug/message → 解析请求体 → IntentRouter.route()
-  → AgentRegistry.get(intent) → agent.handle() → DebugMessageResponse
+  用户请求 → POST /api/debug/message → 解析请求体
+  → ButlerAgent.handle() → DebugMessageResponse
 
 与 wechat 路由的区别:
   - 无需加密/解密
@@ -12,7 +12,7 @@
   - 始终注册，不依赖企业微信配置
 
 支持群聊总结测试:
-  发送 chat_type="group" + chat_id → 保存消息到 DB，触发关键词时走 summarize_group
+  发送 chat_type="group" + chat_id → 保存消息到 DB，触发关键词时走 ButlerAgent
 """
 import time
 import logging
@@ -24,6 +24,7 @@ from src.schemas.response import DebugMessageResponse
 from src.db.session import get_db
 from src.intent.router import IntentRouter
 from src.agents.registry import AgentRegistry
+from src.agents.butler import ButlerAgent
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +46,14 @@ def _is_trigger(content: str) -> bool:
 def create_debug_router(
     intent_router: IntentRouter,
     agent_registry: AgentRegistry,
+    butler_agent: ButlerAgent,
 ) -> APIRouter:
     """创建调试路由
 
     参数:
         intent_router: 意图路由器实例
         agent_registry: Agent 注册表实例
+        butler_agent: 小管家总控 Agent 实例
 
     返回:
         APIRouter: 挂载了 POST /api/debug/message 的路由
@@ -61,7 +64,7 @@ def create_debug_router(
     async def debug_message(
         req: DebugMessageRequest, db: AsyncSession = Depends(get_db)
     ) -> DebugMessageResponse:
-        """处理调试消息，走完整的意图路由 → agent 处理链路
+        """处理调试消息，走 ButlerAgent 总控处理链路
 
         参数:
             req: 调试消息请求体（user_id, message, chat_type, chat_id）
@@ -90,45 +93,30 @@ def create_debug_router(
                     data={"chat_id": req.chat_id, "saved": True},
                 )
 
-            # 触发消息：使用 summarize_group 意图
-            agent = agent_registry.get("summarize_group")
-            if agent is None:
-                return DebugMessageResponse(
-                    intent="summarize_group",
-                    confidence=1.0,
-                    response="抱歉，无法处理该消息",
-                )
+            # 触发消息：交给 ButlerAgent 携带群聊上下文统一编排
             try:
-                result = await agent.handle(
-                    "summarize_group", req.message, req.user_id, db,
+                result = await butler_agent.handle(
+                    "butler", req.message, req.user_id, db,
                     extra_state={"chat_id": req.chat_id, "chat_type": "group"},
                 )
                 return DebugMessageResponse(
-                    intent="summarize_group",
+                    intent="butler",
                     confidence=1.0,
                     response=result.reply,
                     data=result.data,
                 )
             except APIError as e:
                 return DebugMessageResponse(
-                    intent="summarize_group",
+                    intent="butler",
                     confidence=1.0,
                     response="LLM 服务暂时不可用，请稍后重试。",
                     data={"error": str(e)},
                 )
 
-        # 私聊：走意图路由
-        intent, confidence = await intent_router.route(req.message)
-        agent = agent_registry.get(intent)
-        if agent is None:
-            return DebugMessageResponse(
-                intent=intent,
-                confidence=confidence,
-                response="抱歉，无法处理该消息",
-            )
+        # 私聊：交给 ButlerAgent 统一判断意图并编排领域能力
         try:
-            result = await agent.handle(
-                intent,
+            result = await butler_agent.handle(
+                "butler",
                 req.message,
                 req.user_id,
                 db,
@@ -136,15 +124,15 @@ def create_debug_router(
             )
         except APIError as e:
             return DebugMessageResponse(
-                intent=intent,
-                confidence=confidence,
+                intent="butler",
+                confidence=1.0,
                 response="LLM 服务暂时不可用，请稍后重试。",
                 data={"error": str(e)},
             )
 
         return DebugMessageResponse(
-            intent=intent,
-            confidence=confidence,
+            intent="butler",
+            confidence=1.0,
             response=result.reply,
             data=result.data,
         )

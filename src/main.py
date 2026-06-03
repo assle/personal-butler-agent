@@ -21,8 +21,11 @@ from src.agents.fitness import FitnessAgent
 from src.agents.summary import SummaryAgent
 from src.agents.meal import MealAgent
 from src.agents.qa import QAAgent
+from src.agents.butler import ButlerAgent
 from src.agents.registry import AgentRegistry
+from src.knowledge import KnowledgeService
 from src.router.debug import create_debug_router
+from src.search import WebSearchService
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -37,6 +40,16 @@ fitness_agent = FitnessAgent(llm_client=llm_client)
 summary_agent = SummaryAgent(llm_client=llm_client)
 meal_agent = MealAgent(llm_client=llm_client)
 qa_agent = QAAgent(llm_client=llm_client)
+knowledge_service = KnowledgeService()
+web_search_service = WebSearchService()
+butler_agent = ButlerAgent(
+    llm_client=llm_client,
+    fitness_agent=fitness_agent,
+    meal_agent=meal_agent,
+    summary_agent=summary_agent,
+    knowledge_service=knowledge_service,
+    web_search_service=web_search_service,
+)
 
 agent_registry = AgentRegistry()
 agent_registry.register("log_training", fitness_agent)
@@ -79,6 +92,7 @@ app = FastAPI(title="Personal Butler Agent", version="0.1.0", lifespan=lifespan)
 debug_router = create_debug_router(
     intent_router=intent_router,
     agent_registry=agent_registry,
+    butler_agent=butler_agent,
 )
 app.include_router(debug_router)
 
