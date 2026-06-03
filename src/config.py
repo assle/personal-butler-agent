@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     # SQLite 数据库配置
     database_url: str = "sqlite+aiosqlite:///butler.db"
 
+    # 联网搜索配置；默认关闭，启用后由 search_web 工具查询实时信息
+    web_search_enabled: bool = False
+    web_search_provider: str = "tavily"
+    web_search_api_key: str = ""
+    web_search_max_results: int = 5
+    web_search_timeout_seconds: int = 8
+
     # 企业微信智能机器人 URL 回调模式配置
     wecom_aibot_bot_id: str = ""
     wecom_aibot_token: str = ""

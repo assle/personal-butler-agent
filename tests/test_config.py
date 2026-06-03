@@ -55,6 +55,47 @@ def test_settings_use_defaults():
         assert settings.wecom_aibot_encoding_aes_key == ""
 
 
+def test_settings_loads_web_search_from_env():
+    """验证 Settings 正确从环境变量加载联网搜索配置
+
+    模拟 Tavily 搜索相关环境变量，确保 Settings 构造函数能读取启用状态、供应商、密钥和限制参数。
+    """
+    env_vars = {
+        "DEEPSEEK_API_KEY": "sk-test-key",
+        "WEB_SEARCH_ENABLED": "true",
+        "WEB_SEARCH_PROVIDER": "tavily",
+        "WEB_SEARCH_API_KEY": "tvly-test",
+        "WEB_SEARCH_MAX_RESULTS": "3",
+        "WEB_SEARCH_TIMEOUT_SECONDS": "6",
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+        assert settings.web_search_enabled is True
+        assert settings.web_search_provider == "tavily"
+        assert settings.web_search_api_key == "tvly-test"
+        assert settings.web_search_max_results == 3
+        assert settings.web_search_timeout_seconds == 6
+
+
+def test_settings_web_search_use_defaults():
+    """验证联网搜索配置默认关闭并使用安全默认值
+
+    仅设置必需的 DEEPSEEK_API_KEY，验证联网搜索默认不启用且 Tavily 参数使用类定义中的默认值。
+    """
+    env_vars = {"DEEPSEEK_API_KEY": "sk-test-key"}
+    with patch.dict(os.environ, env_vars, clear=True):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+        assert settings.web_search_enabled is False
+        assert settings.web_search_provider == "tavily"
+        assert settings.web_search_api_key == ""
+        assert settings.web_search_max_results == 5
+        assert settings.web_search_timeout_seconds == 8
+
+
 def test_legacy_self_built_app_env_is_ignored():
     """验证旧自建应用环境变量不再被 Settings 暴露
 
