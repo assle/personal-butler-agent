@@ -31,4 +31,4 @@ class ButlerState(TypedDict, total=False):
     # 最终要返回给用户的自然语言回复
     reply: str
     # 图执行过程中的错误信息
-    error: str
+    error: str | None
