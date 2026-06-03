@@ -34,8 +34,8 @@ async def handle_ws_message(
     ws_client,
     intent_router: IntentRouter,
     agent_registry: AgentRegistry,
-    butler_agent: ButlerAgent | AsyncSession,
-    db: AsyncSession | None = None,
+    butler_agent: ButlerAgent,
+    db: AsyncSession,
 ):
     """处理从 WebSocket 收到的消息回调
 
@@ -48,10 +48,6 @@ async def handle_ws_message(
         butler_agent: 小管家总控 agent，用于处理可回复文本和语音消息
         db: 数据库异步会话
     """
-    if db is None:
-        db = butler_agent
-        butler_agent = None
-
     from_user = msg.get("from", {}).get("userid", "")
     msg_type = msg.get("msgtype", "text")
 
@@ -91,41 +87,6 @@ async def handle_ws_message(
     # 非文本且非语音消息
     if msg_type not in ("text", "voice"):
         reply_text = "暂不支持该消息类型"
-    elif butler_agent is None and is_group_trigger:
-        agent = agent_registry.get("summarize_group")
-        if agent is None:
-            reply_text = "抱歉，无法处理该消息"
-        else:
-            try:
-                result = await agent.handle(
-                    "summarize_group", content, from_user, db,
-                    extra_state=extra_state,
-                )
-                reply_text = result.reply
-            except Exception as e:
-                logger.exception("WS handler: agent error: %s", e)
-                reply_text = "抱歉，处理消息时遇到错误"
-    elif butler_agent is None:
-        # 兼容旧调用方：未注入 ButlerAgent 时继续走原有意图路由
-        try:
-            intent, _confidence = await intent_router.route(content)
-            logger.info("WS handler: intent=%s", intent)
-            agent = agent_registry.get(intent)
-            if agent is None:
-                reply_text = "抱歉，无法处理该消息"
-            else:
-                try:
-                    result = await agent.handle(
-                        intent, content, from_user, db,
-                        extra_state=extra_state,
-                    )
-                    reply_text = result.reply
-                except Exception as e:
-                    logger.exception("WS handler: agent error: %s", e)
-                    reply_text = "LLM 服务暂时不可用，请稍后重试。"
-        except Exception as e:
-            logger.exception("WS handler: unexpected error: %s", e)
-            reply_text = "抱歉，处理消息时遇到错误"
     else:
         # 可回复消息统一交给 ButlerAgent 处理
         try:

@@ -32,9 +32,23 @@ def mock_agent_registry():
     return registry
 
 
+@pytest.fixture
+def mock_butler_agent():
+    from src.schemas.response import AgentResponse
+    agent = AsyncMock()
+    agent.handle.return_value = AgentResponse(reply="mock butler reply", data={"intent": "butler"})
+    return agent
+
+
 @pytest.mark.asyncio
-async def test_handle_private_message(db_session, mock_ws, mock_intent_router, mock_agent_registry):
-    """验证私聊消息走意图路由 → agent → 回复"""
+async def test_handle_private_message(
+    db_session,
+    mock_ws,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
+    """验证私聊消息统一走 ButlerAgent 回复"""
     from src.wechat.message_handler import handle_ws_message
 
     msg = {
@@ -45,15 +59,36 @@ async def test_handle_private_message(db_session, mock_ws, mock_intent_router, m
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, "req-1", mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(
+        msg,
+        "req-1",
+        mock_ws,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
 
-    mock_intent_router.route.assert_called_once_with("今天练什么")
-    mock_ws.send_reply.assert_called_once_with("req-1", "mock reply")
+    mock_intent_router.route.assert_not_called()
+    mock_butler_agent.handle.assert_awaited_once_with(
+        "butler",
+        "今天练什么",
+        "user1",
+        db_session,
+        extra_state={"chat_type": "single", "chat_id": None},
+    )
+    mock_ws.send_reply.assert_called_once_with("req-1", "mock butler reply")
 
 
 @pytest.mark.asyncio
-async def test_handle_group_trigger_message(db_session, mock_ws, mock_intent_router, mock_agent_registry):
-    """验证群聊触发消息走 summarize_group → 回复"""
+async def test_handle_group_trigger_message(
+    db_session,
+    mock_ws,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
+    """验证群聊触发消息统一走 ButlerAgent 回复"""
     from src.wechat.message_handler import handle_ws_message
 
     msg = {
@@ -65,9 +100,25 @@ async def test_handle_group_trigger_message(db_session, mock_ws, mock_intent_rou
         "chatid": "chat-1",
     }
 
-    await handle_ws_message(msg, "req-2", mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(
+        msg,
+        "req-2",
+        mock_ws,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
 
-    mock_ws.send_reply.assert_called_once()
+    mock_intent_router.route.assert_not_called()
+    mock_butler_agent.handle.assert_awaited_once_with(
+        "butler",
+        "群里总结一下",
+        "user2",
+        db_session,
+        extra_state={"chat_type": "group", "chat_id": "chat-1"},
+    )
+    mock_ws.send_reply.assert_called_once_with("req-2", "mock butler reply")
     # 验证群聊消息被保存
     from src.models.group_message import GroupMessage
     from sqlalchemy import select
@@ -78,7 +129,13 @@ async def test_handle_group_trigger_message(db_session, mock_ws, mock_intent_rou
 
 
 @pytest.mark.asyncio
-async def test_handle_group_non_trigger(db_session, mock_ws, mock_intent_router, mock_agent_registry):
+async def test_handle_group_non_trigger(
+    db_session,
+    mock_ws,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
     """验证非触发群聊消息不回复"""
     from src.wechat.message_handler import handle_ws_message
 
@@ -91,15 +148,30 @@ async def test_handle_group_non_trigger(db_session, mock_ws, mock_intent_router,
         "chatid": "chat-2",
     }
 
-    await handle_ws_message(msg, "req-3", mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(
+        msg,
+        "req-3",
+        mock_ws,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
 
     # 非触发消息不应回复
+    mock_butler_agent.handle.assert_not_awaited()
     mock_ws.send_reply.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_handle_voice_message(db_session, mock_ws, mock_intent_router, mock_agent_registry):
-    """验证语音消息提取 recognition 文本"""
+async def test_handle_voice_message(
+    db_session,
+    mock_ws,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
+    """验证语音消息提取 recognition 文本并交给 ButlerAgent"""
     from src.wechat.message_handler import handle_ws_message
 
     msg = {
@@ -110,14 +182,35 @@ async def test_handle_voice_message(db_session, mock_ws, mock_intent_router, moc
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, "req-4", mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(
+        msg,
+        "req-4",
+        mock_ws,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
 
-    mock_intent_router.route.assert_called_once_with("今天练胸")
-    mock_ws.send_reply.assert_called_once()
+    mock_intent_router.route.assert_not_called()
+    mock_butler_agent.handle.assert_awaited_once_with(
+        "butler",
+        "今天练胸",
+        "user1",
+        db_session,
+        extra_state={"chat_type": "single", "chat_id": None},
+    )
+    mock_ws.send_reply.assert_called_once_with("req-4", "mock butler reply")
 
 
 @pytest.mark.asyncio
-async def test_handle_voice_empty(db_session, mock_ws, mock_intent_router, mock_agent_registry):
+async def test_handle_voice_empty(
+    db_session,
+    mock_ws,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
     """验证空语音识别结果静默忽略"""
     from src.wechat.message_handler import handle_ws_message
 
@@ -129,13 +222,28 @@ async def test_handle_voice_empty(db_session, mock_ws, mock_intent_router, mock_
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, "req-5", mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(
+        msg,
+        "req-5",
+        mock_ws,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
 
+    mock_butler_agent.handle.assert_not_awaited()
     mock_ws.send_reply.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_non_text_message(db_session, mock_ws, mock_intent_router, mock_agent_registry):
+async def test_non_text_message(
+    db_session,
+    mock_ws,
+    mock_intent_router,
+    mock_agent_registry,
+    mock_butler_agent,
+):
     """验证非文本非语音消息返回不支持"""
     from src.wechat.message_handler import handle_ws_message
 
@@ -146,8 +254,17 @@ async def test_non_text_message(db_session, mock_ws, mock_intent_router, mock_ag
         "chattype": "single",
     }
 
-    await handle_ws_message(msg, "req-6", mock_ws, mock_intent_router, mock_agent_registry, db_session)
+    await handle_ws_message(
+        msg,
+        "req-6",
+        mock_ws,
+        mock_intent_router,
+        mock_agent_registry,
+        mock_butler_agent,
+        db_session,
+    )
 
+    mock_butler_agent.handle.assert_not_awaited()
     mock_ws.send_reply.assert_called_once()
     args = mock_ws.send_reply.call_args
     assert "暂不支持" in args.args[1]
