@@ -11,46 +11,33 @@ from sqlalchemy import select
 
 
 @pytest.fixture
-def mock_intent_router():
-    """创建测试用意图路由器
+def mock_private_agent():
+    """创建测试用私聊场景 agent
 
     返回:
-        AsyncMock: route() 固定返回 qa 意图
-    """
-    router = AsyncMock()
-    router.route.return_value = ("qa", 0.9)
-    return router
-
-
-@pytest.fixture
-def mock_agent_registry():
-    """创建测试用 agent 注册表
-
-    返回:
-        AgentRegistry: 注册了 qa 和 summarize_group 的测试注册表
-    """
-    from src.agents.registry import AgentRegistry
-    from src.schemas.response import AgentResponse
-
-    registry = AgentRegistry()
-    mock_agent = AsyncMock()
-    mock_agent.handle.return_value = AgentResponse(reply="mock reply")
-    registry.register("qa", mock_agent)
-    registry.register("summarize_group", mock_agent)
-    return registry
-
-
-@pytest.fixture
-def mock_butler_agent():
-    """创建测试用 ButlerAgent
-
-    返回:
-        AsyncMock: handle() 固定返回小管家回复
+        AsyncMock: handle() 固定返回私聊回复
     """
     from src.schemas.response import AgentResponse
 
     agent = AsyncMock()
-    agent.handle.return_value = AgentResponse(reply="mock butler reply", data={"intent": "butler"})
+    agent.handle.return_value = AgentResponse(
+        reply="mock private reply",
+        data={"intent": "private_butler"},
+    )
+    return agent
+
+
+@pytest.fixture
+def mock_group_agent():
+    """创建测试用群聊场景 agent
+
+    返回:
+        AsyncMock: handle() 固定返回群聊回复
+    """
+    from src.schemas.response import AgentResponse
+
+    agent = AsyncMock()
+    agent.handle.return_value = AgentResponse(reply="mock group reply", data={"intent": "group_mention"})
     return agent
 
 
@@ -123,17 +110,15 @@ async def test_record_inbound_message_is_idempotent(db_session):
 @pytest.mark.asyncio
 async def test_handle_callback_message_posts_reply_to_response_url(
     db_session,
-    mock_intent_router,
-    mock_agent_registry,
-    mock_butler_agent,
+    mock_private_agent,
+    mock_group_agent,
 ):
     """验证 URL 回调消息处理完成后通过 response_url 回复
 
     参数:
         db_session: 测试数据库会话
-        mock_intent_router: 模拟意图路由器
-        mock_agent_registry: 模拟 agent 注册表
-        mock_butler_agent: 模拟 ButlerAgent
+        mock_private_agent: 模拟私聊场景 agent
+        mock_group_agent: 模拟群聊场景 agent
     """
     from src.wechat.callback_handler import ResponseUrlReplyClient, handle_callback_message
 
@@ -166,41 +151,39 @@ async def test_handle_callback_message_posts_reply_to_response_url(
     await handle_callback_message(
         msg,
         reply_client,
-        mock_intent_router,
-        mock_agent_registry,
-        mock_butler_agent,
+        mock_private_agent,
+        mock_group_agent,
         db_session,
     )
 
     assert posted == [
         (
             "https://example.test/respond",
-            {"msgtype": "markdown", "markdown": {"content": "mock butler reply"}},
+            {"msgtype": "markdown", "markdown": {"content": "mock private reply"}},
         )
     ]
-    mock_butler_agent.handle.assert_awaited_once_with(
-        "butler",
+    mock_private_agent.handle.assert_awaited_once_with(
+        "private_butler",
         "今天练什么",
         "user1",
         db_session,
         extra_state={"chat_type": "single", "chat_id": None},
     )
+    mock_group_agent.handle.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_handle_callback_message_group_non_trigger_does_not_call_butler(
+async def test_handle_callback_message_group_non_trigger_does_not_call_agent(
     db_session,
-    mock_intent_router,
-    mock_agent_registry,
-    mock_butler_agent,
+    mock_private_agent,
+    mock_group_agent,
 ):
-    """验证群聊非触发消息只保存不回复，也不调用 ButlerAgent
+    """验证群聊非触发消息只保存不回复，也不调用群聊 agent
 
     参数:
         db_session: 测试数据库会话
-        mock_intent_router: 模拟意图路由器
-        mock_agent_registry: 模拟 agent 注册表
-        mock_butler_agent: 模拟 ButlerAgent
+        mock_private_agent: 模拟私聊场景 agent
+        mock_group_agent: 模拟群聊场景 agent
     """
     from src.wechat.callback_handler import ResponseUrlReplyClient, handle_callback_message
 
@@ -234,23 +217,28 @@ async def test_handle_callback_message_group_non_trigger_does_not_call_butler(
     await handle_callback_message(
         msg,
         reply_client,
-        mock_intent_router,
-        mock_agent_registry,
-        mock_butler_agent,
+        mock_private_agent,
+        mock_group_agent,
         db_session,
     )
 
     assert posted == []
-    mock_butler_agent.handle.assert_not_awaited()
+    mock_private_agent.handle.assert_not_awaited()
+    mock_group_agent.handle.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_callback_router_accepts_encrypted_json_and_records_message(db_session, mock_butler_agent):
+async def test_callback_router_accepts_encrypted_json_and_records_message(
+    db_session,
+    mock_private_agent,
+    mock_group_agent,
+):
     """验证 HTTP 回调路由可以解密 JSON 帧并先落库再返回 success
 
     参数:
         db_session: 测试数据库会话
-        mock_butler_agent: 模拟 ButlerAgent
+        mock_private_agent: 模拟私聊场景 agent
+        mock_group_agent: 模拟群聊场景 agent
     """
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
@@ -273,9 +261,8 @@ async def test_callback_router_accepts_encrypted_json_and_records_message(db_ses
             token="token-1",
             encoding_aes_key=_valid_encoding_aes_key(),
             receive_id="bot-1",
-            intent_router=AsyncMock(),
-            agent_registry=AsyncMock(),
-            butler_agent=mock_butler_agent,
+            private_agent=mock_private_agent,
+            group_agent=mock_group_agent,
             db_session_factory=db_session_factory,
             reply_client=AsyncMock(),
         )
@@ -318,13 +305,15 @@ async def test_callback_router_accepts_encrypted_json_and_records_message(db_ses
 @pytest.mark.asyncio
 async def test_callback_router_accepts_message_when_crypto_receive_id_differs_from_bot_id(
     db_session,
-    mock_butler_agent,
+    mock_private_agent,
+    mock_group_agent,
 ):
     """验证智能机器人用消息体 aibotid 校验 BotID，而不把密文尾部 receive_id 当 BotID
 
     参数:
         db_session: 测试数据库会话
-        mock_butler_agent: 模拟 ButlerAgent
+        mock_private_agent: 模拟私聊场景 agent
+        mock_group_agent: 模拟群聊场景 agent
     """
     from fastapi import FastAPI
     from httpx import ASGITransport, AsyncClient
@@ -347,9 +336,8 @@ async def test_callback_router_accepts_message_when_crypto_receive_id_differs_fr
             token="token-1",
             encoding_aes_key=_valid_encoding_aes_key(),
             receive_id="bot-1",
-            intent_router=AsyncMock(),
-            agent_registry=AsyncMock(),
-            butler_agent=mock_butler_agent,
+            private_agent=mock_private_agent,
+            group_agent=mock_group_agent,
             db_session_factory=db_session_factory,
             reply_client=AsyncMock(),
         )

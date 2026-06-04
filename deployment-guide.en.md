@@ -24,13 +24,7 @@ uv sync
 uv run uvicorn src.main:app --host 127.0.0.1 --port 8000
 ```
 
-Debug endpoint:
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/debug/message \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":"assle","message":"今天练什么"}'
-```
+The app no longer exposes a local debug/dev message API. Configure the WeChat Work intelligent robot callback URL through HTTPS tunneling or production HTTPS.
 
 ## Production
 

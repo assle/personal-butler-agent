@@ -66,7 +66,7 @@ def test_llm_client_bind_tools_delegates_to_chat_model():
     """验证 LLMClient.bind_tools() 透传到底层 ChatOpenAI 实例
 
     返回:
-        None；通过断言确认 ButlerAgent 可以获取绑定工具后的 runnable
+        None；通过断言确认 private tool-calling agent 可以获取绑定工具后的 runnable
     """
     env_vars = {"DEEPSEEK_API_KEY": "sk-test-key"}
     with patch.dict(os.environ, env_vars, clear=True):

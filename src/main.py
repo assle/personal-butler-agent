@@ -3,10 +3,10 @@ Personal Butler Agent 应用入口
 负责 FastAPI 应用初始化、单例组件创建和路由注册
 
 Workflow:
-1. 创建 LLMClient、IntentRouter、各业务 agent 单例
-2. 向 AgentRegistry 注册所有 intent → agent 映射
+1. 创建 LLMClient、领域 agent 和 scene agent 单例
+2. 私聊、群聊 @、scheduler webhook 分别由场景 agent 处理
 3. lifespan 中初始化数据库表结构
-4. 注册调试路由和智能机器人 URL 回调路由
+4. 注册智能机器人 URL 回调路由
 5. 配置企业微信群 webhook 定时推送
 """
 import logging
@@ -16,15 +16,14 @@ from fastapi import FastAPI
 
 from src.config import settings
 from src.llm.client import LLMClient
-from src.intent.router import IntentRouter
 from src.agents.fitness import FitnessAgent
 from src.agents.summary import SummaryAgent
 from src.agents.meal import MealAgent
 from src.agents.qa import QAAgent
-from src.agents.butler import ButlerAgent
-from src.agents.registry import AgentRegistry
+from src.agents.group_mention import GroupMentionAgent
+from src.agents.private_butler import PrivateButlerAgent
+from src.agents.webhook_composer import WebhookComposerAgent
 from src.knowledge import KnowledgeService
-from src.router.debug import create_debug_router
 from src.search import WebSearchService
 from src.scheduler import SchedulerManager, WebhookPushClient, load_webhook_targets
 
@@ -36,14 +35,13 @@ if not logger.handlers:
     logger.addHandler(h)
 
 llm_client = LLMClient()
-intent_router = IntentRouter(llm_client=llm_client)
 fitness_agent = FitnessAgent(llm_client=llm_client)
 summary_agent = SummaryAgent(llm_client=llm_client)
 meal_agent = MealAgent(llm_client=llm_client)
 qa_agent = QAAgent(llm_client=llm_client)
 knowledge_service = KnowledgeService()
 web_search_service = WebSearchService()
-butler_agent = ButlerAgent(
+private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
     fitness_agent=fitness_agent,
     meal_agent=meal_agent,
@@ -51,16 +49,12 @@ butler_agent = ButlerAgent(
     knowledge_service=knowledge_service,
     web_search_service=web_search_service,
 )
+group_mention_agent = GroupMentionAgent(
+    llm_client=llm_client,
+    summary_agent=summary_agent,
+)
+webhook_composer_agent = WebhookComposerAgent(llm_client=llm_client)
 
-agent_registry = AgentRegistry()
-agent_registry.register("log_training", fitness_agent)
-agent_registry.register("today_plan", fitness_agent)
-agent_registry.register("summarize_text", summary_agent)
-agent_registry.register("summarize_group", summary_agent)
-agent_registry.register("make_meal_plan", meal_agent)
-agent_registry.register("qa", qa_agent)
-agent_registry.register("unknown", qa_agent)
-agent_registry.set_fallback(qa_agent)
 scheduler_manager: SchedulerManager | None = None
 
 @asynccontextmanager
@@ -83,10 +77,8 @@ async def lifespan(app: FastAPI):
     if settings.scheduler_targets_file:
         targets = load_webhook_targets(settings.scheduler_targets_file)
         scheduler_manager = SchedulerManager(
-            agent_registry=agent_registry,
             db_session_factory=async_session,
-            intent_router=intent_router,
-            butler_agent=butler_agent,
+            webhook_composer_agent=webhook_composer_agent,
             webhook_client=WebhookPushClient(),
             webhook_targets=targets,
         )
@@ -101,14 +93,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Personal Butler Agent", version="0.1.0", lifespan=lifespan)
 
-# 调试路由（始终注册，用于本地开发测试）
-debug_router = create_debug_router(
-    intent_router=intent_router,
-    agent_registry=agent_registry,
-    butler_agent=butler_agent,
-)
-app.include_router(debug_router)
-
 # 智能机器人 URL 回调路由（Token + EncodingAESKey 配置完整时注册）
 if settings.wecom_aibot_token and settings.wecom_aibot_encoding_aes_key:
     from src.db.session import async_session
@@ -119,9 +103,8 @@ if settings.wecom_aibot_token and settings.wecom_aibot_encoding_aes_key:
             token=settings.wecom_aibot_token,
             encoding_aes_key=settings.wecom_aibot_encoding_aes_key,
             receive_id=settings.wecom_aibot_bot_id,
-            intent_router=intent_router,
-            agent_registry=agent_registry,
-            butler_agent=butler_agent,
+            private_agent=private_butler_agent,
+            group_agent=group_mention_agent,
             db_session_factory=async_session,
         )
     )

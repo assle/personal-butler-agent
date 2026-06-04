@@ -1,31 +1,20 @@
 """
 调度器测试
-测试 SchedulerManager 的创建、job 触发和推送逻辑
+验证 APScheduler 企业微信群 webhook 推送只调用 WebhookComposerAgent 生成正文。
 """
-import pytest
+import json
 from unittest.mock import AsyncMock, MagicMock
 
-
-@pytest.fixture
-def mock_ws():
-    """创建 mock WebSocket 客户端"""
-    ws = AsyncMock()
-    ws.push_message.return_value = True
-    return ws
-
-
-@pytest.fixture
-def mock_registry():
-    """创建 mock AgentRegistry"""
-    from src.agents.registry import AgentRegistry
-    registry = AgentRegistry()
-    return registry
+import pytest
 
 
 @pytest.fixture
 def mock_db_factory():
-    """创建 mock 数据库会话工厂"""
-    from unittest.mock import AsyncMock, MagicMock
+    """创建 mock 数据库会话工厂
+
+    返回:
+        MagicMock: 返回异步上下文数据库会话的工厂
+    """
     session = AsyncMock()
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=None)
@@ -35,441 +24,287 @@ def mock_db_factory():
 
 
 @pytest.fixture
-def mock_router():
-    """创建 mock IntentRouter，用于自动路由测试"""
-    router = AsyncMock()
-    router.route.return_value = ("qa", 1.0)
-    return router
+def mock_composer_agent():
+    """创建 mock WebhookComposerAgent
 
-
-@pytest.mark.asyncio
-async def test_scheduler_creation(mock_ws, mock_registry, mock_db_factory):
-    """验证 SchedulerManager 创建不报错"""
-    from src.scheduler import SchedulerManager
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single",
-        target_id="user1",
-        message="今日训练建议",
-        intent="today_plan",
-        db_session_factory=mock_db_factory,
-    )
-    assert mgr._cron == "0 9 * * *"
-    assert mgr._targets == [("single", "user1", "今日训练建议", "today_plan")]
-
-
-@pytest.mark.asyncio
-async def test_scheduled_push_calls_agent_and_pushes(mock_ws, mock_registry, mock_db_factory):
-    """验证 _scheduled_push 调用 agent 并推送结果"""
-    from src.scheduler import SchedulerManager
+    返回:
+        AsyncMock: handle() 固定返回 markdown 正文
+    """
     from src.schemas.response import AgentResponse
-    from unittest.mock import AsyncMock
 
-    # 注册一个 mock agent
-    mock_agent = AsyncMock()
-    mock_agent.handle.return_value = AgentResponse(
-        reply="今日训练计划：练肩 + 哑铃推举",
-        data=None,
+    agent = AsyncMock()
+    agent.handle.return_value = AgentResponse(
+        reply="## 早安\n今天记得准时出门。",
+        data={"intent": "webhook_compose"},
     )
-    mock_registry.register("today_plan", mock_agent)
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single",
-        target_id="user1",
-        message="今日训练建议",
-        intent="today_plan",
-        db_session_factory=mock_db_factory,
-    )
-
-    await mgr._scheduled_push()
-
-    # 验证 agent.handle 被调用
-    mock_agent.handle.assert_called_once()
-    call_kwargs = mock_agent.handle.call_args.kwargs
-    assert call_kwargs["intent"] == "today_plan"
-    assert call_kwargs["message"] == "今日训练建议"
-    assert call_kwargs["user_id"] == "user1"
-
-    # 验证 ws.push_message 被调用
-    mock_ws.push_message.assert_called_once_with(
-        target_type="single",
-        target_id="user1",
-        msgtype="markdown",
-        content="今日训练计划：练肩 + 哑铃推举",
-    )
+    return agent
 
 
-@pytest.mark.asyncio
-async def test_scheduled_push_handles_agent_not_found(mock_ws, mock_registry, mock_db_factory):
-    """验证 agent 未注册时不崩溃"""
-    from src.scheduler import SchedulerManager
+@pytest.fixture
+def mock_webhook_client():
+    """创建 mock webhook 推送客户端
 
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single",
-        target_id="user1",
-        message="test",
-        intent="nonexistent",
-        db_session_factory=mock_db_factory,
+    返回:
+        AsyncMock: send_markdown() 固定成功
+    """
+    client = AsyncMock()
+    client.send_markdown.return_value = True
+    return client
+
+
+def test_load_webhook_targets_reads_json(tmp_path):
+    """验证 JSON 文件会转换为 webhook target 列表"""
+    from src.scheduler import load_webhook_targets
+
+    config_path = tmp_path / "targets.json"
+    config_path.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "work",
+                    "cron": "0 9 * * *",
+                    "webhook_url": "https://example.test/webhook",
+                    "message": "生成早安提醒",
+                    "chat_id": "chat-1",
+                    "enabled": True,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
     )
 
-    await mgr._scheduled_push()
-    # 不应抛出异常，且不应调用 push_message
-    mock_ws.push_message.assert_not_called()
+    targets = load_webhook_targets(str(config_path))
+
+    assert len(targets) == 1
+    assert targets[0].name == "work"
+    assert targets[0].cron == "0 9 * * *"
+    assert targets[0].message == "生成早安提醒"
+    assert targets[0].chat_id == "chat-1"
+    assert targets[0].enabled is True
 
 
-@pytest.mark.asyncio
-async def test_scheduled_push_handles_agent_error(mock_ws, mock_registry, mock_db_factory):
-    """验证 agent 处理异常时不崩溃"""
-    from src.scheduler import SchedulerManager
-    from unittest.mock import AsyncMock
+def test_load_webhook_targets_rejects_duplicate_names(tmp_path):
+    """验证重复 target name 会被拒绝"""
+    from src.scheduler import load_webhook_targets
 
-    mock_agent = AsyncMock()
-    mock_agent.handle.side_effect = Exception("LLM error")
-    mock_registry.register("today_plan", mock_agent)
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single",
-        target_id="user1",
-        message="test",
-        intent="today_plan",
-        db_session_factory=mock_db_factory,
+    config_path = tmp_path / "targets.json"
+    config_path.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "work",
+                    "cron": "0 9 * * *",
+                    "webhook_url": "https://example.test/a",
+                    "message": "A",
+                },
+                {
+                    "name": "work",
+                    "cron": "0 10 * * *",
+                    "webhook_url": "https://example.test/b",
+                    "message": "B",
+                },
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
     )
 
-    await mgr._scheduled_push()
-    # 不应抛出异常，但 push_message 不应被调用
-    mock_ws.push_message.assert_not_called()
+    with pytest.raises(ValueError, match="name 重复"):
+        load_webhook_targets(str(config_path))
 
 
-@pytest.mark.asyncio
-async def test_scheduler_start_and_shutdown(mock_ws, mock_registry, mock_db_factory):
-    """验证调度器启动和关闭不报错"""
-    from src.scheduler import SchedulerManager
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single",
-        target_id="user1",
-        message="test",
-        intent="today_plan",
-        db_session_factory=mock_db_factory,
-    )
-    mgr.start()
-    mgr.shutdown()
-
-
-@pytest.mark.asyncio
-async def test_scheduler_multi_target_parsing(mock_ws, mock_registry, mock_db_factory):
-    """验证多目标 | 分隔解析，单 message 和 intent 广播到所有目标"""
-    from src.scheduler import SchedulerManager
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single|single|group",
-        target_id="user1|user2|chatid1",
-        message="test",
-        intent="today_plan",
-        db_session_factory=mock_db_factory,
-    )
-    assert mgr._targets == [
-        ("single", "user1", "test", "today_plan"),
-        ("single", "user2", "test", "today_plan"),
-        ("group", "chatid1", "test", "today_plan"),
-    ]
-
-
-@pytest.mark.asyncio
-async def test_scheduler_multi_target_count_mismatch(mock_ws, mock_registry, mock_db_factory):
-    """验证类型和 ID 数量不匹配时抛出 ValueError"""
-    from src.scheduler import SchedulerManager
-
-    with pytest.raises(ValueError, match="数量不匹配"):
-        SchedulerManager(
-            ws_client=mock_ws,
-            agent_registry=mock_registry,
-            cron_expression="0 9 * * *",
-            target_type="single|single",
-            target_id="user1",
-            message="test",
-            intent="today_plan",
-            db_session_factory=mock_db_factory,
-        )
-
-
-@pytest.mark.asyncio
-async def test_scheduler_multi_target_empty_id(mock_ws, mock_registry, mock_db_factory):
-    """验证空目标 ID 时抛出 ValueError"""
-    from src.scheduler import SchedulerManager
-
-    with pytest.raises(ValueError, match="不能为空"):
-        SchedulerManager(
-            ws_client=mock_ws,
-            agent_registry=mock_registry,
-            cron_expression="0 9 * * *",
-            target_type="",
-            target_id="",
-            message="test",
-            intent="today_plan",
-            db_session_factory=mock_db_factory,
-        )
-
-
-@pytest.mark.asyncio
-async def test_scheduled_push_multi_target(mock_ws, mock_registry, mock_db_factory):
-    """验证多目标推送：对每个目标分别调用 agent.handle 和 push_message"""
-    from src.scheduler import SchedulerManager
-    from src.schemas.response import AgentResponse
-    from unittest.mock import AsyncMock
-
-    mock_agent = AsyncMock()
-    mock_agent.handle.return_value = AgentResponse(
-        reply="今日训练计划",
-        data=None,
-    )
-    mock_registry.register("today_plan", mock_agent)
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single|group",
-        target_id="user1|chatid1",
-        message="今日训练建议",
-        intent="today_plan",
-        db_session_factory=mock_db_factory,
-    )
-
-    await mgr._scheduled_push()
-
-    # 两次调用 agent.handle
-    assert mock_agent.handle.call_count == 2
-    # 第一次: single -> user1
-    assert mock_agent.handle.call_args_list[0].kwargs["user_id"] == "user1"
-    assert mock_agent.handle.call_args_list[0].kwargs["extra_state"] == {"chat_type": "single"}
-    # 第二次: group -> chatid1
-    assert mock_agent.handle.call_args_list[1].kwargs["user_id"] == "chatid1"
-    assert mock_agent.handle.call_args_list[1].kwargs["extra_state"] == {"chat_type": "group"}
-
-    # 两次调用 push_message
-    assert mock_ws.push_message.call_count == 2
-    mock_ws.push_message.assert_any_call(
-        target_type="single", target_id="user1",
-        msgtype="markdown", content="今日训练计划",
-    )
-    mock_ws.push_message.assert_any_call(
-        target_type="group", target_id="chatid1",
-        msgtype="markdown", content="今日训练计划",
-    )
-
-
-# ── 以下为新测试 ──
-
-
-@pytest.mark.asyncio
-async def test_scheduler_per_target_message(mock_ws, mock_registry, mock_db_factory):
-    """验证每个目标可以使用不同的 message 和 intent"""
-    from src.scheduler import SchedulerManager
-    from src.schemas.response import AgentResponse
-    from unittest.mock import AsyncMock
-
-    mock_agent_tp = AsyncMock()
-    mock_agent_tp.handle.return_value = AgentResponse(
-        reply="训练计划回复",
-        data=None,
-    )
-    mock_agent_mp = AsyncMock()
-    mock_agent_mp.handle.return_value = AgentResponse(
-        reply="食谱回复",
-        data=None,
-    )
-    mock_registry.register("today_plan", mock_agent_tp)
-    mock_registry.register("make_meal_plan", mock_agent_mp)
-
-    mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single|single",
-        target_id="user1|user2",
-        message="今日训练|今天吃什么",
-        intent="today_plan|make_meal_plan",
-        db_session_factory=mock_db_factory,
-    )
-
-    # 验证 _targets 包含正确的 per-target message 和 intent
-    assert mgr._targets == [
-        ("single", "user1", "今日训练", "today_plan"),
-        ("single", "user2", "今天吃什么", "make_meal_plan"),
-    ]
-
-    await mgr._scheduled_push()
-
-    # 第一个目标：today_plan agent 处理 "今日训练"
-    assert mock_agent_tp.handle.call_count == 1
-    assert mock_agent_tp.handle.call_args.kwargs["message"] == "今日训练"
-    assert mock_agent_tp.handle.call_args.kwargs["intent"] == "today_plan"
-    assert mock_agent_tp.handle.call_args.kwargs["user_id"] == "user1"
-
-    # 第二个目标：make_meal_plan agent 处理 "今天吃什么"
-    assert mock_agent_mp.handle.call_count == 1
-    assert mock_agent_mp.handle.call_args.kwargs["message"] == "今天吃什么"
-    assert mock_agent_mp.handle.call_args.kwargs["intent"] == "make_meal_plan"
-    assert mock_agent_mp.handle.call_args.kwargs["user_id"] == "user2"
-
-
-@pytest.mark.asyncio
-async def test_scheduler_intent_auto_routing(
-    mock_ws, mock_registry, mock_db_factory, mock_router,
+def test_scheduler_creation_uses_webhook_targets(
+    mock_db_factory,
+    mock_composer_agent,
+    mock_webhook_client,
 ):
-    """验证 intent 为空时自动调用 intent_router.route() 决定意图"""
-    from src.scheduler import SchedulerManager
-    from src.schemas.response import AgentResponse
-    from unittest.mock import AsyncMock
+    """验证 SchedulerManager 只保存 webhook composer 依赖和 targets"""
+    from src.scheduler import SchedulerManager, WebhookSchedulerTarget
 
-    # 注册 qa agent（mock_router 默认返回 "qa"）
-    mock_agent = AsyncMock()
-    mock_agent.handle.return_value = AgentResponse(
-        reply="自动路由回复",
-        data=None,
+    target = WebhookSchedulerTarget(
+        name="work",
+        cron="0 9 * * *",
+        webhook_url="https://example.test/webhook",
+        message="生成早安提醒",
     )
-    mock_registry.register("qa", mock_agent)
-
     mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single|single",
-        target_id="user1|user2",
-        message="msg1|msg2",
-        intent="",  # 空意图 → 全部自动路由
         db_session_factory=mock_db_factory,
-        intent_router=mock_router,
+        webhook_composer_agent=mock_composer_agent,
+        webhook_client=mock_webhook_client,
+        webhook_targets=[target],
     )
 
-    await mgr._scheduled_push()
-
-    # 验证 intent_router.route() 被每个目标各调用一次
-    assert mock_router.route.call_count == 2
-    # 第一次用 msg1 路由
-    assert mock_router.route.call_args_list[0].args == ("msg1",)
-    # 第二次用 msg2 路由
-    assert mock_router.route.call_args_list[1].args == ("msg2",)
-
-    # 验证 agent 使用路由结果 "qa" 处理
-    assert mock_agent.handle.call_count == 2
-    assert mock_agent.handle.call_args_list[0].kwargs["intent"] == "qa"
-    assert mock_agent.handle.call_args_list[0].kwargs["message"] == "msg1"
-    assert mock_agent.handle.call_args_list[1].kwargs["intent"] == "qa"
-    assert mock_agent.handle.call_args_list[1].kwargs["message"] == "msg2"
+    assert mgr._webhook_composer_agent is mock_composer_agent
+    assert mgr._webhook_targets == [target]
 
 
 @pytest.mark.asyncio
-async def test_scheduler_message_count_mismatch(mock_ws, mock_registry, mock_db_factory):
-    """验证 message 数量（多值）与目标数量不匹配时抛出 ValueError"""
-    from src.scheduler import SchedulerManager
+async def test_scheduled_webhook_push_calls_composer_and_pushes(
+    mock_db_factory,
+    mock_composer_agent,
+    mock_webhook_client,
+):
+    """验证 webhook job 调用 composer agent 后发送 markdown"""
+    from src.scheduler import SchedulerManager, WebhookSchedulerTarget
 
-    with pytest.raises(ValueError, match="数量不匹配"):
-        SchedulerManager(
-            ws_client=mock_ws,
-            agent_registry=mock_registry,
-            cron_expression="0 9 * * *",
-            target_type="single|group",
-            target_id="user1|chatid1",
-            message="msg1|msg2|msg3",  # 3 条消息 vs 2 个目标
-            intent="today_plan",
-            db_session_factory=mock_db_factory,
-        )
-
-
-@pytest.mark.asyncio
-async def test_scheduler_intent_count_mismatch(mock_ws, mock_registry, mock_db_factory):
-    """验证 intent 数量（多值）与目标数量不匹配时抛出 ValueError"""
-    from src.scheduler import SchedulerManager
-
-    with pytest.raises(ValueError, match="数量不匹配"):
-        SchedulerManager(
-            ws_client=mock_ws,
-            agent_registry=mock_registry,
-            cron_expression="0 9 * * *",
-            target_type="single|group",
-            target_id="user1|chatid1",
-            message="test",
-            intent="today_plan|make_meal_plan|qa",  # 3 个意图 vs 2 个目标
-            db_session_factory=mock_db_factory,
-        )
-
-
-@pytest.mark.asyncio
-async def test_scheduler_empty_intent_without_router(mock_ws, mock_registry, mock_db_factory):
-    """验证 intent 为空且未提供 intent_router 时，跳过目标不崩溃"""
-    from src.scheduler import SchedulerManager
-
-    # 不提供 intent_router
+    target = WebhookSchedulerTarget(
+        name="work",
+        cron="0 9 * * *",
+        webhook_url="https://example.test/webhook",
+        message="生成早安提醒",
+        chat_id="chat-1",
+    )
     mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single",
-        target_id="user1",
-        message="test",
-        intent="",
         db_session_factory=mock_db_factory,
-        # intent_router=None (default)
+        webhook_composer_agent=mock_composer_agent,
+        webhook_client=mock_webhook_client,
+        webhook_targets=[target],
     )
 
-    await mgr._scheduled_push()
-    # 不应崩溃，不应推送
-    mock_ws.push_message.assert_not_called()
+    await mgr._scheduled_webhook_push(target)
+    db_session = mock_db_factory.return_value.__aenter__.return_value
+
+    mock_composer_agent.handle.assert_awaited_once_with(
+        intent="webhook_compose",
+        message=target.message,
+        user_id="chat-1",
+        db=db_session,
+        extra_state={"chat_type": "group", "chat_id": "chat-1"},
+    )
+    mock_webhook_client.send_markdown.assert_awaited_once_with(
+        "https://example.test/webhook",
+        "## 早安\n今天记得准时出门。",
+    )
+    db_session.commit.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_scheduler_mixed_explicit_and_auto_intent(mock_ws, mock_registry, mock_db_factory, mock_router):
-    """验证混合 intent：第一个目标走指定 agent，第二个目标走自动路由"""
-    from src.scheduler import SchedulerManager
-    from src.schemas.response import AgentResponse
-    from unittest.mock import AsyncMock
+async def test_scheduled_webhook_push_uses_name_when_chat_id_missing(
+    mock_db_factory,
+    mock_composer_agent,
+    mock_webhook_client,
+):
+    """验证 chat_id 为空时使用 target name 作为群上下文"""
+    from src.scheduler import SchedulerManager, WebhookSchedulerTarget
 
-    mock_agent = AsyncMock()
-    mock_agent.handle.return_value = AgentResponse(reply="OK", data=None)
-    mock_registry.register("today_plan", mock_agent)
-    mock_registry.register("qa", mock_agent)
-
+    target = WebhookSchedulerTarget(
+        name="fitness-group",
+        cron="0 9 * * *",
+        webhook_url="https://example.test/webhook",
+        message="提醒大家喝水",
+    )
     mgr = SchedulerManager(
-        ws_client=mock_ws,
-        agent_registry=mock_registry,
-        cron_expression="0 9 * * *",
-        target_type="single|single",
-        target_id="user1|user2",
-        message="今天练什么？|今天吃什么？",
-        intent="today_plan|",  # 第一个指定，第二个自动路由
         db_session_factory=mock_db_factory,
-        intent_router=mock_router,
+        webhook_composer_agent=mock_composer_agent,
+        webhook_client=mock_webhook_client,
+        webhook_targets=[target],
     )
 
-    await mgr._scheduled_push()
+    await mgr._scheduled_webhook_push(target)
 
-    # intent_router 只对第二个目标调用（第一个 intent 已有值）
-    mock_router.route.assert_called_once_with("今天吃什么？")
+    assert mock_composer_agent.handle.await_args.kwargs["user_id"] == "fitness-group"
+    assert mock_composer_agent.handle.await_args.kwargs["extra_state"] == {
+        "chat_type": "group",
+        "chat_id": "fitness-group",
+    }
 
-    assert mock_agent.handle.call_count == 2
-    # 第一个：直接使用 today_plan
-    assert mock_agent.handle.call_args_list[0].kwargs["intent"] == "today_plan"
-    # 第二个：router 返回 "qa"
-    assert mock_agent.handle.call_args_list[1].kwargs["intent"] == "qa"
 
-    assert mock_ws.push_message.call_count == 2
+@pytest.mark.asyncio
+async def test_scheduled_webhook_push_skips_without_composer(
+    mock_db_factory,
+    mock_webhook_client,
+):
+    """验证缺少 composer agent 时不发送 webhook"""
+    from src.scheduler import SchedulerManager, WebhookSchedulerTarget
+
+    target = WebhookSchedulerTarget(
+        name="work",
+        cron="0 9 * * *",
+        webhook_url="https://example.test/webhook",
+        message="生成早安提醒",
+    )
+    mgr = SchedulerManager(
+        db_session_factory=mock_db_factory,
+        webhook_composer_agent=None,
+        webhook_client=mock_webhook_client,
+        webhook_targets=[target],
+    )
+
+    await mgr._scheduled_webhook_push(target)
+
+    mock_webhook_client.send_markdown.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_scheduled_webhook_push_rolls_back_when_send_fails(
+    mock_db_factory,
+    mock_composer_agent,
+    mock_webhook_client,
+):
+    """验证 webhook 发送失败时回滚数据库会话"""
+    from src.scheduler import SchedulerManager, WebhookSchedulerTarget
+
+    mock_webhook_client.send_markdown.return_value = False
+    target = WebhookSchedulerTarget(
+        name="work",
+        cron="0 9 * * *",
+        webhook_url="https://example.test/webhook",
+        message="生成早安提醒",
+    )
+    mgr = SchedulerManager(
+        db_session_factory=mock_db_factory,
+        webhook_composer_agent=mock_composer_agent,
+        webhook_client=mock_webhook_client,
+        webhook_targets=[target],
+    )
+
+    await mgr._scheduled_webhook_push(target)
+    db_session = mock_db_factory.return_value.__aenter__.return_value
+
+    db_session.rollback.assert_awaited_once()
+    db_session.commit.assert_not_awaited()
+
+
+def test_scheduler_start_registers_enabled_webhook_targets(
+    monkeypatch,
+    mock_db_factory,
+    mock_composer_agent,
+    mock_webhook_client,
+):
+    """验证 start() 只为启用的 webhook target 注册 job"""
+    from src.scheduler import SchedulerManager, WebhookSchedulerTarget
+
+    fake_scheduler = MagicMock()
+    monkeypatch.setattr(
+        "src.scheduler.AsyncIOScheduler",
+        MagicMock(return_value=fake_scheduler),
+    )
+    targets = [
+        WebhookSchedulerTarget(
+            name="enabled",
+            cron="0 9 * * *",
+            webhook_url="https://example.test/a",
+            message="A",
+            enabled=True,
+        ),
+        WebhookSchedulerTarget(
+            name="disabled",
+            cron="0 10 * * *",
+            webhook_url="https://example.test/b",
+            message="B",
+            enabled=False,
+        ),
+    ]
+    mgr = SchedulerManager(
+        db_session_factory=mock_db_factory,
+        webhook_composer_agent=mock_composer_agent,
+        webhook_client=mock_webhook_client,
+        webhook_targets=targets,
+    )
+
+    mgr.start()
+
+    fake_scheduler.add_job.assert_called_once()
+    assert fake_scheduler.add_job.call_args.kwargs["id"] == "scheduled_webhook_push:enabled"
+    fake_scheduler.start.assert_called_once()

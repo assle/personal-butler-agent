@@ -3,7 +3,7 @@ Butler 工具封装
 把已有领域 agent、知识库服务和联网搜索服务包装为 LangChain tools
 
 Workflow:
-  create_butler_tools(context) 接收运行期单例依赖
+  create_private_butler_tools(context) 接收运行期单例依赖
   → 每个 tool 只暴露模型可填写的业务文本参数
   → _runtime() 从 LangGraph/LangChain config 读取 db/user/chat 上下文
   → tool 调用已有 agent 或 service 并返回可读文本
@@ -16,7 +16,7 @@ from langgraph.config import get_config
 
 
 @dataclass
-class ButlerToolContext:
+class PrivateButlerToolContext:
     """Butler 工具依赖上下文，由应用 wiring 层注入"""
 
     # 健身领域 agent，用于训练打卡和今日训练计划
@@ -77,7 +77,7 @@ def _format_knowledge_results(results: list[Any]) -> str:
         results: KnowledgeService.search() 返回的片段结果列表
 
     返回:
-        str: 适合注入给 ButlerAgent 的可读文本
+        str: 适合注入给 PrivateButlerAgent 的可读文本
     """
     if not results:
         return "本地知识库没有查到相关资料。"
@@ -104,11 +104,11 @@ def _format_web_results(results: list[Any]) -> str:
     )
 
 
-def create_butler_tools(context: ButlerToolContext) -> list[Any]:
-    """创建 ButlerAgent 可绑定的 LangChain 工具列表
+def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
+    """创建 PrivateButlerAgent 可绑定的 LangChain 工具列表
 
     参数:
-        context: ButlerToolContext，包含领域 agent 与检索服务依赖
+        context: PrivateButlerToolContext，包含领域 agent 与检索服务依赖
 
     返回:
         list[Any]: 七个 LangChain tool，供模型工具调用使用

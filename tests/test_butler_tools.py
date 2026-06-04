@@ -3,7 +3,7 @@ Butler 工具封装测试
 验证工具从 LangGraph config 读取运行时上下文，并正确调用领域 agent 与检索服务
 
 Workflow:
-  测试构造假 agent/service → create_butler_tools() 生成 LangChain tools
+  测试构造假 agent/service → create_private_butler_tools() 生成 LangChain tools
   → tool.ainvoke(input, config={...}) 注入 db/user/chat 上下文
   → 断言调用参数和格式化结果
 """
@@ -11,7 +11,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents.butler.tools import ButlerToolContext, create_butler_tools
+from src.agents.private_butler.tools import (
+    PrivateButlerToolContext,
+    create_private_butler_tools,
+)
 from src.knowledge.schemas import KnowledgeChunkResult
 from src.schemas.response import AgentResponse
 from src.search.schemas import SearchResult
@@ -37,7 +40,7 @@ def _tool_by_name(tools: list, name: str):
     """按名称取出工具
 
     参数:
-        tools: create_butler_tools() 返回的工具列表
+        tools: create_private_butler_tools() 返回的工具列表
         name: 目标工具名称
 
     返回:
@@ -76,14 +79,14 @@ async def test_log_training_reads_runtime_context_and_calls_fitness_agent(db_ses
         None
     """
     fitness_agent = FakeAgent(reply="已记录卧推")
-    context = ButlerToolContext(
+    context = PrivateButlerToolContext(
         fitness_agent=fitness_agent,
         meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=AsyncMock(),
     )
-    tool = _tool_by_name(create_butler_tools(context), "log_training")
+    tool = _tool_by_name(create_private_butler_tools(context), "log_training")
 
     result = await tool.ainvoke(
         {"message": "今天卧推 80kg 5x5"},
@@ -158,14 +161,14 @@ async def test_domain_tools_forward_existing_intent_conventions(
     fitness_agent = FakeAgent(reply="fitness ok")
     meal_agent = FakeAgent(reply="meal ok")
     summary_agent = FakeAgent(reply="summary ok")
-    context = ButlerToolContext(
+    context = PrivateButlerToolContext(
         fitness_agent=fitness_agent,
         meal_agent=meal_agent,
         summary_agent=summary_agent,
         knowledge_service=AsyncMock(),
         web_search_service=AsyncMock(),
     )
-    tool = _tool_by_name(create_butler_tools(context), tool_name)
+    tool = _tool_by_name(create_private_butler_tools(context), tool_name)
 
     await tool.ainvoke(input_payload, config=_runtime_config(db_session))
 
@@ -197,14 +200,14 @@ async def test_search_web_formats_search_results(db_session):
             snippet="Tool calling docs",
         )
     ]
-    context = ButlerToolContext(
+    context = PrivateButlerToolContext(
         fitness_agent=FakeAgent(),
         meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=web_search_service,
     )
-    tool = _tool_by_name(create_butler_tools(context), "search_web")
+    tool = _tool_by_name(create_private_butler_tools(context), "search_web")
 
     result = await tool.ainvoke(
         {"query": "LangChain tool calling"},
@@ -227,14 +230,14 @@ async def test_search_web_returns_disabled_message_when_no_results(db_session):
     """
     web_search_service = AsyncMock()
     web_search_service.search.return_value = []
-    context = ButlerToolContext(
+    context = PrivateButlerToolContext(
         fitness_agent=FakeAgent(),
         meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=web_search_service,
     )
-    tool = _tool_by_name(create_butler_tools(context), "search_web")
+    tool = _tool_by_name(create_private_butler_tools(context), "search_web")
 
     result = await tool.ainvoke(
         {"query": "今天新闻"},
@@ -265,14 +268,14 @@ async def test_search_local_knowledge_reads_runtime_context_and_formats_results(
             domain="qa",
         )
     ]
-    context = ButlerToolContext(
+    context = PrivateButlerToolContext(
         fitness_agent=FakeAgent(),
         meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=knowledge_service,
         web_search_service=AsyncMock(),
     )
-    tool = _tool_by_name(create_butler_tools(context), "search_local_knowledge")
+    tool = _tool_by_name(create_private_butler_tools(context), "search_local_knowledge")
 
     result = await tool.ainvoke(
         {"query": "训练偏好"},

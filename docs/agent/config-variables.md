@@ -61,10 +61,10 @@ WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
 ```
 
 关键差异：
-- 入站方式：企业微信通过 HTTP POST 回调公网 URL，而不是应用主动维持 WebSocket
+- 入站方式：企业微信通过 HTTP POST 回调公网 URL
 - 消息可靠性：回调路由按 `msgid` 幂等落库，便于去重和失败追踪
 - 回复方式：通过消息里的临时 `response_url` 被动回复
-- 主动推送：URL 回调模式不启动 WebSocket；主动群推送通过企业微信群机器人 webhook 独立完成
+- 主动推送：主动群推送通过企业微信群机器人 webhook 独立完成
 
 ## APScheduler 定时推送
 
@@ -72,7 +72,7 @@ WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
 |----------|----------|---------|---------|
 | `SCHEDULER_TARGETS_FILE` | No | `""` | 企业微信群 webhook 定时推送目标 JSON 文件路径。设置后按文件中每个群的独立 cron 启动 APScheduler job |
 
-当前 URL 回调模式下，主动推送使用企业微信群机器人 webhook。推荐设置 `SCHEDULER_TARGETS_FILE`，文件中每个群拥有独立 `cron`、`webhook_url`、`message` 和 `intent`。真实 webhook 地址视为密钥，不提交到仓库；仓库只保留 `config/scheduler_targets.example.json` 模板，真实文件建议命名为 `config/scheduler_targets.local.json`。
+当前 URL 回调模式下，主动推送使用企业微信群机器人 webhook。推荐设置 `SCHEDULER_TARGETS_FILE`，文件中每个群拥有独立 `cron`、`webhook_url` 和 `message`。真实 webhook 地址视为密钥，不提交到仓库；仓库只保留 `config/scheduler_targets.example.json` 模板，真实文件建议命名为 `config/scheduler_targets.local.json`。
 
 示例:
 
@@ -87,7 +87,6 @@ SCHEDULER_TARGETS_FILE=config/scheduler_targets.local.json
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...",
     "message": "今日训练建议",
-    "intent": "butler",
     "enabled": true
   }
 ]

@@ -3,7 +3,7 @@ Butler Agent 状态定义
 定义小管家工具调用图在节点之间传递的消息、用户上下文和最终回复字段
 
 Workflow:
-  handle() 构造初始 ButlerState → agent 节点追加 AIMessage
+  handle() 构造初始 PrivateButlerState → agent 节点追加 AIMessage
   → ToolNode 按需追加 ToolMessage → extract_reply 提取最终回复
 """
 from typing import Annotated
@@ -13,8 +13,8 @@ from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 
-class ButlerState(TypedDict, total=False):
-    """ButlerAgent 图状态，所有字段均可按节点需要增量更新"""
+class PrivateButlerState(TypedDict, total=False):
+    """PrivateButlerAgent 图状态，所有字段均可按节点需要增量更新"""
 
     # LangGraph 消息列表，使用 add_messages 合并 Human/AI/Tool 消息
     messages: Annotated[list[AnyMessage], add_messages]

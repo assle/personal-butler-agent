@@ -11,15 +11,15 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from src.agents.butler.nodes import build_initial_messages, call_model, extract_reply
-from src.agents.butler.state import ButlerState
-from src.agents.butler.tools import ButlerToolContext, create_butler_tools
+from src.agents.private_butler.nodes import build_initial_messages, call_model, extract_reply
+from src.agents.private_butler.state import PrivateButlerState
+from src.agents.private_butler.tools import PrivateButlerToolContext, create_private_butler_tools
 from src.graph.memory import checkpointer as _checkpointer
 from src.memory.conversation import ConversationMemory
 from src.schemas.response import AgentResponse
 
 
-class ButlerAgent:
+class PrivateButlerAgent:
     """小管家总控 agent，负责用工具调用编排领域 agent 和检索服务"""
 
     def __init__(
@@ -31,7 +31,7 @@ class ButlerAgent:
         knowledge_service,
         web_search_service,
     ):
-        """初始化 ButlerAgent 并编译工具调用图
+        """初始化 PrivateButlerAgent 并编译工具调用图
 
         参数:
             llm_client: 支持 bind_tools().ainvoke() 和 chat() 的 LLM 客户端
@@ -45,18 +45,18 @@ class ButlerAgent:
             None
         """
         self._llm = llm_client
-        self._tool_context = ButlerToolContext(
+        self._tool_context = PrivateButlerToolContext(
             fitness_agent=fitness_agent,
             meal_agent=meal_agent,
             summary_agent=summary_agent,
             knowledge_service=knowledge_service,
             web_search_service=web_search_service,
         )
-        self._tools = create_butler_tools(self._tool_context)
+        self._tools = create_private_butler_tools(self._tool_context)
         self._graph = self._build_graph()
 
     def _build_graph(self):
-        """构建并编译 ButlerAgent StateGraph
+        """构建并编译 PrivateButlerAgent StateGraph
 
         参数:
             无
@@ -64,7 +64,7 @@ class ButlerAgent:
         返回:
             CompiledStateGraph: 编译后的 LangGraph 图
         """
-        builder = StateGraph(ButlerState)
+        builder = StateGraph(PrivateButlerState)
         builder.add_node("agent", call_model)
         builder.add_node("tools", ToolNode(self._tools))
         builder.add_node("extract_reply", extract_reply)
@@ -91,7 +91,7 @@ class ButlerAgent:
         """处理用户消息并返回小管家回复
 
         参数:
-            intent: 意图标识，通常为 "butler"
+            intent: 意图标识，通常为 "private_butler"
             message: 用户原始消息文本
             user_id: 用户唯一标识
             db: SQLAlchemy 异步数据库会话
@@ -122,7 +122,7 @@ class ButlerAgent:
                 "db": db,
                 "llm": self._llm,
                 "tools": self._tools,
-                "thread_id": f"butler:{user_id}",
+                "thread_id": f"private_butler:{user_id}",
                 "user_id": user_id,
                 "chat_type": chat_type,
                 "chat_id": chat_id,
@@ -139,4 +139,4 @@ class ButlerAgent:
             reply = "LLM 服务暂时不可用，请稍后重试。"
 
         await memory.save_exchange(user_id, message, reply, db)
-        return AgentResponse(reply=reply, data={"intent": "butler"})
+        return AgentResponse(reply=reply, data={"intent": "private_butler"})

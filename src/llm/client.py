@@ -3,10 +3,10 @@ LLM 客户端封装
 基于 LangChain ChatOpenAI 封装 DeepSeek API 调用，提供 chat、chat_json 和工具调用接口
 
 在总流程中的位置:
-  main.py 创建 LLMClient 单例 → 注入到 IntentRouter 和各 agent
-  IntentRouter: chat_json 用于意图分类
+  main.py 创建 LLMClient 单例 → 注入到领域 agent 和 scene agent
+  GroupMentionAgent: chat_json 可用于群聊消息兜底分类
   各 agent: chat 用于自然语言生成，chat_json 用于结构化数据提取
-  ButlerAgent: bind_tools/ainvoke_messages 用于工具绑定和保留 AIMessage 元数据
+  PrivateButlerAgent: bind_tools/ainvoke_messages 用于工具绑定和保留 AIMessage 元数据
 
 Workflow:
   所有 LLM 调用经过此客户端，统一管理 base_url、api_key、temperature 等参数

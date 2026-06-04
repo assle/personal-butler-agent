@@ -6,7 +6,7 @@ Workflow:
 1. GET /api/wechat/aibot/callback 解密 echostr，完成企业微信 URL 验证
 2. POST 接收加密 JSON/XML 或明文 JSON 回调
 3. 按 msgid 写入 inbound_messages，重复回调直接返回成功
-4. 新消息通过 BackgroundTasks 调用 ButlerAgent，并用 response_url 回复
+4. 新消息通过 BackgroundTasks 调用场景分发层，并用 response_url 回复
 """
 from __future__ import annotations
 
@@ -20,9 +20,6 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.agents.butler import ButlerAgent
-from src.agents.registry import AgentRegistry
-from src.intent.router import IntentRouter
 from src.wechat.callback_crypto import WeComCallbackCrypto
 from src.wechat.callback_handler import ResponseUrlReplyClient, handle_callback_message
 from src.wechat.callback_inbox import (
@@ -47,9 +44,8 @@ def create_aibot_callback_router(
     token: str,
     encoding_aes_key: str,
     receive_id: str,
-    intent_router: IntentRouter,
-    agent_registry: AgentRegistry,
-    butler_agent: ButlerAgent,
+    private_agent,
+    group_agent,
     db_session_factory,
     reply_client: ResponseUrlReplyClient | None = None,
 ) -> APIRouter:
@@ -59,9 +55,8 @@ def create_aibot_callback_router(
         token: 智能机器人 URL 回调 Token
         encoding_aes_key: 智能机器人 URL 回调 EncodingAESKey
         receive_id: 智能机器人 BotID，用于校验消息体 aibotid
-        intent_router: 兼容保留的意图路由器
-        agent_registry: 兼容保留的 agent 注册表
-        butler_agent: 小管家总控 agent
+        private_agent: 私聊场景 agent
+        group_agent: 群聊 @ 场景 agent
         db_session_factory: 异步数据库会话工厂
         reply_client: 可选 response_url 回复客户端
 
@@ -133,9 +128,8 @@ def create_aibot_callback_router(
                 process_recorded_message,
                 msg,
                 reply_client,
-                intent_router,
-                agent_registry,
-                butler_agent,
+                private_agent,
+                group_agent,
                 db_session_factory,
             )
         '''
@@ -154,9 +148,8 @@ def create_aibot_callback_router(
 async def process_recorded_message(
     msg: dict,
     reply_client: ResponseUrlReplyClient,
-    intent_router: IntentRouter,
-    agent_registry: AgentRegistry,
-    butler_agent: ButlerAgent,
+    private_agent,
+    group_agent,
     db_session_factory,
 ):
     """后台处理已落库的智能机器人回调消息
@@ -164,9 +157,8 @@ async def process_recorded_message(
     参数:
         msg: 智能机器人消息体
         reply_client: response_url 回复客户端
-        intent_router: 兼容保留的意图路由器
-        agent_registry: 兼容保留的 agent 注册表
-        butler_agent: 小管家总控 agent
+        private_agent: 私聊场景 agent
+        group_agent: 群聊 @ 场景 agent
         db_session_factory: 异步数据库会话工厂
     """
     msgid = msg.get("msgid", "")
@@ -176,9 +168,8 @@ async def process_recorded_message(
             await handle_callback_message(
                 msg,
                 reply_client,
-                intent_router,
-                agent_registry,
-                butler_agent,
+                private_agent,
+                group_agent,
                 db,
             )
             await mark_processed(db, msgid)
@@ -257,7 +248,7 @@ def _extract_message_body(frame: dict, expected_aibotid: str = "") -> dict:
     """从智能机器人回调帧中提取消息体
 
     参数:
-        frame: 回调帧，可能是 WebSocket 风格帧或直接消息体
+        frame: 回调帧，可能是智能机器人包装帧或直接消息体
         expected_aibotid: 可选智能机器人 BotID，用于校验消息体归属
 
     返回:

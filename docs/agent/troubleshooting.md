@@ -1,6 +1,6 @@
 # Troubleshooting
 
-> Known issues and proven diagnostic steps. Load when debugging test failures, LLM errors, or WeChat callback issues.
+> Known issues and proven diagnostic steps. Load when debugging test failures, LLM errors, WeChat callback issues, or scheduler webhook pushes.
 
 ## Tests Fail Because `DEEPSEEK_API_KEY` Is Missing
 
@@ -23,13 +23,13 @@ Check:
 - Confirm the path under test receives the mock instead of constructing a new client internally.
 
 Fix pattern:
-- Inject the LLM client through constructors or router factories.
+- Inject the LLM client through constructors or route factories.
 - Keep direct `LLMClient()` construction centralized in app wiring.
 
 ## SQLite Tables Are Missing
 
 Symptom:
-- Runtime or tests fail with missing `training_records` or `user_preferences`.
+- Runtime or tests fail with missing tables such as `training_records`, `group_messages`, or `inbound_messages`.
 
 Check:
 - App startup should run the FastAPI lifespan in `src/main.py`.
@@ -39,7 +39,7 @@ Check:
 ## LLM JSON Parsing Fails
 
 Symptom:
-- Intent falls back to `unknown`, or training extraction returns a parse error.
+- Training extraction or group mention fallback classification returns a parse error.
 
 Check:
 - Confirm prompts ask for JSON only.
@@ -49,144 +49,79 @@ Fix pattern:
 - Keep safe fallback behavior.
 - Add tests with malformed JSON before tightening parsing.
 
-## API Returns LLM Service Error
+## URL Callback Mode Message Flow
 
 Symptom:
-- Debug endpoint returns `LLM 服务暂时不可用，请稍后重试。`
-
-Reason:
-- `src/router/debug.py` catches `openai.APIError` from agent execution.
+- A user message reaches the service but does not produce the expected reply.
 
 Check:
-- Validate `.env` values.
-- Check DeepSeek base URL, model, and key.
-- Confirm network access from the runtime environment.
-
-## Unexpected Intent
-
-Symptom:
-- A message goes to Q&A or unknown instead of the expected domain.
-
-Check:
-- Search `src/intent/rules.py` for keyword coverage.
-- Check `KNOWN_INTENTS` in `src/intent/router.py`.
-- Add or update tests before changing routing behavior.
-
-## Intelligent Robot Stops Logging New Messages During LLM Reply
-
-Symptom:
-- A private chat message receives or is generating a reply.
-- A group chat then @mentions the robot, but server logs do not print a new `WS: msg_callback ...` line until the earlier message finishes.
-- Shutdown may also warn: `RuntimeWarning: coroutine 'WeComWSClient.stop' was never awaited`.
-
-Reason:
-- The WebSocket receive loop must keep calling `recv()`. If `_listen()` directly awaits the long-running message handler, LLM/agent work blocks receipt of subsequent WebSocket frames.
-- `WeComWSClient.stop()` is async and must be awaited during FastAPI lifespan shutdown.
-
-Check:
-- Inspect `src/wechat/ws_client.py:_listen()`. Message callbacks should be scheduled with `asyncio.create_task(...)` and tracked for cleanup, not awaited inline.
-- Inspect `src/main.py:lifespan()`. Shutdown should call `await app.state.ws_client.stop()`.
+- Enterprise WeChat callback URL should be `https://<domain>/api/wechat/aibot/callback`.
+- `.env` should set `WECOM_AIBOT_BOT_ID`, `WECOM_AIBOT_TOKEN`, and `WECOM_AIBOT_ENCODING_AES_KEY`.
+- `inbound_messages.status` should move from `pending` to `processed`; failed messages should have an `error`.
+- `src/messaging/inbound.py` should extract `from.userid`, `text.content` or `voice.content`, `chatid`, `chattype`, and `response_url`.
 
 Fix pattern:
-```python
-# Receive loop stays free to read the next WebSocket frame.
-task = asyncio.create_task(self._on_message(msg, req_id))
-self._message_tasks.add(task)
-task.add_done_callback(self._handle_message_task_done)
-```
+- Keep callback handling thin: parse, record, normalize, dispatch, reply.
+- Do not run long LLM work before recording the inbound message.
 
-## Intelligent Robot Message Fields Are All Empty
+## URL Callback Reports `callback receive_id mismatch`
 
 Symptom:
-- Logs show `from_user=`, `chat_type=single`, `content=` after parsing, even though the raw JSON looks correct.
-- Messages are misrouted as private chat instead of group chat.
-
-Check:
-- The intelligent robot uses nested JSON fields: `from.userid`, `text.content`, `chatid`, `chattype`.
-- Verify `src/wechat/message_handler.py` parses the correct nested JSON keys.
-
-## WS 闲置时频繁断连：incorrect masking / invalid opcode
-
-Symptom:
-- 项目闲置一段时间后日志刷出 `WS disconnected: sent 1002 (protocol error) incorrect masking; no close frame received`
-- 或 `WS disconnected: sent 1002 (protocol error) invalid opcode; no close frame received`
-- 每次断连后 30s 自动重连成功，但闲置稍久又复现。
-- 断连窗口内给智能机器人发消息，服务端没有打印 `WS: msg_callback ...`，机器人不回复。
+- Enterprise WeChat POSTs to `/api/wechat/aibot/callback`, but the app returns `400 Bad Request`.
+- Logs show `AIBot callback parse failed: callback receive_id mismatch`.
 
 Reason:
-- TCP 连接被中间网络设备（NAT/防火墙/负载均衡器或企微服务器自身）静默断开。
-- 旧实现用自定义心跳发 ping 但不校验 pong，死连接检测不及时。
-- `_listen()` 仍阻塞在 `recv()` 上，当 TCP 已断开时读到残存缓冲数据/RST 包，被 websockets 库误解析为 WebSocket 帧，触发协议错误。
-- 仅在 `_connect_and_listen()` 正常返回时重置 `retry_delay` 不可靠：成功订阅后通常会长期阻塞在 `_listen()`，断线时直接抛异常，因此重连退避会逐步增长到 30s。这个离线窗口内的新消息可能不会补发。
-
-Fix (已应用):
-- `src/wechat/ws_client.py` 中删除自定义 `_heartbeat()`，改用 websockets 库内置的 `ping_interval=20` + `ping_timeout=10`。
-- 库内置机制在 pong 超时时同时在 ping 和 `recv()` 上抛出 `ConnectionClosed`，在读到垃圾帧之前就判定连接死亡并触发重连。
-- 成功订阅后记录本次连接已建立；该连接断开时将下一次重连等待重置为 1s，避免稳定运行后的闲置断线进入 30s 离线窗口。
-- 连接退出时清空 `_ws` 并标记 `_connected = False`，避免消息处理任务或定时推送使用旧连接。
+- The intelligent robot callback message body `aibotid` is the BotID validation source.
+- The AES plaintext tail receive_id should not be treated as the configured BotID.
 
 Check:
-- 确认 `_connect_and_listen()` 中 `ping_interval` 和 `ping_timeout` 均已设置且不为 None。
-- 确认 `run()` 在 `_connected` 或 `_connection_established_for_attempt` 为真时重置 `retry_delay`。
-- 如果企微服务端 pong 响应偏慢导致误断连，适当调大 `ping_timeout`（如 15-20s）。
+- Confirm `WECOM_AIBOT_BOT_ID` matches the intelligent robot admin page.
+- Confirm callback token and EncodingAESKey match the admin page.
 
-## URL 回调模式下消息入站可靠性
+## Group Message Does Not Reply
 
 Symptom:
-- 用户在 WebSocket 断线窗口发消息，应用没有任何 `msg_callback` 日志，也无法补收。
-- 业务目标要求“消息先被系统接住”，而不是仅缩短重连窗口。
+- A group callback message is saved but no reply is sent through `response_url`.
 
 Reason:
-- WebSocket 长连接无法消除断线瞬间的离线窗口。
-- URL 回调由企业微信主动投递 HTTP 请求，应用可先将回调按 `msgid` 写入 SQLite，再异步运行 LLM/agent。
-
-Fix (已应用):
-- `src/main.py` 不再启动 `WeComWSClient`。
-- 新增 `GET/POST /api/wechat/aibot/callback`，使用 `WECOM_AIBOT_TOKEN` + `WECOM_AIBOT_ENCODING_AES_KEY` 做签名校验和 AES 解密。
-- 新增 `inbound_messages` 表，`msgid` 唯一，重复回调不重复处理。
-- 新消息先落库并返回 `{"errcode": 0, "errmsg": "ok"}`，后台处理后通过 `response_url` 回复。
+- Group messages pass through `apply_group_policy()` before any agent runs.
+- Non-trigger group messages are intentionally collected silently.
+- Empty voice recognition or missing `chat_id` is ignored for reply purposes.
 
 Check:
-- 企业微信后台 URL 配置为 `https://<域名>/api/wechat/aibot/callback`。
-- `.env` 配置 `WECOM_AIBOT_BOT_ID`、`WECOM_AIBOT_TOKEN`、`WECOM_AIBOT_ENCODING_AES_KEY`。
-- 数据库中 `inbound_messages.status` 应从 `pending` 变为 `processed`；失败时查看 `error` 字段。
+- Inspect `group_messages` for the saved row.
+- Confirm the content includes an allowed trigger: summary keywords, weather keywords, or a simple question marker.
+- Confirm unsupported training or meal requests are expected to be rejected by `GroupMentionAgent`, not handled by private tools.
 
-## URL 回调报错：callback receive_id mismatch
+## Scheduler Webhook Push Does Not Send
 
 Symptom:
-- 企业微信已经 POST 到 `/api/wechat/aibot/callback`，但应用返回 `400 Bad Request`。
-- 日志出现 `AIBot callback parse failed: callback receive_id mismatch`。
-
-Reason:
-- 智能机器人 URL 回调的 AES 明文尾部 receive_id 不能当作 BotID 校验。
-- BotID 应从解密后的消息体字段 `aibotid` 校验；如果把 `WECOM_AIBOT_BOT_ID` 传给 AES 尾部 receive_id 校验，会在签名和解密都正确时误报 mismatch。
-
-Fix (已应用):
-- `src/wechat/callback_router.py` 构造 `WeComCallbackCrypto` 时不再传入 BotID。
-- 回调帧解析完成后，使用消息体 `aibotid` 与 `WECOM_AIBOT_BOT_ID` 比较，防止其他机器人消息误入。
+- APScheduler target exists but no Enterprise WeChat group message appears.
 
 Check:
-- 确认 `WECOM_AIBOT_BOT_ID` 填的是智能机器人后台的 BotID。
-- 确认 `WECOM_AIBOT_TOKEN` 和 `WECOM_AIBOT_ENCODING_AES_KEY` 与后台 URL 回调配置一致。
-
-## 公网访问 `/`、`/health`、`/v1/models` 返回 404
-
-Symptom:
-- 生产日志出现类似 `GET / HTTP/1.1" 404 Not Found`、`GET /health HTTP/1.1" 404 Not Found`、`GET /v1/models HTTP/1.1" 404 Not Found`。
-- 日志源 IP 是公网地址，不是本机或企业微信固定回调流程。
-- 同时 `.env` 中配置了 `SCHEDULER_TARGETS_FILE`，容易误以为是 APScheduler 配置导致。
-
-Reason:
-- 当前 FastAPI 应用没有注册 `/`、`/health`、`/v1/models`、`/api/v1/model`、`/favicon.ico` 等路径，这些请求按设计返回 404。
-- `/v1/models` 等路径通常是公网扫描器在探测服务是否暴露 OpenAI-compatible API。
-- 群 webhook 主动推送只会向配置中的企业微信 webhook 发起出站 POST，不会主动访问当前 FastAPI 应用的 `/`、`/health` 或 `/v1/models` 路径。
-
-Check:
-- 确认可用业务路由是 `POST /api/debug/message` 和 `GET/POST /api/wechat/aibot/callback`。
-- 用 `curl -i https://<域名>/api/wechat/aibot/callback` 检查回调路径是否可达；没有企业微信签名参数时返回 `422` 或 `403` 属于正常现象，不应是 `404`。
-- 如果需要健康检查，应显式新增 `/health` 路由，或在反向代理/监控里改用已存在路径。
+- `SCHEDULER_TARGETS_FILE` points to an existing JSON array.
+- Each target has non-empty `name`, `cron`, `webhook_url`, and `message`.
+- The target is not disabled with `"enabled": false`.
+- `WebhookComposerAgent.handle()` is called with `intent="webhook_compose"`.
+- `WebhookPushClient.send_markdown()` receives the generated markdown body.
 
 Fix pattern:
-- 不要把公网扫描造成的 404 当作 Scheduler 故障处理。
-- 如果只是想减少日志噪音，可在反向代理层过滤明显扫描路径，或新增只返回静态状态的 `/health`。
-- 如果要排查主动推送，请查看群 webhook job 日志和企业微信 webhook 响应状态，不要把公网扫描造成的入站 404 当作 scheduler 故障。
+- Treat webhook composition as scheduler-only content generation.
+- The composer should generate final markdown body only; sending belongs to `WebhookPushClient`.
+
+## Public 404 Requests
+
+Symptom:
+- Production logs show `GET /`, `GET /health`, or `GET /v1/models` returning 404.
+
+Reason:
+- The app only exposes the WeChat callback route unless future routes are explicitly added.
+- Public scanners commonly probe generic paths.
+- Scheduler webhook jobs send outbound POST requests to Enterprise WeChat and do not call local app paths.
+
+Check:
+- Use `curl -i https://<domain>/api/wechat/aibot/callback` to confirm the callback route is reachable. Missing Enterprise WeChat signature parameters should fail verification rather than return 404.
+
+Fix pattern:
+- Do not treat generic public 404s as scheduler failures.
+- Add a dedicated health route only if deployment monitoring requires it.

@@ -3,7 +3,7 @@ Butler Agent 图编排测试
 验证小管家 StateGraph 支持直接 LLM 回复和 search_web 工具调用闭环
 
 Workflow:
-  构造 FakeToolCallingLLM 与假依赖 → ButlerAgent.handle()
+  构造 FakeToolCallingLLM 与假依赖 → PrivateButlerAgent.handle()
   → LangGraph agent 节点调用 bind_tools().ainvoke()
   → 需要工具时 ToolNode 调用 search_web 后回到 agent
   → extract_reply 返回最终 AgentResponse
@@ -14,7 +14,7 @@ import pytest
 from langchain_core.messages import AIMessage, ToolCall
 from langgraph.errors import GraphRecursionError
 
-from src.agents.butler.graph import ButlerAgent
+from src.agents.private_butler import PrivateButlerAgent
 from src.schemas.response import AgentResponse
 from src.search.schemas import SearchResult
 
@@ -55,7 +55,7 @@ class FakeToolCallingLLM:
         """记录绑定工具并返回自身
 
         参数:
-            tools: ButlerAgent 传入的 LangChain tool 列表
+            tools: PrivateButlerAgent 传入的 LangChain tool 列表
 
         返回:
             FakeToolCallingLLM: 当前对象，兼容 LangChain Runnable 接口
@@ -89,16 +89,16 @@ class FakeToolCallingLLM:
 
 
 def _build_agent(llm, web_search_service):
-    """构造 ButlerAgent 测试实例
+    """构造 PrivateButlerAgent 测试实例
 
     参数:
         llm: FakeToolCallingLLM 实例
         web_search_service: 带 search() 的假联网搜索服务
 
     返回:
-        ButlerAgent: 注入假依赖的小管家 agent
+        PrivateButlerAgent: 注入假依赖的小管家 agent
     """
-    return ButlerAgent(
+    return PrivateButlerAgent(
         llm_client=llm,
         fitness_agent=FakeAgent(),
         meal_agent=FakeAgent(),
@@ -122,16 +122,16 @@ async def test_butler_agent_returns_direct_llm_reply(db_session):
     web_search_service = AsyncMock()
     agent = _build_agent(llm, web_search_service)
 
-    result = await agent.handle("butler", "你好", "assle", db_session)
+    result = await agent.handle("private_butler", "你好", "assle", db_session)
 
     assert result.reply == "你好，我在。"
-    assert result.data == {"intent": "butler"}
+    assert result.data == {"intent": "private_butler"}
     assert len(llm.calls) == 1
 
 
 @pytest.mark.asyncio
 async def test_butler_agent_keeps_response_intent_stable_for_compat_callers(db_session):
-    """验证兼容调用传入其他 intent 时仍返回 butler intent
+    """验证兼容调用传入其他 intent 时仍返回 private_butler intent
 
     参数:
         db_session: 测试数据库会话 fixture
@@ -146,7 +146,7 @@ async def test_butler_agent_keeps_response_intent_stable_for_compat_callers(db_s
     result = await agent.handle("qa", "你好", "assle", db_session)
 
     assert result.reply == "我来处理。"
-    assert result.data == {"intent": "butler"}
+    assert result.data == {"intent": "private_butler"}
 
 
 @pytest.mark.asyncio
@@ -181,10 +181,10 @@ async def test_butler_agent_returns_specific_reply_on_recursion_overflow(
 
     monkeypatch.setattr(agent._graph, "ainvoke", raise_recursion_overflow)
 
-    result = await agent.handle("butler", "一直搜索", "assle", db_session)
+    result = await agent.handle("private_butler", "一直搜索", "assle", db_session)
 
     assert result.reply == "这次工具调用太多了，我先停一下，请把需求拆小一点。"
-    assert result.data == {"intent": "butler"}
+    assert result.data == {"intent": "private_butler"}
 
 
 @pytest.mark.asyncio
@@ -222,7 +222,7 @@ async def test_butler_agent_runs_search_web_tool_call_loop(db_session):
     ]
     agent = _build_agent(llm, web_search_service)
 
-    result = await agent.handle("butler", "搜一下最新韩剧", "assle", db_session)
+    result = await agent.handle("private_butler", "搜一下最新韩剧", "assle", db_session)
 
     assert result.reply == "查到了：一部新韩剧正在热播。"
     web_search_service.search.assert_awaited_once_with("最新韩剧")

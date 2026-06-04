@@ -10,7 +10,7 @@ Workflow:
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.config import get_config
 
-from src.agents.butler.prompts import build_system_prompt
+from src.agents.private_butler.prompts import build_system_prompt
 
 
 def _recent_message_to_langchain(message: dict):
@@ -33,7 +33,7 @@ async def call_model(state: dict) -> dict:
     """调用支持 tool calling 的 LLM
 
     参数:
-        state: ButlerState 当前状态，包含 messages 和会话记忆字段
+        state: PrivateButlerState 当前状态，包含 messages 和会话记忆字段
 
     返回:
         dict: {"messages": [AIMessage]}，由 add_messages 合并进状态
@@ -64,10 +64,10 @@ async def extract_reply(state: dict) -> dict:
     """提取最后一条不含 tool_calls 的 AIMessage 作为最终回复
 
     参数:
-        state: ButlerState 当前状态，包含完整 messages 列表
+        state: PrivateButlerState 当前状态，包含完整 messages 列表
 
     返回:
-        dict: {"reply": "..."}，供 ButlerAgent.handle() 包装 AgentResponse
+        dict: {"reply": "..."}，供 PrivateButlerAgent.handle() 包装 AgentResponse
     """
     for message in reversed(state.get("messages", [])):
         if isinstance(message, AIMessage) and not message.tool_calls:
@@ -76,7 +76,7 @@ async def extract_reply(state: dict) -> dict:
 
 
 def build_initial_messages(message: str) -> list:
-    """构造 ButlerAgent 初始用户消息
+    """构造 PrivateButlerAgent 初始用户消息
 
     参数:
         message: 用户原始输入文本

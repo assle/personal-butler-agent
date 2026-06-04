@@ -4,126 +4,90 @@
 
 ## Application Wiring
 
-- `src/main.py` constructs singleton service objects at module load: `LLMClient`, `IntentRouter`, domain agents, `ButlerAgent`, search/knowledge services, and `AgentRegistry`.
+- `src/main.py` constructs singleton service objects at module load: `LLMClient`, domain agents, `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, search/knowledge services, and scheduler support.
 - The FastAPI lifespan creates DB tables through `Base.metadata.create_all` and disposes the async engine on shutdown.
-- Route modules should expose router factory functions when they need injected dependencies, following `create_debug_router(...)`.
+- URL callback routes use factory functions for injected scene agents and database session factories.
 
-## Request Flow
+## Scene-First Dispatch
 
-1. API route receives a Pydantic request.
-2. Deterministic protection runs first where needed, such as group-message collection and trigger detection.
-3. Replyable messages call `ButlerAgent.handle("butler", message, user_id, db, extra_state=...)`.
-4. `ButlerAgent` runs a LangGraph tool-calling loop: LLM message → optional ToolNode execution → final LLM answer.
-5. The result is wrapped in `AgentResponse` and returned as `DebugMessageResponse` or sent through `response_url`.
+Runtime message routing starts with the communication scene, not a global intent classifier.
 
-Keep deterministic guards outside the LLM when they protect product behavior, such as silent group collection.
+1. URL callback messages are normalized into `InboundMessage`.
+2. `dispatch_message()` routes `single` chat to `PrivateButlerAgent`.
+3. `dispatch_message()` sends `group` chat through `apply_group_policy()`.
+4. Scheduler webhook jobs bypass chat dispatch and call `WebhookComposerAgent`.
 
-## Intent Routing
+Keep deterministic guards outside the LLM when they protect product behavior, such as silent group collection and group capability restrictions.
 
-- Use deterministic keyword/rule matching first for stable, common user phrases.
-- Use the LLM only as a fallback for messages that rules do not classify.
-- Unknown or malformed LLM classification output should fall back to `unknown`, not raise.
-- Add tests for both rule hits and fallback behavior when adding intents.
-- `IntentRouter` is no longer the default reply path for debug or WeChat messages; keep it available for compatibility surfaces and scheduler auto-routing.
+## Group Policy
 
-## Butler Tool-Calling Pattern
+Group messages are saved before any reply decision. Non-trigger messages stop after persistence and cleanup. Allowed triggers enter `GroupMentionAgent`; training and meal requests are rejected in group context.
 
-Replyable private messages and trigger-style group messages enter `ButlerAgent`.
-`ButlerAgent` owns the LangGraph `ToolNode` loop and exposes existing capabilities as tools instead of duplicating business logic.
+Rules:
+- Empty group voice recognition returns `empty_content` and is not saved.
+- Missing `chat_id` returns `missing_chat_id` and is not saved.
+- Summary/weather/simple-QA triggers may reply.
+- Unsupported group requests should not reach private tools.
+
+## Private Tool-Calling Pattern
+
+Replyable private messages enter `PrivateButlerAgent`. It owns the LangGraph `ToolNode` loop and exposes existing capabilities as tools instead of duplicating business logic.
 
 Rules:
 - Tools read `db`, `user_id`, `chat_type`, and `chat_id` from LangGraph config, not from model-supplied arguments.
 - Tool functions return short text; they do not return `AgentResponse` objects.
 - Existing domain agents remain the source of truth for training, meal, and summary workflows.
-- Group non-trigger messages stay outside ButlerAgent and are collected silently.
-- Do not add or modify test files unless the user explicitly asks for tests; when reading existing tests, use fake `AIMessage.tool_calls` patterns instead of real DeepSeek calls.
+- Group non-trigger messages stay outside private tool calling and are collected silently.
+- Do not add or modify test files unless the user explicitly asks for tests, except when an approved implementation plan explicitly requires test changes.
 
 ## Graph Agent Boundaries
 
-Each agent is a LangGraph `StateGraph` with three files:
+Each domain or scene agent is a LangGraph `StateGraph` package with this shape:
 
 ```
-agents/<domain>/
-├── __init__.py   # Re-exports the agent class
-├── state.py      # TypedDict state definition
-├── nodes.py      # Single-responsibility async node functions
-└── graph.py      # StateGraph assembly, agent class with handle()
+agents/<domain_or_scene>/
+├── __init__.py
+├── state.py
+├── nodes.py
+└── graph.py
 ```
 
-- **State**: A `TypedDict(total=False)` defining all fields that flow through the graph. Fields are optional by default; a node only updates what it changes.
-- **Nodes**: Async functions `(state: dict) -> dict` returning a partial state update. Nodes access runtime dependencies (LLM client, DB session) via `langgraph.config.get_config()`.
-- **Graph**: Assembles nodes with `builder.add_node()`, sets entry point, defines edges or conditional edges, and calls `builder.compile(checkpointer=...)`.
-- **Agent class**: Wraps the compiled graph. `handle(intent, message, user_id, db)` builds initial state, passes `config` with `{"configurable": {"db", "llm", "thread_id"}}`, and runs `graph.ainvoke()`.
-
-### Adding a new agent
-
-1. Create `src/agents/<domain>/` with `state.py`, `nodes.py`, `graph.py`, `__init__.py`.
-2. Define the state TypedDict.
-3. Write node functions — each does one thing, returns partial state.
-4. Assemble the graph with nodes and edges.
-5. Implement the agent class with `handle()`.
-6. Register in `src/main.py`: instantiate and call `agent_registry.register(intent, agent)`.
-
-### Node conventions
-
-- Nodes that call LLM: wrap in try/except, set `error` field on failure.
-- Nodes that touch DB: access session via `get_config()["configurable"]["db"]`.
-- Condition functions: sync functions `(state: dict) -> str` returning the next node name.
-- Keep nodes focused — if a node does two things, split it.
+- State: a `TypedDict(total=False)` defining fields that flow through the graph.
+- Nodes: async functions `(state: dict) -> dict` returning partial state updates.
+- Graph: assembles nodes, sets entry point, defines edges or conditional edges, and compiles the graph.
+- Agent class: exposes `handle(intent, message, user_id, db, extra_state=None)` and returns `AgentResponse`.
 
 ## Database Patterns
 
 - Use SQLAlchemy async APIs only.
-- Use `select(...)` queries with the injected `AsyncSession` from config.
+- Use `select(...)` queries with the injected `AsyncSession` from config or function parameters.
 - Add ORM objects to the session and `flush()` when tests or response data need generated state before route completion.
 - Store extensible user preferences as JSON text under namespace keys such as `fitness` and `meal`.
 
 ## Conversation Memory Pattern
 
-Agent `handle()` methods that need cross-turn context follow this pattern:
-
-```python
-async def handle(self, intent, message, user_id, db) -> AgentResponse:
-    memory = ConversationMemory(self._llm)
-    summary, recent = await memory.get_context(user_id, db)
-
-    initial_state = {
-        "intent": intent,
-        "message": message,
-        "user_id": user_id,
-        "conversation_summary": summary,
-        "recent_messages": recent,
-    }
-    config = {"configurable": {"db": db, "llm": self._llm, "thread_id": user_id}}
-    result = await self._graph.ainvoke(initial_state, config)
-
-    reply = result.get("reply", "")
-    await memory.save_exchange(user_id, message, reply, db)
-    return AgentResponse(reply=reply, data=result.get("data"))
-```
+Agent `handle()` methods that need cross-turn context load memory before graph execution and save the exchange after the reply is known.
 
 Key rules:
-- Load context **before** ainvoke, save exchange **after** — the reply is only known after graph execution.
-- Not all intents need memory — condition on intent (e.g., `log_training` skips it).
-- State TypedDicts must declare `conversation_summary: Optional[str]` and `recent_messages: list[dict]` for the fields to flow through nodes.
-- In generate nodes, splice summary + recent messages into the LLM messages list before appending the current user message.
-- `ConversationMemory` handles compression transparently — callers only call `get_context` and `save_exchange`.
-
-## Testing Patterns
-
-- Tests should not require real DeepSeek calls.
-- Use `conftest.py`'s `mock_llm` fixture (`AsyncMock()`) for agent tests — graph nodes call `llm.chat()` / `llm.chat_json()` through config, and the mock still intercepts these.
-- Use in-memory SQLite or isolated async engines in fixtures.
-- Prefer focused module tests plus API smoke tests when adding behavior.
-- Graph agents are tested through `handle()` — the same interface as before, so existing test patterns remain valid.
+- Load context before `ainvoke`, save exchange after.
+- Not all intents need memory; skip it for one-shot persistence or independent summary operations.
+- State TypedDicts must declare `conversation_summary: str | None` and `recent_messages: list[dict]` for fields that flow through nodes.
+- `ConversationMemory` handles compression transparently; callers only call `get_context` and `save_exchange`.
 
 ## Knowledge Base Pattern
 
 Knowledge retrieval is centralized in `src/knowledge/service.py`.
 
 - Agents must call `KnowledgeService.search()` instead of querying `knowledge_chunks` directly.
-- `search()` owns scope filtering: private chat can see `public + user`, group chat can see `public + group`.
+- Private chat can see `public + user`; group chat can see `public + group`.
 - Group chat does not read the speaker's user-private knowledge unless a future explicit opt-in is added.
 - Agents pass domain allowlists such as `["global", "qa"]`; they do not hard-code SQL filters.
 - `KnowledgeService.ingest()` owns validation, checksum deduplication, chunking, and ORM writes.
 - Stage 1 imports use `scripts/ingest_knowledge.py` for local `.md` / `.txt` files.
+
+## Testing Patterns
+
+- Tests should not require real DeepSeek calls.
+- Use `conftest.py` fixtures such as `mock_llm` and isolated async DB setup.
+- Prefer focused module tests plus callback/scheduler smoke tests when adding behavior.
+- Graph agents are tested through `handle()`, the same interface used by scene dispatch and scheduler composition.

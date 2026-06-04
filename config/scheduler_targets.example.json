@@ -4,7 +4,6 @@
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
     "message": "在群里发送快起床了，早睡早起，准备上班的信息",
-    "intent": "butler",
     "enabled": true
   },
   {
@@ -12,7 +11,6 @@
     "cron": "0 18 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
     "message": "生成今晚健康晚餐建议",
-    "intent": "butler",
     "enabled": true
   }
 ]
