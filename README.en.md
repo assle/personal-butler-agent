@@ -2,18 +2,117 @@
 
 [中文](README.md)
 
-AI personal butler for WeChat Work intelligent robot workflows: fitness logging and plans, meal planning, group-chat summaries, personalized Q&A, conversation memory, and Stage 1 SQLite-backed knowledge retrieval.
+AI personal butler for WeChat Work intelligent robot workflows. The current runtime uses scene-specific agents for private chat, group mentions, and scheduled group webhook composition.
 
 ## Current Interfaces
 
-| Interface | Path | Purpose |
-|----------|------|---------|
-| Debug API | `POST /api/debug/message` | Local development and automated tests |
-| Intelligent robot callback | `GET/POST /api/wechat/aibot/callback` | WeChat Work intelligent robot URL verification and message callbacks |
+| Interface | Path / Config | Purpose |
+|----------|----------------|---------|
+| Intelligent robot URL callback | `GET/POST /api/wechat/aibot/callback` | WeChat Work URL verification, message callbacks, and passive `response_url` replies |
+| Enterprise WeChat group webhook push | `SCHEDULER_TARGETS_FILE` | APScheduler reads JSON targets, composes markdown, and pushes to group webhooks |
 
-The old WeChat Work self-built app callback (`/api/wechat/callback`) has been removed.
+The app no longer exposes a local debug/dev message API. Use HTTPS tunneling or production HTTPS to test the real WeChat Work callback.
 
-## Required Configuration
+## Architecture
+
+```text
+WeChat Work intelligent robot callback
+  -> callback_router decrypts, verifies, and records by msgid
+  -> callback_handler normalizes to InboundMessage
+  -> dispatch_message routes by scene
+       ├─ single -> PrivateButlerAgent
+       │            └─ LangGraph tool calling -> Fitness / Meal / Summary / QA / Knowledge / Web Search
+       └─ group  -> apply_group_policy stores group messages and checks triggers
+                    └─ GroupMentionAgent -> group summary / weather placeholder / simple QA / rejection
+
+APScheduler
+  -> SchedulerManager
+  -> WebhookComposerAgent generates final markdown body
+  -> WebhookPushClient sends to Enterprise WeChat group webhook
+```
+
+## Stack
+
+| Component | Choice |
+|-----------|--------|
+| Runtime | Python 3.13+ |
+| Web framework | FastAPI |
+| Agent framework | LangGraph + LangChain |
+| LLM | langchain-openai -> DeepSeek/OpenAI-compatible API |
+| WeChat crypto | cryptography (AES-256-CBC) |
+| ORM | SQLAlchemy 2 async + aiosqlite |
+| Validation | Pydantic v2 |
+| Scheduler | APScheduler |
+| Package manager | uv |
+| Tests | pytest + pytest-asyncio |
+
+## Capabilities
+
+| Scene | Agent | Capabilities |
+|-------|-------|--------------|
+| Private chat | `PrivateButlerAgent` | Natural conversation, training logs and plans, meal plans, text summaries, local knowledge retrieval, web search |
+| Group mention | `GroupMentionAgent` | Group summaries, weather placeholder replies, lightweight QA; private capabilities such as training and meal plans are rejected |
+| Scheduled group push | `WebhookComposerAgent` | Generates final Enterprise WeChat markdown body from scheduler target instructions |
+
+## Project Layout
+
+```text
+personal_butler_agent/
+├── src/
+│   ├── main.py                  # FastAPI app, singleton wiring, callback route, scheduler
+│   ├── config.py                # .env settings
+│   ├── messaging/               # InboundMessage, group policy, scene dispatch
+│   ├── wechat/                  # URL callback, crypto, inbox, response_url replies
+│   ├── scheduler/               # APScheduler + group webhook push
+│   ├── agents/
+│   │   ├── private_butler/      # Private-chat tool-calling controller
+│   │   ├── group_mention/       # Restricted group mention agent
+│   │   ├── webhook_composer/    # Scheduler-only markdown composer
+│   │   ├── fitness/
+│   │   ├── summary/
+│   │   ├── meal/
+│   │   └── qa/
+│   ├── knowledge/
+│   ├── memory/
+│   ├── models/
+│   ├── schemas/
+│   ├── llm/
+│   └── db/
+├── tests/
+├── docs/agent/
+├── config/scheduler_targets.example.json
+├── deployment-guide.en.md
+├── 部署指南.md
+├── AGENTS.md
+├── CLAUDE.md
+└── README.md
+```
+
+## Quick Start
+
+```bash
+uv sync
+cp .env.example .env
+uv run uvicorn src.main:app --host 127.0.0.1 --port 8000
+```
+
+Run tests:
+
+```bash
+DEEPSEEK_API_KEY=test uv run pytest -q
+```
+
+Configure this callback URL in WeChat Work intelligent robot admin:
+
+```text
+https://<your-domain>/api/wechat/aibot/callback
+```
+
+See [deployment-guide.en.md](deployment-guide.en.md) for production setup.
+
+## Configuration
+
+Base `.env`:
 
 ```env
 DEEPSEEK_API_KEY=sk-your-key
@@ -26,42 +125,42 @@ WECOM_AIBOT_TOKEN=your-callback-token
 WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
 ```
 
-Configure this callback URL in WeChat Work intelligent robot admin:
+Scheduled group webhook push:
 
-```text
-https://<your-domain>/api/wechat/aibot/callback
+```env
+SCHEDULER_TARGETS_FILE=config/scheduler_targets.local.json
 ```
 
-## Run
+Target JSON example:
 
-```bash
-uv sync
-DEEPSEEK_API_KEY=test uv run pytest -q
-uv run uvicorn src.main:app --host 127.0.0.1 --port 8000
+```json
+[
+  {
+    "name": "fitness-group",
+    "cron": "0 9 * * *",
+    "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
+    "message": "Generate a morning reminder",
+    "enabled": true
+  }
+]
 ```
 
-For production, run uvicorn behind HTTPS reverse proxy such as Caddy:
+Do not commit real `.env` values or real group webhook URLs.
 
-```text
-butler.assle.online {
-    reverse_proxy 127.0.0.1:8000
-}
-```
+## Message Rules
 
-## Message Flow
+| Message | Behavior |
+|---------|----------|
+| Private text | Enters `PrivateButlerAgent`; the model decides whether to answer directly or call tools |
+| Private voice | Uses WeChat Work recognition text and follows private text flow; empty recognition is ignored |
+| Normal group message | Saved to `group_messages`; no reply |
+| Group summary/weather/simple question | Saved, then routed to `GroupMentionAgent` |
+| Group training/meal/private tasks | Short rejection, asking the user to switch to private chat |
+| Other message types | Unsupported-message reply |
 
-```text
-WeChat Work intelligent robot
-  -> GET/POST /api/wechat/aibot/callback
-  -> decrypt and verify callback
-  -> store inbound message by msgid
-  -> route intent
-  -> run LangGraph agent
-  -> reply through response_url
-```
+## Development Notes
 
-## Notes
-
-- Inbound messages are persisted in `inbound_messages` before background processing.
-- Duplicate callbacks are deduplicated by `msgid`.
-- APScheduler proactive push is currently paused because URL callback mode does not start the WebSocket client.
+- Read `docs/agent/active-context.md`, `docs/agent/patterns.md`, and relevant source files before code changes.
+- New cross-scene behavior should first choose an owner: private chat, group mention, or scheduler composition.
+- New domain agents should keep the `state.py` + `nodes.py` + `graph.py` + `handle()` structure.
+- Never commit real API keys, real `.env` files, or real group webhook URLs.
