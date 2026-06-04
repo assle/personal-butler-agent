@@ -1,9 +1,12 @@
 """
 群聊 @ Agent 节点函数
-实现分类、群总结、天气占位、简单问答和不支持能力回复。
+实现分类、群总结、天气工具调用、简单问答和不支持能力回复。
 """
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.config import get_config
+
 from src.agents.group_mention.classifier import classify_group_message
-from src.agents.group_mention.prompts import GROUP_QA_PROMPT
+from src.agents.group_mention.prompts import GROUP_QA_PROMPT, GROUP_TOOL_PROMPT
 
 
 async def classify_node(state: dict) -> dict:
@@ -57,16 +60,61 @@ async def summarize_group_node(state: dict) -> dict:
     return {"reply": result.reply, "data": result.data}
 
 
+def build_initial_messages(message: str) -> list:
+    """构造群聊工具调用初始用户消息
+
+    参数:
+        message: 群聊 @ 消息文本
+
+    返回:
+        list[HumanMessage]: 初始 messages 列表
+    """
+    return [HumanMessage(content=message)]
+
+
+async def call_model_with_tools(state: dict) -> dict:
+    """调用支持 tool calling 的 LLM 处理群聊天气问题
+
+    参数:
+        state: 当前图状态，包含 messages
+
+    返回:
+        dict: {"messages": [AIMessage]}，由 add_messages 合并进状态
+    """
+    configurable = get_config()["configurable"]
+    llm = configurable["llm"]
+    tools = configurable["tools"]
+    messages = [SystemMessage(content=GROUP_TOOL_PROMPT)]
+    messages.extend(state.get("messages", []))
+    response = await llm.bind_tools(tools).ainvoke(messages)
+    return {"messages": [response]}
+
+
+async def extract_tool_reply(state: dict) -> dict:
+    """提取群聊工具调用后的最终回复
+
+    参数:
+        state: 当前图状态，包含完整 messages 列表
+
+    返回:
+        dict: {"reply": "..."}，没有最终 AIMessage 时返回兜底提示
+    """
+    for message in reversed(state.get("messages", [])):
+        if isinstance(message, AIMessage) and not message.tool_calls:
+            return {"reply": str(message.content)}
+    return {"reply": "天气回复生成失败，请稍后再试。"}
+
+
 async def weather_placeholder_node(state: dict) -> dict:
-    """返回天气功能待配置提示
+    """返回天气工具未启用提示
 
     参数:
         state: 当前图状态
 
     返回:
-        dict: 天气占位回复
+        dict: 天气工具不可用回复
     """
-    return {"reply": "天气功能还没有接入数据源，配置完成后我就能查询。"}
+    return {"reply": "天气功能已接入工具，但当前没有可用天气数据源。"}
 
 
 async def simple_qa_node(state: dict) -> dict:

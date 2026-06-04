@@ -5,6 +5,7 @@ from src.models.group_message import GroupMessage
 from src.models.conversation import ConversationMessage, ConversationSummary
 from src.models.knowledge import KnowledgeDocument, KnowledgeChunk
 from src.models.inbound_message import InboundMessage
+from src.models.reminder import Reminder, ReminderRun
 
 __all__ = [
     "TrainingRecord",
@@ -15,4 +16,6 @@ __all__ = [
     "KnowledgeDocument",
     "KnowledgeChunk",
     "InboundMessage",
+    "Reminder",
+    "ReminderRun",
 ]

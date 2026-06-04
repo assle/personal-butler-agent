@@ -1,6 +1,6 @@
 """
 Butler 工具封装
-把已有领域 agent、知识库服务和联网搜索服务包装为 LangChain tools
+把已有领域 agent、知识库服务、联网搜索服务和天气服务包装为 LangChain tools
 
 Workflow:
   create_private_butler_tools(context) 接收运行期单例依赖
@@ -13,6 +13,8 @@ from typing import Any
 
 from langchain_core.tools import tool
 from langgraph.config import get_config
+
+from src.weather import format_weather_report
 
 
 @dataclass
@@ -29,6 +31,10 @@ class PrivateButlerToolContext:
     knowledge_service: Any
     # 联网搜索服务，用于外部网页检索
     web_search_service: Any
+    # 天气服务，用于实时天气查询
+    weather_service: Any = None
+    # 提醒 agent，用于创建、查看和取消群 webhook 提醒
+    reminder_agent: Any = None
 
 
 def _runtime():
@@ -104,6 +110,18 @@ def _format_web_results(results: list[Any]) -> str:
     )
 
 
+def _weather_unavailable_message() -> str:
+    """返回天气工具不可用提示
+
+    参数:
+        无
+
+    返回:
+        str: 缺少地点、服务或结果时的统一提示
+    """
+    return "天气功能已接入工具，但当前缺少明确地点，或天气数据源暂时查不到结果。请提供城市或地区，例如“今天上海天气”。"
+
+
 def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
     """创建 PrivateButlerAgent 可绑定的 LangChain 工具列表
 
@@ -111,9 +129,8 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         context: PrivateButlerToolContext，包含领域 agent 与检索服务依赖
 
     返回:
-        list[Any]: 七个 LangChain tool，供模型工具调用使用
+        list[Any]: 十一个 LangChain tool，供模型工具调用使用
     """
-
     @tool
     async def log_training(message: str) -> str:
         """记录用户的一次训练打卡
@@ -209,6 +226,69 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         results = await context.web_search_service.search(query)
         return _format_web_results(results)
 
+    @tool
+    async def query_weather(query: str) -> str:
+        """查询指定地点的天气
+
+        参数:
+            query: 用户天气问题，应包含地点，可包含今天、明天或后天
+
+        返回:
+            str: 天气查询结果；地点不清或查询失败时返回提示
+        """
+        if context.weather_service is None:
+            return _weather_unavailable_message()
+        report = await context.weather_service.query(query)
+        if report is None:
+            return _weather_unavailable_message()
+        return format_weather_report(report)
+
+    @tool
+    async def create_group_webhook_reminder(message: str) -> str:
+        """创建最终发送到企业微信群 webhook 的提醒
+
+        参数:
+            message: 用户关于提醒时间、目标群和事项的完整原始描述
+
+        返回:
+            str: 提醒创建结果；缺少目标群或时间时返回说明
+        """
+        if context.reminder_agent is None:
+            return "提醒功能尚未初始化，请先配置 scheduler target。"
+        return await _call_agent(
+            context.reminder_agent,
+            "create_group_webhook_reminder",
+            message,
+        )
+
+    @tool
+    async def list_reminders(message: str) -> str:
+        """查看当前用户创建的启用中提醒
+
+        参数:
+            message: 用户查看提醒的请求文本
+
+        返回:
+            str: 当前用户提醒列表
+        """
+        if context.reminder_agent is None:
+            return "提醒功能尚未初始化，请先配置 scheduler target。"
+        return await _call_agent(context.reminder_agent, "list_reminders", message)
+
+    @tool
+    async def cancel_reminder(message: str) -> str:
+        """取消当前用户创建的指定提醒
+
+        参数:
+            message: 用户取消提醒的请求文本，应包含提醒编号
+
+        返回:
+            str: 取消结果
+        """
+        if context.reminder_agent is None:
+            return "提醒功能尚未初始化，请先配置 scheduler target。"
+        return await _call_agent(context.reminder_agent, "cancel_reminder", message)
+
     return [
         log_training,
         get_today_training_plan,
@@ -217,4 +297,8 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         summarize_group_chat,
         search_local_knowledge,
         search_web,
+        query_weather,
+        create_group_webhook_reminder,
+        list_reminders,
+        cancel_reminder,
     ]

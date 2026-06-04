@@ -7,6 +7,8 @@ Workflow:
   → tools → agent（有工具调用时循环）
   → extract_reply → END（无工具调用时输出最终回复）
 """
+import re
+
 from langgraph.graph import END, START, StateGraph
 from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -17,6 +19,33 @@ from src.agents.private_butler.tools import PrivateButlerToolContext, create_pri
 from src.graph.memory import checkpointer as _checkpointer
 from src.memory.conversation import ConversationMemory
 from src.schemas.response import AgentResponse
+
+
+def _direct_reminder_intent(message: str) -> str | None:
+    """识别应绕过 LLM 工具选择的提醒请求
+
+    参数:
+        message: 用户私聊原始消息
+
+    返回:
+        str | None: 提醒 intent；不是提醒请求时返回 None
+    """
+    text = message.strip()
+    if not text:
+        return None
+    if re.search(r"(查看|看看|列出|有哪些).{0,8}提醒|提醒列表|我的提醒", text):
+        return "list_reminders"
+    if re.search(r"(取消|删除|关掉|停止).{0,8}(#?\s*\d+|提醒)", text):
+        return "cancel_reminder"
+    has_reminder_word = re.search(r"(提醒我|提醒一下|定个提醒|设置提醒|到点提醒|叫我|喊我)", text)
+    has_time_word = re.search(
+        r"(今天|明天|后天|今晚|早上|上午|中午|下午|晚上|每天|每周|每月|"
+        r"\d{1,2}\s*[点:：]\s*\d{0,2}|周[一二三四五六日天])",
+        text,
+    )
+    if has_reminder_word and has_time_word:
+        return "create_group_webhook_reminder"
+    return None
 
 
 class PrivateButlerAgent:
@@ -30,6 +59,8 @@ class PrivateButlerAgent:
         summary_agent,
         knowledge_service,
         web_search_service,
+        weather_service=None,
+        reminder_agent=None,
     ):
         """初始化 PrivateButlerAgent 并编译工具调用图
 
@@ -40,6 +71,8 @@ class PrivateButlerAgent:
             summary_agent: 摘要领域 agent
             knowledge_service: 本地知识库检索服务
             web_search_service: 联网搜索服务
+            weather_service: 天气服务
+            reminder_agent: 提醒 agent，用于创建、查看和取消群 webhook 提醒
 
         返回:
             None
@@ -51,6 +84,8 @@ class PrivateButlerAgent:
             summary_agent=summary_agent,
             knowledge_service=knowledge_service,
             web_search_service=web_search_service,
+            weather_service=weather_service,
+            reminder_agent=reminder_agent,
         )
         self._tools = create_private_butler_tools(self._tool_context)
         self._graph = self._build_graph()
@@ -105,6 +140,26 @@ class PrivateButlerAgent:
         if extra_state:
             chat_type = extra_state.get("chat_type", chat_type)
             chat_id = extra_state.get("chat_id", chat_id)
+
+        direct_reminder_intent = _direct_reminder_intent(message)
+        if chat_type == "single" and direct_reminder_intent:
+            memory = ConversationMemory(self._llm)
+            if self._tool_context.reminder_agent is None:
+                reply = "提醒功能尚未初始化，请先配置 scheduler target。"
+            else:
+                result = await self._tool_context.reminder_agent.handle(
+                    direct_reminder_intent,
+                    message,
+                    user_id,
+                    db,
+                    extra_state=extra_state,
+                )
+                reply = result.reply or "提醒工具没有生成有效结果。"
+            await memory.save_exchange(user_id, message, reply, db)
+            return AgentResponse(
+                reply=reply,
+                data={"intent": direct_reminder_intent},
+            )
 
         memory = ConversationMemory(self._llm)
         summary, recent = await memory.get_context(user_id, db)

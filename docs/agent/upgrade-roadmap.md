@@ -34,9 +34,9 @@
 
 ### 2.2 定时提醒和摘要
 
-- **当前**: 无
-- **目标**: APScheduler 驱动的个人提醒（喝水、训练）和日报/周报摘要
-- **工作量**: 中
+- **当前**: 已支持私聊创建群 webhook 提醒；提醒默认 @ 私聊回调 `from.userid`，可通过 target 级 `mention_user_overrides` 覆盖；Scheduler 每分钟扫描到期任务并推送到配置群；私聊确认展示 target `display_name` 和本地时区时间。
+- **下一步**: 增加训练日报/周报、群聊日报/周报等周期报告型提醒，复用现有 Fitness/Summary/Meal agent 生成正文。
+- **剩余工作量**: 中
 
 ---
 

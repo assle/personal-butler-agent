@@ -50,7 +50,7 @@ APScheduler
 
 | 场景 | Agent | 能力 |
 |------|-------|------|
-| 私聊 | `PrivateButlerAgent` | 自然对话、训练打卡、训练计划、饮食计划、文本摘要、本地知识库检索、联网搜索 |
+| 私聊 | `PrivateButlerAgent` | 自然对话、训练打卡、训练计划、饮食计划、文本摘要、本地知识库检索、联网搜索、创建/查看/取消群 webhook 提醒 |
 | 群聊 @ | `GroupMentionAgent` | 群聊总结、天气占位、轻量问答；训练和食谱等私聊能力会被拒绝 |
 | 定时群推送 | `WebhookComposerAgent` | 根据 scheduler target 配置生成适合直接发送的企业微信群 markdown 正文 |
 
@@ -136,13 +136,33 @@ target JSON 示例：
 ```json
 [
   {
-    "name": "fitness-group",
+    "name": "cosmic-humor-empire",
+    "display_name": "宇宙幽默帝国",
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
-    "message": "生成早安提醒",
+    "message": "发送每日提醒",
+    "aliases": ["宇宙幽默帝国"],
+    "mention_user_overrides": {},
     "enabled": true
   }
 ]
+```
+
+当前本地配置只有一个目标群：`宇宙幽默帝国`。`name` 是内部稳定标识；`display_name` 是私聊确认和提醒列表里展示给用户看的群名；`aliases` 用于解析“在宇宙幽默帝国提醒我”这类自然语言目标。
+
+私聊创建群提醒示例：
+
+```text
+创建提醒，今天19:10分在宇宙幽默帝国提醒我该健身了
+```
+
+确认回复会展示用户可见群名和北京时间，例如：
+
+```text
+已创建提醒 #1：健身提醒
+目标群：宇宙幽默帝国
+提醒对象：@LuZhenDong
+下次触发：2026-06-04 19:10（Asia/Shanghai）
 ```
 
 真实 `.env` 和真实 webhook 地址都不要提交到仓库。

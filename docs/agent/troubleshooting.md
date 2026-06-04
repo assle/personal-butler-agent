@@ -109,6 +109,22 @@ Fix pattern:
 - Treat webhook composition as scheduler-only content generation.
 - The composer should generate final markdown body only; sending belongs to `WebhookPushClient`.
 
+## Private Reminder Confirmation Shows Wrong Group Name Or UTC
+
+Symptom:
+- Private chat creates a reminder successfully and the group webhook receives it, but the private confirmation shows an internal target name such as `cosmic-humor-empire` or a UTC time.
+
+Check:
+- In `SCHEDULER_TARGETS_FILE`, the target should use one group target for the actual group, for example `name="cosmic-humor-empire"` and `display_name="宇宙幽默帝国"`.
+- `aliases` should contain real group names users say in private chat, such as `宇宙幽默帝国`; do not use task names such as “健身” as group aliases.
+- `ReminderService.get_target_display_name()` should resolve `display_name -> aliases[0] -> name`.
+- `src/agents/reminder/nodes.py` should format `next_run_at` in the reminder timezone, usually `Asia/Shanghai`.
+
+Fix pattern:
+- Keep `name` as the internal stable ID for database and job references.
+- Use `display_name` only for user-facing confirmation and reminder lists.
+- Treat the reminder content, such as “该健身了”, separately from the target group.
+
 ## Public 404 Requests
 
 Symptom:

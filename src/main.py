@@ -22,9 +22,12 @@ from src.agents.meal import MealAgent
 from src.agents.qa import QAAgent
 from src.agents.group_mention import GroupMentionAgent
 from src.agents.private_butler import PrivateButlerAgent
+from src.agents.reminder import ReminderAgent
 from src.agents.webhook_composer import WebhookComposerAgent
 from src.knowledge import KnowledgeService
+from src.reminders import ReminderService
 from src.search import WebSearchService
+from src.weather import WeatherService
 from src.scheduler import SchedulerManager, WebhookPushClient, load_webhook_targets
 
 logger = logging.getLogger(__name__)
@@ -35,12 +38,18 @@ if not logger.handlers:
     logger.addHandler(h)
 
 llm_client = LLMClient()
+reminder_service = ReminderService([])
 fitness_agent = FitnessAgent(llm_client=llm_client)
 summary_agent = SummaryAgent(llm_client=llm_client)
 meal_agent = MealAgent(llm_client=llm_client)
 qa_agent = QAAgent(llm_client=llm_client)
 knowledge_service = KnowledgeService()
 web_search_service = WebSearchService()
+weather_service = WeatherService()
+reminder_agent = ReminderAgent(
+    llm_client=llm_client,
+    reminder_service=reminder_service,
+)
 private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
     fitness_agent=fitness_agent,
@@ -48,12 +57,18 @@ private_butler_agent = PrivateButlerAgent(
     summary_agent=summary_agent,
     knowledge_service=knowledge_service,
     web_search_service=web_search_service,
+    weather_service=weather_service,
+    reminder_agent=reminder_agent,
 )
 group_mention_agent = GroupMentionAgent(
     llm_client=llm_client,
     summary_agent=summary_agent,
+    weather_service=weather_service,
 )
-webhook_composer_agent = WebhookComposerAgent(llm_client=llm_client)
+webhook_composer_agent = WebhookComposerAgent(
+    llm_client=llm_client,
+    weather_service=weather_service,
+)
 
 scheduler_manager: SchedulerManager | None = None
 
@@ -75,12 +90,14 @@ async def lifespan(app: FastAPI):
     global scheduler_manager
 
     if settings.scheduler_targets_file:
-        targets = load_webhook_targets(settings.scheduler_targets_file)
+        webhook_targets = load_webhook_targets(settings.scheduler_targets_file)
+        reminder_service.set_targets(webhook_targets)
         scheduler_manager = SchedulerManager(
             db_session_factory=async_session,
             webhook_composer_agent=webhook_composer_agent,
             webhook_client=WebhookPushClient(),
-            webhook_targets=targets,
+            webhook_targets=webhook_targets,
+            enable_reminder_scan=True,
         )
         scheduler_manager.start()
 

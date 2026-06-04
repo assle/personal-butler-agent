@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     web_search_max_results: int = 5
     web_search_timeout_seconds: int = 8
 
+    # 天气查询配置；Open-Meteo 无需 API key，仅配置 HTTP 超时
+    weather_timeout_seconds: int = 8
+
     # 企业微信智能机器人 URL 回调模式配置
     wecom_aibot_bot_id: str = ""
     wecom_aibot_token: str = ""

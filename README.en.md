@@ -50,7 +50,7 @@ APScheduler
 
 | Scene | Agent | Capabilities |
 |-------|-------|--------------|
-| Private chat | `PrivateButlerAgent` | Natural conversation, training logs and plans, meal plans, text summaries, local knowledge retrieval, web search |
+| Private chat | `PrivateButlerAgent` | Natural conversation, training logs and plans, meal plans, text summaries, local knowledge retrieval, web search, group webhook reminders |
 | Group mention | `GroupMentionAgent` | Group summaries, weather placeholder replies, lightweight QA; private capabilities such as training and meal plans are rejected |
 | Scheduled group push | `WebhookComposerAgent` | Generates final Enterprise WeChat markdown body from scheduler target instructions |
 
@@ -136,13 +136,33 @@ Target JSON example:
 ```json
 [
   {
-    "name": "fitness-group",
+    "name": "cosmic-humor-empire",
+    "display_name": "宇宙幽默帝国",
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
-    "message": "Generate a morning reminder",
+    "message": "Send a daily reminder",
+    "aliases": ["宇宙幽默帝国"],
+    "mention_user_overrides": {},
     "enabled": true
   }
 ]
+```
+
+The current local setup has one target group: `宇宙幽默帝国`. `name` is the stable internal identifier; `display_name` is shown in private-chat confirmations and reminder lists; `aliases` help parse natural-language targets such as "remind me in 宇宙幽默帝国".
+
+Private-chat reminder example:
+
+```text
+创建提醒，今天19:10分在宇宙幽默帝国提醒我该健身了
+```
+
+The confirmation reply shows the user-facing group name and local time:
+
+```text
+已创建提醒 #1：健身提醒
+目标群：宇宙幽默帝国
+提醒对象：@LuZhenDong
+下次触发：2026-06-04 19:10（Asia/Shanghai）
 ```
 
 Do not commit real `.env` values or real group webhook URLs.

@@ -12,8 +12,8 @@ Current implementation baseline:
 - Message normalization: `src/messaging/inbound.py` converts callback dictionaries into `InboundMessage`
 - Scene dispatch: `src/messaging/dispatch.py` routes private chat to `PrivateButlerAgent` and group chat through `apply_group_policy()`
 - Group policy: `src/messaging/group_policy.py` saves group messages, cleans history, and allows summary/weather/simple-QA triggers
-- Private chat: `PrivateButlerAgent` uses LangGraph tool calling to reach training, meal, summary, local knowledge, and web search tools
-- Group mention: `GroupMentionAgent` only supports group summaries, weather placeholder replies, and lightweight Q&A; training and meal requests are rejected in group context
+- Private chat: `PrivateButlerAgent` uses LangGraph tool calling to reach training, meal, summary, local knowledge, web search, and weather tools
+- Group mention: `GroupMentionAgent` only supports group summaries, weather lookups, and lightweight Q&A; training and meal requests are rejected in group context
 - Scheduler push: `SchedulerManager` reads `SCHEDULER_TARGETS_FILE`, calls `WebhookComposerAgent`, then sends markdown with `WebhookPushClient`
 - Domain agents: `FitnessAgent`, `SummaryAgent`, `MealAgent`, `QAAgent`
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek through `LLMClient`
@@ -25,10 +25,11 @@ Current implementation baseline:
 
 - WeChat Work intelligent robot URL 回调模式：GET URL 验证、POST 加密回调接收、入站消息幂等落库、后台处理、通过 `response_url` 回复。
 - Scene-first message flow: callback body -> `InboundMessage` -> `dispatch_message()` -> private or group scene agent.
-- Private chat tool-calling controller: `PrivateButlerAgent` can call fitness, meal, summary, local knowledge, and web search tools.
+- Private chat tool-calling controller: `PrivateButlerAgent` can call fitness, meal, summary, local knowledge, web search, weather, and reminder tools.
 - Group message passive collection: non-trigger group messages are saved and not replied to.
-- Group mention restricted replies: group summary, weather placeholder, simple Q&A, and short rejection for private capabilities.
-- APScheduler 企业微信群 webhook 主动推送：按本地 JSON 配置为多个群注册独立 cron，触发 `WebhookComposerAgent` 生成正文后推送 markdown 到对应群 webhook。
+- Group mention restricted replies: group summary, real weather lookup, simple Q&A, and short rejection for private capabilities.
+- APScheduler 企业微信群 webhook 主动推送：按本地 JSON 配置为多个群注册独立 cron，触发 `WebhookComposerAgent` 生成正文；天气类推送指令可先调用天气工具，再推送 markdown 到对应群 webhook。
+- 私聊创建群 webhook 提醒：`ReminderAgent` 将自然语言提醒解析为 SQLite 提醒任务；`SchedulerManager` 每分钟扫描到期提醒，并通过对应群 webhook 以 `<@userid> 事项` 形式提醒；私聊确认和提醒列表使用 target `display_name` 与本地时区展示。
 - Training record extraction and persistence — supports both strength and cardio training types.
 - Recent-history-based training plan generation.
 - Structured chat summarization — private text and group chat history.
@@ -36,11 +37,13 @@ Current implementation baseline:
 - Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite.
 - Stage 1 knowledge-base RAG: SQLite-backed public/user/group scoped knowledge documents and chunks, local `.md`/`.txt` import CLI, scoped retrieval service, and QA/private-butler knowledge-context injection.
 - Web search tool: disabled by default, configurable through `WEB_SEARCH_*`, and available to `PrivateButlerAgent` as `search_web` for current/external information.
+- Weather lookup: Open-Meteo-backed weather data is available in private chat through `PrivateButlerAgent` tools, in group @ through a restricted `GroupMentionAgent` ToolNode loop, and in scheduler webhook composition through its own `query_weather` tool; no API key is required.
 
 ## Deferred Work
 
 The README and MVP spec list these as future scope:
 - RAG Stage 2/3: hybrid vector retrieval, PDF/web imports, file upload UI, index rebuild operations, and broader Fitness/Meal/Summary integration.
+- Reminder Stage 2: 日报/周报提醒内容生成，复用 Fitness/Summary/Meal 等现有 agent 生成周期报告。
 
 ## Working Guidance
 

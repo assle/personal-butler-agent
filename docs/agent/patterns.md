@@ -4,7 +4,7 @@
 
 ## Application Wiring
 
-- `src/main.py` constructs singleton service objects at module load: `LLMClient`, domain agents, `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, search/knowledge services, and scheduler support.
+- `src/main.py` constructs singleton service objects at module load: `LLMClient`, domain agents, `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, search/knowledge/weather services, and scheduler support.
 - The FastAPI lifespan creates DB tables through `Base.metadata.create_all` and disposes the async engine on shutdown.
 - URL callback routes use factory functions for injected scene agents and database session factories.
 
@@ -39,6 +39,16 @@ Rules:
 - Existing domain agents remain the source of truth for training, meal, and summary workflows.
 - Group non-trigger messages stay outside private tool calling and are collected silently.
 - Do not add or modify test files unless the user explicitly asks for tests, except when an approved implementation plan explicitly requires test changes.
+
+## Weather Tool Pattern
+
+`src.weather` owns weather lookup. `WeatherService` extracts a location/date from the user text, calls Open-Meteo geocoding and forecast APIs, then returns a `WeatherReport`. Agent-specific tool wrappers live in the agent package that owns the tool-calling loop.
+
+Rules:
+- Private chat defines and registers `query_weather` in `src/agents/private_butler/tools.py` with the rest of the private tools.
+- Group @ weather triggers bind `query_weather` from `src/agents/group_mention/tools.py` in a restricted ToolNode loop, while unsupported private capabilities remain blocked before tool execution.
+- Scheduler webhook composition defines its own allowed `query_weather` wrapper in `src/agents/webhook_composer/tools.py`, then binds it in a small ToolNode loop before generating final markdown.
+- Missing locations and provider failures must return a clear text fallback rather than fabricated weather.
 
 ## Graph Agent Boundaries
 
