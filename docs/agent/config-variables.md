@@ -64,37 +64,36 @@ WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
 - 入站方式：企业微信通过 HTTP POST 回调公网 URL，而不是应用主动维持 WebSocket
 - 消息可靠性：回调路由按 `msgid` 幂等落库，便于去重和失败追踪
 - 回复方式：通过消息里的临时 `response_url` 被动回复
-- 主动推送：当前不启动 WebSocket，因此 `aibot_send_msg` 和 APScheduler 主动推送暂不可用
+- 主动推送：URL 回调模式不启动 WebSocket；主动群推送通过企业微信群机器人 webhook 独立完成
 
 ## APScheduler 定时推送
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `SCHEDULER_CRON` | No | `""` | Cron 表达式，定义调度频率（例：`0 9 * * 1-5` 表示工作日 9:00） |
-| `SCHEDULER_TARGET_TYPE` | No | `"single"` | 推送目标类型，支持 `\|` 分隔多个值：`single`（单聊）/ `group`（群聊） |
-| `SCHEDULER_TARGET_ID` | No | `""` | 推送目标 ID，支持 `\|` 分隔多个值。单聊时为 `userid`，群聊时为 `chatid`，按位置与 TARGET_TYPE 配对 |
-| `SCHEDULER_MESSAGE` | No | `""` | 定时触发消息文本，支持 `\|` 分隔多个值。单值共享所有目标，多值时须与目标数一致 |
-| `SCHEDULER_INTENT` | No | `""` | 可选，支持 `\|` 分隔多个值。有值走指定 agent，空位由 IntentRouter 自动判定（规则 → LLM → unknown/QA 兜底）。全空时所有目标均自动路由 |
+| `SCHEDULER_TARGETS_FILE` | No | `""` | 企业微信群 webhook 定时推送目标 JSON 文件路径。设置后按文件中每个群的独立 cron 启动 APScheduler job |
 
-所有四个字段 `TARGET_TYPE`、`TARGET_ID`、`MESSAGE`、`INTENT` 均使用 `|` 分隔，按位置配对。单值格式（无 `|`）保持向前兼容。
+当前 URL 回调模式下，主动推送使用企业微信群机器人 webhook。推荐设置 `SCHEDULER_TARGETS_FILE`，文件中每个群拥有独立 `cron`、`webhook_url`、`message` 和 `intent`。真实 webhook 地址视为密钥，不提交到仓库；仓库只保留 `config/scheduler_targets.example.json` 模板，真实文件建议命名为 `config/scheduler_targets.local.json`。
 
-当前 URL 回调模式不启动 WebSocket，因此即使 `SCHEDULER_CRON`、`SCHEDULER_TARGET_ID` 已设置，应用也不会启动 APScheduler 主动推送。后续如恢复定时提醒，需要重新设计独立主动发送通道。
+示例:
 
 ```env
-# 单目标（与原有格式兼容）
-SCHEDULER_CRON=0 9 * * 1-5
-SCHEDULER_TARGET_TYPE=single
-SCHEDULER_TARGET_ID=AssLe
-SCHEDULER_MESSAGE=早安！今天我该做什么训练？
-SCHEDULER_INTENT=
-
-# 多目标 + 独立消息 + 混合指定/自动 intent
-SCHEDULER_CRON=0 9 * * *
-SCHEDULER_TARGET_TYPE=single|single|group
-SCHEDULER_TARGET_ID=AssLe|ZhangSan|chatid123456
-SCHEDULER_MESSAGE=今日训练建议|今天吃什么？|总结一下最近群聊重点
-SCHEDULER_INTENT=today_plan||summarize_group
+SCHEDULER_TARGETS_FILE=config/scheduler_targets.local.json
 ```
+
+```json
+[
+  {
+    "name": "fitness-group",
+    "cron": "0 9 * * *",
+    "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...",
+    "message": "今日训练建议",
+    "intent": "butler",
+    "enabled": true
+  }
+]
+```
+
+如果生产日志出现 `GET /`、`GET /health`、`GET /v1/models` 等 404，这通常是公网探测请求命中了未注册路径，不是 scheduler 配置触发的定时推送失败，详见 `docs/agent/troubleshooting.md`。
 
 ## Change Guidance
 

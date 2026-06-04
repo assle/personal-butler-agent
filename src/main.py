@@ -7,7 +7,7 @@ Workflow:
 2. 向 AgentRegistry 注册所有 intent → agent 映射
 3. lifespan 中初始化数据库表结构
 4. 注册调试路由和智能机器人 URL 回调路由
-5. URL 回调模式不再启动 WebSocket 长连接客户端
+5. 配置企业微信群 webhook 定时推送
 """
 import logging
 from contextlib import asynccontextmanager
@@ -26,6 +26,7 @@ from src.agents.registry import AgentRegistry
 from src.knowledge import KnowledgeService
 from src.router.debug import create_debug_router
 from src.search import WebSearchService
+from src.scheduler import SchedulerManager, WebhookPushClient, load_webhook_targets
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -60,29 +61,41 @@ agent_registry.register("make_meal_plan", meal_agent)
 agent_registry.register("qa", qa_agent)
 agent_registry.register("unknown", qa_agent)
 agent_registry.set_fallback(qa_agent)
+scheduler_manager: SchedulerManager | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI 生命周期管理
 
-    应用启动时自动创建数据库表结构。URL 回调模式下不再启动 WebSocket 长连接。
+    应用启动时自动创建数据库表结构，并按配置启动群 webhook 定时推送。
 
     参数:
         app: FastAPI 应用实例
     """
     from src.db.base import Base
-    from src.db.session import engine
+    from src.db.session import async_session, engine
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    if settings.wecom_aibot_secret:
-        logger.warning("WECOM_AIBOT_SECRET is ignored in URL callback mode")
-    if settings.scheduler_cron and settings.scheduler_target_id:
-        logger.warning("Scheduler push is disabled in URL callback mode because WebSocket is not started")
+    global scheduler_manager
+
+    if settings.scheduler_targets_file:
+        targets = load_webhook_targets(settings.scheduler_targets_file)
+        scheduler_manager = SchedulerManager(
+            agent_registry=agent_registry,
+            db_session_factory=async_session,
+            intent_router=intent_router,
+            butler_agent=butler_agent,
+            webhook_client=WebhookPushClient(),
+            webhook_targets=targets,
+        )
+        scheduler_manager.start()
 
     yield
 
+    if scheduler_manager is not None:
+        scheduler_manager.shutdown()
     await engine.dispose()
 
 

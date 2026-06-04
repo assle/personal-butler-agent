@@ -195,7 +195,7 @@ curl -X POST http://localhost:8000/api/debug/message \
 | 消息接收 | 企业微信 POST 到 `/api/wechat/aibot/callback` |
 | 入站可靠性 | 按 `msgid` 写入 `inbound_messages`，重复回调幂等去重 |
 | 被动回复 | agent 处理完成后通过消息体里的 `response_url` 发送 markdown 回复 |
-| 主动推送 | URL 回调模式暂不启动 WebSocket，因此 APScheduler 主动推送暂不可用 |
+| 主动推送 | APScheduler 读取 `SCHEDULER_TARGETS_FILE`，按群 webhook 配置主动推送 markdown |
 
 后台配置 URL：
 
@@ -266,7 +266,7 @@ log_training     today_plan
 - 应用先按 `msgid` 写入 `inbound_messages`，重复回调不重复处理
 - 应用在后台 task 中完成意图路由和 agent 处理，避免 LLM 调用阻塞 HTTP 成功响应
 - 回复方式：通过消息体中的临时 `response_url` 下发 markdown 消息
-- 主动推送：URL 回调模式暂不启动 WebSocket，APScheduler 主动推送暂不可用
+- 主动推送：APScheduler 通过企业微信群机器人 webhook 推送 markdown 到群
 
 ### 配置变量
 
@@ -275,11 +275,7 @@ log_training     today_plan
 | `WECOM_AIBOT_BOT_ID` | 智能机器人必需 | 智能机器人 BotID，用于消息体 `aibotid` 校验 |
 | `WECOM_AIBOT_TOKEN` | 智能机器人必需 | URL 回调 Token |
 | `WECOM_AIBOT_ENCODING_AES_KEY` | 智能机器人必需 | URL 回调 EncodingAESKey |
-| `SCHEDULER_CRON` | 定时推送可选 | cron 表达式，例如 `0 9 * * 1-5` |
-| `SCHEDULER_TARGET_TYPE` | 定时推送可选 | 推送目标类型：`single` 或 `group` |
-| `SCHEDULER_TARGET_ID` | 定时推送可选 | 单聊 userid 或群聊 chatid |
-| `SCHEDULER_MESSAGE` | 定时推送可选 | 定时触发时交给 agent 的消息 |
-| `SCHEDULER_INTENT` | 定时推送可选 | 可选 intent，留空时自动路由 |
+| `SCHEDULER_TARGETS_FILE` | 定时推送可选 | 企业微信群 webhook 目标 JSON 文件路径 |
 
 ## 数据库
 
@@ -595,7 +591,7 @@ QA、Fitness（today_plan）和 Meal 三个 Agent 具备跨轮次对话记忆能
 |------|------|------|
 | 已实现 | 智能机器人私聊 + 群聊 @ | URL 回调入站，msgid 幂等落库，response_url 回复，支持文本和语音 |
 | 已实现 | 群聊消息收集 + 触发总结 | 自动存 DB，触发词生成结构化摘要 |
-| 暂停 | APScheduler 定时推送 | URL 回调模式不启动 WebSocket，主动推送通道需重新设计 |
+| 已实现 | APScheduler 群 webhook 定时推送 | 多群独立 cron，ButlerAgent 生成内容后推送 markdown |
 | 已实现 | 调试端点 | 本地测试全功能可用 |
 | 已实现 | 训练数据持久化 | SQLite 存储，支持历史查询 |
 | 已实现 | 用户偏好管理 | 自动提取并持久化偏好 |

@@ -4,19 +4,19 @@
 
 ## Application Wiring
 
-- `src/main.py` constructs singleton service objects at module load: `LLMClient`, `IntentRouter`, each agent, and `AgentRegistry`.
+- `src/main.py` constructs singleton service objects at module load: `LLMClient`, `IntentRouter`, domain agents, `ButlerAgent`, search/knowledge services, and `AgentRegistry`.
 - The FastAPI lifespan creates DB tables through `Base.metadata.create_all` and disposes the async engine on shutdown.
 - Route modules should expose router factory functions when they need injected dependencies, following `create_debug_router(...)`.
 
 ## Request Flow
 
 1. API route receives a Pydantic request.
-2. `IntentRouter.route(message)` returns `(intent, confidence)`.
-3. `AgentRegistry.get(intent)` resolves the compiled graph agent.
-4. The selected agent builds initial state and runs its graph via `ainvoke()`.
-5. The result is wrapped in `AgentResponse` and returned as `DebugMessageResponse`.
+2. Deterministic protection runs first where needed, such as group-message collection and trigger detection.
+3. Replyable messages call `ButlerAgent.handle("butler", message, user_id, db, extra_state=...)`.
+4. `ButlerAgent` runs a LangGraph tool-calling loop: LLM message → optional ToolNode execution → final LLM answer.
+5. The result is wrapped in `AgentResponse` and returned as `DebugMessageResponse` or sent through `response_url`.
 
-Keep this flow linear unless a new feature clearly needs orchestration.
+Keep deterministic guards outside the LLM when they protect product behavior, such as silent group collection.
 
 ## Intent Routing
 
@@ -24,6 +24,19 @@ Keep this flow linear unless a new feature clearly needs orchestration.
 - Use the LLM only as a fallback for messages that rules do not classify.
 - Unknown or malformed LLM classification output should fall back to `unknown`, not raise.
 - Add tests for both rule hits and fallback behavior when adding intents.
+- `IntentRouter` is no longer the default reply path for debug or WeChat messages; keep it available for compatibility surfaces and scheduler auto-routing.
+
+## Butler Tool-Calling Pattern
+
+Replyable private messages and trigger-style group messages enter `ButlerAgent`.
+`ButlerAgent` owns the LangGraph `ToolNode` loop and exposes existing capabilities as tools instead of duplicating business logic.
+
+Rules:
+- Tools read `db`, `user_id`, `chat_type`, and `chat_id` from LangGraph config, not from model-supplied arguments.
+- Tool functions return short text; they do not return `AgentResponse` objects.
+- Existing domain agents remain the source of truth for training, meal, and summary workflows.
+- Group non-trigger messages stay outside ButlerAgent and are collected silently.
+- Do not add or modify test files unless the user explicitly asks for tests; when reading existing tests, use fake `AIMessage.tool_calls` patterns instead of real DeepSeek calls.
 
 ## Graph Agent Boundaries
 

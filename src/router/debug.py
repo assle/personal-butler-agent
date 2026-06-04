@@ -78,7 +78,7 @@ def create_debug_router(
             from src.models.group_message import GroupMessage
             await GroupMessage.save(
                 db, req.chat_id, req.user_id, req.message,
-                int(time.time()),
+                int(time.time()),   # 返回的是float，这里强制转换为int(直接截断小数)
             )
             logger.info("Debug: saved group message, chat_id=%s, user=%s",
                         req.chat_id, req.user_id)

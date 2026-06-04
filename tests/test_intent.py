@@ -45,7 +45,7 @@ class TestIntentRules:
         """验证无关键词匹配时返回 None（触发 LLM 分类）"""
         from src.intent.rules import match_rules
 
-        assert match_rules("你好") is None
+        assert match_rules("随便聊聊") is None
         assert match_rules("今天天气怎么样") is None
         assert match_rules("") is None
 

@@ -17,11 +17,12 @@ For build, test, and verification steps, see `deployment-guide.en.md` in the pro
 
 ## Code Style & Conventions
 
-- Follow existing Python style in `src/` and `tests/`; keep changes small and local.
+- Follow existing Python style in `src/`; keep changes small and local.
 - Preserve the current agent boundary: intent routing chooses an intent, AgentRegistry resolves to a graph agent, handle() builds state and runs the StateGraph, returning `AgentResponse`.
+- Do not add or modify test files unless the user explicitly asks for tests.
 - All functions and methods must include Chinese comments describing: (1) what the function does, (2) input parameters, (3) return value. Every `.py` file must start with a Chinese comment block explaining the file's purpose and overall workflow.
 
-For detailed patterns (async DB, agent structure, testing conventions), load `docs/agent/patterns.md`.
+For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`.
 
 ## Architecture
 
@@ -35,7 +36,7 @@ For detailed patterns (async DB, agent structure, testing conventions), load `do
 - `src/db/`: async SQLAlchemy engine, session factory, declarative base.
 - `src/models/`: SQLite ORM models for training records and user preferences.
 - `src/llm/`: LangChain ChatOpenAI wrapper pointed at DeepSeek.
-- `tests/`: pytest coverage for schemas, config, DB, intent routing, agents, and API smoke flow.
+- `tests/`: existing pytest coverage; read only when needed and do not create new test files by default.
 
 ---
 

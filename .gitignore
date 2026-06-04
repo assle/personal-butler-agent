@@ -1,5 +1,8 @@
 .env
+config/scheduler_targets.local.json
 *.db
+*.db-shm
+*.db-wal
 __pycache__/
 *.pyc
 .venv/

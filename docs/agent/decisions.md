@@ -131,24 +131,42 @@ Reasoning:
 
 Trade-off: agent 上下文只使用回调消息中的 `userid`、`chatid` 等基础字段，不再查询用户姓名、部门、头像。若未来确实需要用户详情，应作为单独的自建应用/OAuth 集成重新设计。
 
-## ADR-013: 调度器多目标逗号分隔配置
+## ADR-013: 调度器目标配置改为 JSON 文件
 
-SCHEDULER_TARGET_TYPE 和 SCHEDULER_TARGET_ID 均支持逗号分隔多个值，按位置配对后遍历推送。
+旧的 `.env` 扁平多字段调度配置已被 `SCHEDULER_TARGETS_FILE` JSON 目标文件取代。
 
 Reasoning:
-- **最小配置复杂度**: 在现有的 `.env` 单值字符串字段上扩展，无需引入 JSON 或 YAML 结构化配置。单目标场景（`TARGET_TYPE=single, TARGET_ID=user1`）与原有格式完全兼容。
-- **按位置配对**: `TARGET_TYPE` 和 `TARGET_ID` 通过索引对应 —— 第 N 个 type 对应第 N 个 id。直观且易于校验（长度必须一致，否则启动时报 ValueError）。
-- **独立失败隔离**: 遍历推送时每个目标的 agent.handle + push_message 独立 try/except，单个目标失败不影响后续目标。
-- **复用 agent 管线**: 每个目标独立调用 agent.handle()，因此不同用户可能因 user_id 和 user_name 差异获得个性化回复。
+- 每个企业微信群需要独立 cron、webhook、触发消息和 intent，JSON 对象比多个位置配对字符串更清晰。
+- webhook 地址是敏感凭据，真实 local JSON 文件可以单独加入 `.gitignore`。
+- 配置文件可以保留 `enabled` 开关，便于临时关闭单个群。
 
-Trade-off: 配置超过 3-4 个目标时逗号分隔可读性下降，但当前场景下目标数量有限，结构化格式（JSON/YAML）的收益不及其引入的复杂度。
+Trade-off: JSON 文件比单行 `.env` 多一个本地文件，但明显降低了多群配置错位风险。
 
-### 迭代（2026-06-02）：扩展为按目标独立配置
+## ADR-014: ButlerAgent Tool-Calling Main Entry
 
-ADR-013 的逗号分隔多目标方案进一步扩展：
+Replyable user messages now enter a total-control `ButlerAgent` that binds LangChain tools to the LLM and executes them through LangGraph `ToolNode`.
 
-- **分隔符改为 `|`**：避免英文逗号与消息文本潜在冲突。
-- **MESSAGE 和 INTENT 独立配置**：每个目标可指定不同消息和 intent。MESSAGE 单值广播，多值按位置配对。INTENT 有值走指定 agent，空位走 IntentRouter 自动路由（规则 → LLM → unknown/QA 兜底）。
-- **SchedulerManager 接收 IntentRouter**：intent 为空时调用 `intent_router.route(message)` 自动判定，不再强制 fallback 到 QA。
+Reasoning:
+- The previous route-first model was stable but made every new capability depend on intent classification.
+- Tool calling lets the LLM choose when to use local knowledge, web search, training, meal, and summary tools.
+- Existing domain agents remain reusable behind tools, so business logic is not duplicated.
+- Group non-trigger collection stays deterministic to avoid LLM work for every group message.
 
-详见 `docs/superpowers/specs/2026-06-02-scheduler-per-target-config-design.md`。
+Trade-off:
+- One user message can involve multiple LLM calls, increasing latency and cost.
+- Tool descriptions and tests are now part of behavior control.
+- DeepSeek tool-calling compatibility should be manually smoke-tested with a real key after unit tests pass.
+
+## ADR-015: 企业微信群 Webhook 作为主动推送通道
+
+URL 回调模式继续负责智能机器人入站消息和 `response_url` 被动回复；主动推送改由企业微信群机器人 webhook 独立完成。APScheduler 通过 `SCHEDULER_TARGETS_FILE` 读取本地 JSON 目标配置，为每个群注册独立 cron job，到点后调用 ButlerAgent 生成内容，再发送 markdown 到对应 webhook。
+
+Reasoning:
+- URL 回调模式不启动 WebSocket，不能继续依赖 `aibot_send_msg` 做主动推送。
+- 企业微信“消息推送”类 webhook 适合群通知，不适合伪装成私聊主动推送，因此当前主动通道只面向群。
+- JSON 文件比 `.env` 中多个 `|` 分隔字段更适合保存多群、多 cron、多 webhook 的配置，且真实 webhook 文件可加入 `.gitignore` 避免提交密钥。
+
+Trade-off:
+- 群 webhook 是单向推送通道，不能接收用户回复。
+- webhook 地址本身是敏感凭据，需要按密钥管理。
+- 每个群独立 job 会增加调度配置数量，但目标边界更清晰。

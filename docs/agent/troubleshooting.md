@@ -168,3 +168,25 @@ Fix (已应用):
 Check:
 - 确认 `WECOM_AIBOT_BOT_ID` 填的是智能机器人后台的 BotID。
 - 确认 `WECOM_AIBOT_TOKEN` 和 `WECOM_AIBOT_ENCODING_AES_KEY` 与后台 URL 回调配置一致。
+
+## 公网访问 `/`、`/health`、`/v1/models` 返回 404
+
+Symptom:
+- 生产日志出现类似 `GET / HTTP/1.1" 404 Not Found`、`GET /health HTTP/1.1" 404 Not Found`、`GET /v1/models HTTP/1.1" 404 Not Found`。
+- 日志源 IP 是公网地址，不是本机或企业微信固定回调流程。
+- 同时 `.env` 中配置了 `SCHEDULER_TARGETS_FILE`，容易误以为是 APScheduler 配置导致。
+
+Reason:
+- 当前 FastAPI 应用没有注册 `/`、`/health`、`/v1/models`、`/api/v1/model`、`/favicon.ico` 等路径，这些请求按设计返回 404。
+- `/v1/models` 等路径通常是公网扫描器在探测服务是否暴露 OpenAI-compatible API。
+- 群 webhook 主动推送只会向配置中的企业微信 webhook 发起出站 POST，不会主动访问当前 FastAPI 应用的 `/`、`/health` 或 `/v1/models` 路径。
+
+Check:
+- 确认可用业务路由是 `POST /api/debug/message` 和 `GET/POST /api/wechat/aibot/callback`。
+- 用 `curl -i https://<域名>/api/wechat/aibot/callback` 检查回调路径是否可达；没有企业微信签名参数时返回 `422` 或 `403` 属于正常现象，不应是 `404`。
+- 如果需要健康检查，应显式新增 `/health` 路由，或在反向代理/监控里改用已存在路径。
+
+Fix pattern:
+- 不要把公网扫描造成的 404 当作 Scheduler 故障处理。
+- 如果只是想减少日志噪音，可在反向代理层过滤明显扫描路径，或新增只返回静态状态的 `/health`。
+- 如果要排查主动推送，请查看群 webhook job 日志和企业微信 webhook 响应状态，不要把公网扫描造成的入站 404 当作 scheduler 故障。

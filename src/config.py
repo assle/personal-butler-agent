@@ -34,15 +34,8 @@ class Settings(BaseSettings):
     wecom_aibot_token: str = ""
     wecom_aibot_encoding_aes_key: str = ""
 
-    # 兼容旧长连接配置；URL 回调模式不再使用该字段
-    wecom_aibot_secret: str = ""
-
     # 定时推送配置
-    scheduler_cron: str = "0 9 * * *"
-    scheduler_target_type: str = "single"
-    scheduler_target_id: str = ""
-    scheduler_message: str = "今日训练建议"
-    scheduler_intent: str = "today_plan"
+    scheduler_targets_file: str = ""
 
 
 settings = Settings()

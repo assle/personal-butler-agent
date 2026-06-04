@@ -5,7 +5,7 @@
       <paths name="personal-butler-agent">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/ubuntu/apps" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/ubuntu/apps/personal_butler_agent" local="$PROJECT_DIR$" web="/" />
             <mapping local="" />
           </mappings>
           <excludedPaths>

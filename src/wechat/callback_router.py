@@ -138,6 +138,14 @@ def create_aibot_callback_router(
                 butler_agent,
                 db_session_factory,
             )
+        '''
+        如果这条消息需要处理：
+        不在当前请求里立刻处理
+        而是把 process_recorded_message 加入后台任务队列
+        当前接口可以先返回响应
+        响应返回后，FastAPI 再执行这个后台任务
+        这是因为企业微信回调要求服务器尽快返回*响应*
+        '''
         return {"errcode": 0, "errmsg": "ok"}
 
     return router

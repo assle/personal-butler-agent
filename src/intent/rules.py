@@ -42,6 +42,10 @@ RULES: list[IntentRule] = [
         "make_meal_plan",
         ["食谱", "吃什么", "meal plan", "饮食"],
     ),
+    IntentRule(
+        "qa",
+        ["你好", "嗨", "hello", "在吗"],
+    ),
 ]
 """规则列表，按顺序匹配，先匹配到的规则生效"""
 
