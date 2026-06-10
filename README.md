@@ -9,7 +9,7 @@
 | 接口 | 路径/配置 | 用途 |
 |------|-----------|------|
 | 智能机器人 URL 回调 | `GET/POST /api/wechat/aibot/callback` | 企业微信 URL 验证、消息回调、`response_url` 被动回复 |
-| 企业微信群 webhook 推送 | `SCHEDULER_TARGETS_FILE` | APScheduler 按 JSON 配置定时生成并推送群 markdown |
+| 企业微信群 webhook 推送 | `SCHEDULER_TARGETS_FILE` | APScheduler 按 JSON 配置定时生成或原样拼接并推送群 markdown |
 
 项目不再暴露本地 debug/dev 消息 API；本地联调请通过 HTTPS 隧道或生产 HTTPS 配置企业微信智能机器人 URL 回调。
 
@@ -21,13 +21,13 @@
   -> callback_handler 规范化为 InboundMessage
   -> dispatch_message 按场景分发
        ├─ single -> PrivateButlerAgent
-       │            └─ LangGraph tool-calling -> Fitness / Meal / Summary / QA / Knowledge / Web Search
+       │            └─ LangGraph tool-calling -> Summary / Knowledge / Web Search / Weather / Reminder
        └─ group  -> apply_group_policy 保存群消息、判断触发
-                    └─ GroupMentionAgent -> 群总结 / 天气占位 / 简单问答 / 越界拒绝
+                    └─ GroupMentionAgent -> 群总结 / 真实天气 / 简单问答 / 越界拒绝
 
 APScheduler
   -> SchedulerManager
-  -> WebhookComposerAgent 生成最终 markdown 正文
+  -> SchedulerManager 按 target mode 生成或拼接最终 markdown 正文
   -> WebhookPushClient 发送到企业微信群 webhook
 ```
 
@@ -50,9 +50,9 @@ APScheduler
 
 | 场景 | Agent | 能力 |
 |------|-------|------|
-| 私聊 | `PrivateButlerAgent` | 自然对话、训练打卡、训练计划、饮食计划、文本摘要、本地知识库检索、联网搜索、创建/查看/取消群 webhook 提醒 |
-| 群聊 @ | `GroupMentionAgent` | 群聊总结、天气占位、轻量问答；训练和食谱等私聊能力会被拒绝 |
-| 定时群推送 | `WebhookComposerAgent` | 根据 scheduler target 配置生成适合直接发送的企业微信群 markdown 正文 |
+| 私聊 | `PrivateButlerAgent` | 自然对话、文本摘要、本地知识库检索、联网搜索、天气查询、创建/查看/取消群 webhook 提醒 |
+| 群聊 @ | `GroupMentionAgent` | 群聊总结、真实天气、轻量问答；训练和食谱等未开放能力会被拒绝 |
+| 定时群推送 | `SchedulerManager` / `WebhookComposerAgent` | 原样推送固定正文、追加天气查询结果，或按配置生成企业微信群 markdown 正文 |
 
 ## 项目结构
 
@@ -63,16 +63,17 @@ personal_butler_agent/
 │   ├── config.py                # .env 配置加载
 │   ├── messaging/               # InboundMessage、group_policy、scene dispatch
 │   ├── wechat/                  # 智能机器人 URL 回调、加解密、入站落库、response_url 回复
-│   ├── scheduler/               # APScheduler + 企业微信群 webhook 推送
+│   ├── scheduler/               # target model/config、webhook client、APScheduler manager
+│   ├── cli/                     # 可安装的维护命令
 │   ├── agents/
 │   │   ├── private_butler/      # 私聊 tool-calling 总控 agent
 │   │   ├── group_mention/       # 群聊 @ 受限 agent
 │   │   ├── webhook_composer/    # scheduler-only 群 markdown 生成 agent
-│   │   ├── fitness/             # 健身记录和计划
+│   │   ├── fitness/             # 旧版健身记录和计划 agent（当前运行路径未接入）
 │   │   ├── summary/             # 文本/群聊摘要
-│   │   ├── meal/                # 饮食计划
-│   │   └── qa/                  # 个性化问答
-│   ├── knowledge/               # Stage 1 SQLite 知识库检索
+│   │   ├── meal/                # 旧版饮食计划 agent（当前运行路径未接入）
+│   │   └── qa/                  # 旧版独立问答 agent（当前运行路径未接入）
+│   ├── knowledge/               # Stage 2 QA-first 混合知识库检索
 │   ├── memory/                  # 对话记忆和摘要压缩
 │   ├── models/                  # SQLAlchemy ORM models
 │   ├── schemas/                 # AgentResponse 等共享 schema
@@ -80,6 +81,7 @@ personal_butler_agent/
 │   └── db/                      # async engine/session/base
 ├── tests/                       # pytest 测试
 ├── docs/agent/                  # 当前上下文、模式、决策、排障、配置说明
+├── i18n/                        # 历史翻译快照，不作为当前实现依据
 ├── config/scheduler_targets.example.json
 ├── deployment-guide.en.md
 ├── 部署指南.md
@@ -100,6 +102,12 @@ uv run uvicorn src.main:app --host 127.0.0.1 --port 8000
 
 ```bash
 DEEPSEEK_API_KEY=test uv run pytest -q
+```
+
+导入本地知识文档：
+
+```bash
+uv run butler-ingest-knowledge notes.md --scope-type public --domain qa
 ```
 
 本地企业微信联调需要公网 HTTPS。可以用 HTTPS 隧道把本地 `127.0.0.1:8000` 暴露给企业微信后台，然后配置：
@@ -136,11 +144,13 @@ target JSON 示例：
 ```json
 [
   {
-    "name": "cosmic-humor-empire",
+    "name": "cosmic-humor-empire-morning",
     "display_name": "宇宙幽默帝国",
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
-    "message": "发送每日提醒",
+    "mode": "raw",
+    "message": "早上好，今天记得看一下今日重点。",
+    "weather_query": "今天杭州天气",
     "aliases": ["宇宙幽默帝国"],
     "mention_user_overrides": {},
     "enabled": true
@@ -148,7 +158,7 @@ target JSON 示例：
 ]
 ```
 
-当前本地配置只有一个目标群：`宇宙幽默帝国`。`name` 是内部稳定标识；`display_name` 是私聊确认和提醒列表里展示给用户看的群名；`aliases` 用于解析“在宇宙幽默帝国提醒我”这类自然语言目标。
+当前本地配置只有一个目标群：`宇宙幽默帝国`。`name` 是内部稳定标识；`display_name` 是私聊确认和提醒列表里展示给用户看的群名；`mode` 为 `raw` 时原样发送 `message`，为 `compose` 时保留旧的 LLM 生成正文；`weather_query` 仅支持 `raw`，存在时会在到点后查询天气并追加到 `message` 后，一次性推送；`aliases` 用于解析“在宇宙幽默帝国提醒我”这类自然语言目标。
 
 私聊创建群提醒示例：
 

@@ -4,7 +4,7 @@
 
 ## Application Wiring
 
-- `src/main.py` constructs singleton service objects at module load: `LLMClient`, domain agents, `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, search/knowledge/weather services, and scheduler support.
+- `src/main.py` constructs only runtime singleton objects: `LLMClient`, `SummaryAgent`, `ReminderAgent`, scene agents, search/knowledge/weather services, and scheduler support.
 - The FastAPI lifespan creates DB tables through `Base.metadata.create_all` and disposes the async engine on shutdown.
 - URL callback routes use factory functions for injected scene agents and database session factories.
 
@@ -15,7 +15,7 @@ Runtime message routing starts with the communication scene, not a global intent
 1. URL callback messages are normalized into `InboundMessage`.
 2. `dispatch_message()` routes `single` chat to `PrivateButlerAgent`.
 3. `dispatch_message()` sends `group` chat through `apply_group_policy()`.
-4. Scheduler webhook jobs bypass chat dispatch and call `WebhookComposerAgent`.
+4. Scheduler webhook jobs bypass chat dispatch; raw targets send configured content directly with optional weather appended, while compose targets call `WebhookComposerAgent`.
 
 Keep deterministic guards outside the LLM when they protect product behavior, such as silent group collection and group capability restrictions.
 
@@ -28,6 +28,7 @@ Rules:
 - Missing `chat_id` returns `missing_chat_id` and is not saved.
 - Summary/weather/simple-QA triggers may reply.
 - Unsupported group requests should not reach private tools.
+- `apply_group_policy()` owns deterministic trigger classification. `dispatch_message()` passes `group_category` to `GroupMentionAgent`, whose classifier only runs when the agent is called without a preclassified category.
 
 ## Private Tool-Calling Pattern
 
@@ -36,7 +37,8 @@ Replyable private messages enter `PrivateButlerAgent`. It owns the LangGraph `To
 Rules:
 - Tools read `db`, `user_id`, `chat_type`, and `chat_id` from LangGraph config, not from model-supplied arguments.
 - Tool functions return short text; they do not return `AgentResponse` objects.
-- Existing domain agents remain the source of truth for training, meal, and summary workflows.
+- Existing domain agents remain the source of truth for summary and reminder workflows.
+- Fitness and meal source packages are legacy code only unless a future product decision reintroduces them.
 - Group non-trigger messages stay outside private tool calling and are collected silently.
 - Do not add or modify test files unless the user explicitly asks for tests, except when an approved implementation plan explicitly requires test changes.
 
@@ -47,7 +49,7 @@ Rules:
 Rules:
 - Private chat defines and registers `query_weather` in `src/agents/private_butler/tools.py` with the rest of the private tools.
 - Group @ weather triggers bind `query_weather` from `src/agents/group_mention/tools.py` in a restricted ToolNode loop, while unsupported private capabilities remain blocked before tool execution.
-- Scheduler webhook composition defines its own allowed `query_weather` wrapper in `src/agents/webhook_composer/tools.py`, then binds it in a small ToolNode loop before generating final markdown.
+- Scheduler webhook raw composition uses target-level `weather_query` and calls `WeatherService` directly before appending `format_weather_report()` to the fixed `message`. Compose targets may still use the `src/agents/webhook_composer/tools.py` wrapper in a small ToolNode loop.
 - Missing locations and provider failures must return a clear text fallback rather than fabricated weather.
 
 ## Graph Agent Boundaries
@@ -93,7 +95,17 @@ Knowledge retrieval is centralized in `src/knowledge/service.py`.
 - Group chat does not read the speaker's user-private knowledge unless a future explicit opt-in is added.
 - Agents pass domain allowlists such as `["global", "qa"]`; they do not hard-code SQL filters.
 - `KnowledgeService.ingest()` owns validation, checksum deduplication, chunking, and ORM writes.
-- Stage 1 imports use `scripts/ingest_knowledge.py` for local `.md` / `.txt` files.
+- Hybrid retrieval stays inside `KnowledgeService`: existing keyword scoring, SQLite FTS, and local hashing embeddings are merged into one score before returning `KnowledgeChunkResult`.
+- `src/knowledge/embedding.py` is intentionally local and deterministic so tests and local development do not need live embedding API calls.
+- Local imports use the installable `butler-ingest-knowledge` command. `scripts/ingest_knowledge.py` remains as a compatibility wrapper.
+
+## Scheduler Package Pattern
+
+- `src/scheduler/models.py` defines `WebhookSchedulerTarget`.
+- `src/scheduler/config.py` validates and loads target JSON.
+- `src/scheduler/client.py` owns Enterprise WeChat webhook HTTP delivery.
+- `src/scheduler/manager.py` owns APScheduler lifecycle and jobs.
+- `src/scheduler/__init__.py` only re-exports the stable public API.
 
 ## Testing Patterns
 

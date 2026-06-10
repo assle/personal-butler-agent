@@ -100,8 +100,6 @@ def _build_agent(llm, web_search_service):
     """
     return PrivateButlerAgent(
         llm_client=llm,
-        fitness_agent=FakeAgent(),
-        meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=web_search_service,

@@ -74,7 +74,7 @@ WECOM_AIBOT_ENCODING_AES_KEY=your-43-char-encoding-aes-key
 |----------|----------|---------|---------|
 | `SCHEDULER_TARGETS_FILE` | No | `""` | 企业微信群 webhook 定时推送目标 JSON 文件路径。设置后按文件中每个群的独立 cron 启动 APScheduler job |
 
-当前 URL 回调模式下，主动推送使用企业微信群机器人 webhook。推荐设置 `SCHEDULER_TARGETS_FILE`，文件中每个群拥有独立 `cron`、`webhook_url` 和 `message`。当前本地配置只有一个目标群：`宇宙幽默帝国`。`name` 是内部稳定标识；`display_name` 是私聊确认和提醒列表展示给用户看的群名；同一个 target 也可配置 `aliases` 供提醒解析使用，例如把“宇宙幽默帝国”映射到内部标识 `cosmic-humor-empire`；`mention_user_overrides` 是可选兜底，用于回调 `from.userid` 与 webhook `<@userid>` 不一致时覆盖。真实 webhook 地址视为密钥，不提交到仓库；仓库只保留 `config/scheduler_targets.example.json` 模板，真实文件建议命名为 `config/scheduler_targets.local.json`。
+当前 URL 回调模式下，主动推送使用企业微信群机器人 webhook。推荐设置 `SCHEDULER_TARGETS_FILE`，文件中每个群拥有独立 `cron`、`webhook_url` 和 `message`。当前本地配置只有一个目标群：`宇宙幽默帝国`。`name` 是内部稳定标识；`display_name` 是私聊确认和提醒列表展示给用户看的群名；`mode` 可选 `raw` 或 `compose`：`raw` 原样发送固定 `message`，`compose` 保留旧的 LLM 生成正文；`weather_query` 仅支持 `raw`，存在时会在定时触发时直接查询天气并追加到 `message` 后，一次性推送。同一个 target 也可配置 `aliases` 供提醒解析使用，例如把“宇宙幽默帝国”映射到内部标识 `cosmic-humor-empire`；`mention_user_overrides` 是可选兜底，用于回调 `from.userid` 与 webhook `<@userid>` 不一致时覆盖。真实 webhook 地址视为密钥，不提交到仓库；仓库只保留 `config/scheduler_targets.example.json` 模板，真实文件建议命名为 `config/scheduler_targets.local.json`。
 
 示例:
 
@@ -85,11 +85,13 @@ SCHEDULER_TARGETS_FILE=config/scheduler_targets.local.json
 ```json
 [
   {
-    "name": "cosmic-humor-empire",
+    "name": "cosmic-humor-empire-morning",
     "display_name": "宇宙幽默帝国",
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...",
-    "message": "发送每日提醒",
+    "mode": "raw",
+    "message": "早上好，今天记得看一下今日重点。",
+    "weather_query": "今天杭州天气",
     "aliases": ["宇宙幽默帝国"],
     "mention_user_overrides": {
       "callback_userid": "webhook_mention_userid"

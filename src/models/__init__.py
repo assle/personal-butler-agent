@@ -3,7 +3,11 @@ from src.models.training import TrainingRecord
 from src.models.preference import UserPreference
 from src.models.group_message import GroupMessage
 from src.models.conversation import ConversationMessage, ConversationSummary
-from src.models.knowledge import KnowledgeDocument, KnowledgeChunk
+from src.models.knowledge import (
+    KnowledgeChunk,
+    KnowledgeChunkEmbedding,
+    KnowledgeDocument,
+)
 from src.models.inbound_message import InboundMessage
 from src.models.reminder import Reminder, ReminderRun
 
@@ -15,6 +19,7 @@ __all__ = [
     "ConversationSummary",
     "KnowledgeDocument",
     "KnowledgeChunk",
+    "KnowledgeChunkEmbedding",
     "InboundMessage",
     "Reminder",
     "ReminderRun",

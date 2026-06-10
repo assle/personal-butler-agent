@@ -1,6 +1,6 @@
 """
 Butler 工具封装
-把已有领域 agent、知识库服务、联网搜索服务和天气服务包装为 LangChain tools
+把私聊可用的摘要、知识库、联网搜索、天气和提醒能力包装为 LangChain tools
 
 Workflow:
   create_private_butler_tools(context) 接收运行期单例依赖
@@ -21,10 +21,6 @@ from src.weather import format_weather_report
 class PrivateButlerToolContext:
     """Butler 工具依赖上下文，由应用 wiring 层注入"""
 
-    # 健身领域 agent，用于训练打卡和今日训练计划
-    fitness_agent: Any
-    # 饮食领域 agent，用于生成一日三餐计划
-    meal_agent: Any
     # 摘要领域 agent，用于文本摘要和群聊摘要
     summary_agent: Any
     # 本地知识库服务，用于 scoped RAG 检索
@@ -129,44 +125,8 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         context: PrivateButlerToolContext，包含领域 agent 与检索服务依赖
 
     返回:
-        list[Any]: 十一个 LangChain tool，供模型工具调用使用
+        list[Any]: 八个 LangChain tool，供模型工具调用使用
     """
-    @tool
-    async def log_training(message: str) -> str:
-        """记录用户的一次训练打卡
-
-        参数:
-            message: 用户描述训练内容的原始文本
-
-        返回:
-            str: 健身 agent 生成的训练记录回复
-        """
-        return await _call_agent(context.fitness_agent, "log_training", message)
-
-    @tool
-    async def get_today_training_plan(message: str) -> str:
-        """根据用户历史和偏好生成今日训练计划
-
-        参数:
-            message: 用户关于今日训练计划的请求文本
-
-        返回:
-            str: 健身 agent 生成的今日训练计划
-        """
-        return await _call_agent(context.fitness_agent, "today_plan", message)
-
-    @tool
-    async def make_meal_plan(message: str) -> str:
-        """根据用户需求和偏好生成一日三餐计划
-
-        参数:
-            message: 用户关于饮食计划的请求文本
-
-        返回:
-            str: 饮食 agent 生成的餐食计划
-        """
-        return await _call_agent(context.meal_agent, "make_meal_plan", message)
-
     @tool
     async def summarize_text(text: str) -> str:
         """总结用户提供的一段文本内容
@@ -290,9 +250,6 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         return await _call_agent(context.reminder_agent, "cancel_reminder", message)
 
     return [
-        log_training,
-        get_today_training_plan,
-        make_meal_plan,
         summarize_text,
         summarize_group_chat,
         search_local_knowledge,

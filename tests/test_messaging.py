@@ -111,6 +111,29 @@ async def test_group_policy_triggers_summary_after_saving(db_session):
 
 
 @pytest.mark.asyncio
+async def test_group_policy_classifies_weather_with_domain_name(db_session):
+    """验证天气触发分类使用 weather 而不是历史占位名称"""
+    from src.messaging import InboundMessage, apply_group_policy
+
+    message = InboundMessage(
+        source="wecom_callback",
+        msg_id="msg-weather",
+        msg_type="text",
+        user_id="user-a",
+        content="今天上海天气怎么样？",
+        chat_type="group",
+        chat_id="chat-1",
+        response_url="https://reply.example",
+        raw={},
+    )
+
+    decision = await apply_group_policy(message, db_session)
+
+    assert decision.should_reply is True
+    assert decision.category == "weather"
+
+
+@pytest.mark.asyncio
 async def test_group_policy_ignores_empty_voice(db_session):
     """验证空语音识别内容不保存不回复"""
     from src.messaging import InboundMessage, apply_group_policy
@@ -231,5 +254,9 @@ async def test_dispatch_group_trigger_to_group_agent(db_session):
         "总结一下",
         "user-a",
         db_session,
-        extra_state={"chat_type": "group", "chat_id": "chat-1"},
+        extra_state={
+            "chat_type": "group",
+            "chat_id": "chat-1",
+            "group_category": "summarize_group",
+        },
     )

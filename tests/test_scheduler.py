@@ -277,7 +277,7 @@ def test_scheduler_start_registers_enabled_webhook_targets(
 
     fake_scheduler = MagicMock()
     monkeypatch.setattr(
-        "src.scheduler.AsyncIOScheduler",
+        "src.scheduler.manager.AsyncIOScheduler",
         MagicMock(return_value=fake_scheduler),
     )
     targets = [

@@ -61,8 +61,8 @@
 
 ### 4.1 知识库集成
 
-- **当前**: Stage 1 已支持 SQLite 知识库、public/user/group scope 隔离、QAAgent RAG 注入、本地 `.md`/`.txt` 导入脚本。
-- **下一步**: 接入混合检索（FTS + embedding）、PDF/网页导入、文件上传 UI，并逐步扩展到 FitnessAgent 和 MealAgent。
+- **当前**: Stage 2 QA-first 已支持 SQLite 知识库、public/user/group scope 隔离、QAAgent RAG 注入、本地 `.md`/`.txt` 导入脚本，以及关键词 + SQLite FTS + 本地 embedding 的混合检索。
+- **下一步**: PDF/网页导入、文件上传 UI、持久化索引重建操作、可选外部向量库，并按需扩展到摘要或 webhook 内容生成。
 - **收益**: 回答更专业、更个性化，减少 LLM 幻觉，同时保留多用户/多群聊知识隔离。
 - **剩余工作量**: 中到大（主要取决于向量数据库、文件管理和后台索引重建需求）。
 
@@ -72,8 +72,8 @@
 
 ### 5.1 依赖管理规范化
 
-- **当前**: `pytest` 等开发依赖在 `[project.optional-dependencies]` 中，`uv sync` 不会自动安装，每次需手动 `uv pip install`
-- **目标**: 迁移到 `[dependency-groups]` 或使用 `uv sync --dev` 支持的格式
+- **当前**: 运行依赖已移除重复的 `python-dotenv`/`websockets` 声明，`ipykernel` 已移入 `dev` extra；pytest 仍位于 `[project.optional-dependencies].dev`
+- **目标**: 如 CI 或团队开发需要，迁移到 `[dependency-groups]` 并统一使用 `uv sync --group dev`
 - **工作量**: 小（修改 `pyproject.toml`）
 
 ### 5.2 容器化部署
@@ -101,7 +101,7 @@
 
 ### 6.1 多用户群聊消息收集
 
-- **当前**: 已实现 — 群聊消息被动收集到 `GroupMessage` 表，触发词检测后调用 LLM 生成摘要。通过智能机器人长连接渠道接收和处理
+- **当前**: 已实现 — 群聊消息通过智能机器人 URL 回调接收并被动收集到 `GroupMessage` 表；策略层分类后将结果传给 `GroupMentionAgent`
 - **目标**: 增强多群支持、跨群用户身份映射、按用户/时间段聚合摘要
 - **工作量**: 中
 
@@ -115,4 +115,4 @@
 | 中 | 预计 1-3 小时 |
 | 大 | 预计半天以上 |
 
-最后更新: 2026-06-03（智能机器人 URL 回调负责入站；APScheduler 通过企业微信群 webhook 负责主动群推送）
+最后更新: 2026-06-11（完成 scene-agent 结构收口、群聊单次分类、scheduler 模块拆分和 CLI 入口整理）

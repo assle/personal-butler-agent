@@ -51,7 +51,11 @@ async def dispatch_message(
             message.content,
             message.user_id,
             db,
-            extra_state={"chat_type": "group", "chat_id": message.chat_id},
+            extra_state={
+                "chat_type": "group",
+                "chat_id": message.chat_id,
+                "group_category": decision.category,
+            },
         )
         return DispatchResult(True, result.reply, result.data, decision.reason)
 

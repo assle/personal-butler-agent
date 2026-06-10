@@ -9,7 +9,7 @@ AI personal butler for WeChat Work intelligent robot workflows. The current runt
 | Interface | Path / Config | Purpose |
 |----------|----------------|---------|
 | Intelligent robot URL callback | `GET/POST /api/wechat/aibot/callback` | WeChat Work URL verification, message callbacks, and passive `response_url` replies |
-| Enterprise WeChat group webhook push | `SCHEDULER_TARGETS_FILE` | APScheduler reads JSON targets, composes markdown, and pushes to group webhooks |
+| Enterprise WeChat group webhook push | `SCHEDULER_TARGETS_FILE` | APScheduler reads JSON targets, sends raw content or generated markdown, and pushes to group webhooks |
 
 The app no longer exposes a local debug/dev message API. Use HTTPS tunneling or production HTTPS to test the real WeChat Work callback.
 
@@ -21,13 +21,13 @@ WeChat Work intelligent robot callback
   -> callback_handler normalizes to InboundMessage
   -> dispatch_message routes by scene
        ├─ single -> PrivateButlerAgent
-       │            └─ LangGraph tool calling -> Fitness / Meal / Summary / QA / Knowledge / Web Search
+       │            └─ LangGraph tool calling -> Summary / Knowledge / Web Search / Weather / Reminder
        └─ group  -> apply_group_policy stores group messages and checks triggers
-                    └─ GroupMentionAgent -> group summary / weather placeholder / simple QA / rejection
+                    └─ GroupMentionAgent -> group summary / live weather / simple QA / rejection
 
 APScheduler
   -> SchedulerManager
-  -> WebhookComposerAgent generates final markdown body
+  -> raw composition or WebhookComposerAgent
   -> WebhookPushClient sends to Enterprise WeChat group webhook
 ```
 
@@ -50,9 +50,9 @@ APScheduler
 
 | Scene | Agent | Capabilities |
 |-------|-------|--------------|
-| Private chat | `PrivateButlerAgent` | Natural conversation, training logs and plans, meal plans, text summaries, local knowledge retrieval, web search, group webhook reminders |
-| Group mention | `GroupMentionAgent` | Group summaries, weather placeholder replies, lightweight QA; private capabilities such as training and meal plans are rejected |
-| Scheduled group push | `WebhookComposerAgent` | Generates final Enterprise WeChat markdown body from scheduler target instructions |
+| Private chat | `PrivateButlerAgent` | Natural conversation, text summaries, local knowledge retrieval, web search, weather, and group webhook reminders |
+| Group mention | `GroupMentionAgent` | Group summaries, live weather, and lightweight QA; unavailable capabilities such as training and meal plans are rejected |
+| Scheduled group push | `SchedulerManager` / `WebhookComposerAgent` | Sends fixed content, appends weather, or generates markdown from target instructions |
 
 ## Project Layout
 
@@ -63,15 +63,16 @@ personal_butler_agent/
 │   ├── config.py                # .env settings
 │   ├── messaging/               # InboundMessage, group policy, scene dispatch
 │   ├── wechat/                  # URL callback, crypto, inbox, response_url replies
-│   ├── scheduler/               # APScheduler + group webhook push
+│   ├── scheduler/               # Target model/config, webhook client, scheduler manager
+│   ├── cli/                     # Installable maintenance commands
 │   ├── agents/
 │   │   ├── private_butler/      # Private-chat tool-calling controller
 │   │   ├── group_mention/       # Restricted group mention agent
 │   │   ├── webhook_composer/    # Scheduler-only markdown composer
-│   │   ├── fitness/
+│   │   ├── fitness/             # Legacy source package, not wired at runtime
 │   │   ├── summary/
-│   │   ├── meal/
-│   │   └── qa/
+│   │   ├── meal/                # Legacy source package, not wired at runtime
+│   │   └── qa/                  # Legacy standalone QA agent
 │   ├── knowledge/
 │   ├── memory/
 │   ├── models/
@@ -80,6 +81,7 @@ personal_butler_agent/
 │   └── db/
 ├── tests/
 ├── docs/agent/
+├── i18n/                        # Historical translation snapshots
 ├── config/scheduler_targets.example.json
 ├── deployment-guide.en.md
 ├── 部署指南.md
@@ -100,6 +102,12 @@ Run tests:
 
 ```bash
 DEEPSEEK_API_KEY=test uv run pytest -q
+```
+
+Import a local knowledge document:
+
+```bash
+uv run butler-ingest-knowledge notes.md --scope-type public --domain qa
 ```
 
 Configure this callback URL in WeChat Work intelligent robot admin:
@@ -136,11 +144,13 @@ Target JSON example:
 ```json
 [
   {
-    "name": "cosmic-humor-empire",
+    "name": "cosmic-humor-empire-morning",
     "display_name": "宇宙幽默帝国",
     "cron": "0 9 * * *",
     "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_WEBHOOK_KEY",
-    "message": "Send a daily reminder",
+    "mode": "raw",
+    "message": "Good morning. Review today's priorities.",
+    "weather_query": "today Hangzhou weather",
     "aliases": ["宇宙幽默帝国"],
     "mention_user_overrides": {},
     "enabled": true
@@ -148,7 +158,7 @@ Target JSON example:
 ]
 ```
 
-The current local setup has one target group: `宇宙幽默帝国`. `name` is the stable internal identifier; `display_name` is shown in private-chat confirmations and reminder lists; `aliases` help parse natural-language targets such as "remind me in 宇宙幽默帝国".
+The current local setup has one target group: `宇宙幽默帝国`. `name` is the stable internal identifier; `display_name` is shown in private-chat confirmations and reminder lists; `mode` selects raw or LLM-composed content; `weather_query` is available only in `raw` mode and appends a live weather result; `aliases` help parse natural-language targets.
 
 Private-chat reminder example:
 

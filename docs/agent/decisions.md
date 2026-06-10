@@ -30,6 +30,10 @@ Reasoning:
 - Tests stay focused by domain.
 - Future modules can follow the same interface (state + nodes + graph + handle method) without rewriting scene dispatch.
 
+Status update:
+- `FitnessAgent` and `MealAgent` remain as legacy source packages, but the runtime private-chat path no longer wires or exposes them.
+- The current product direction keeps private chat focused on knowledge Q&A and reminders, while group scenarios focus on passive collection, allowed group replies, scheduled webhook pushes, and reminder pushes.
+
 ## ADR-006: DeepSeek Through LangChain ChatOpenAI
 
 The LLM wrapper uses `langchain_openai.ChatOpenAI` with configurable DeepSeek-compatible base URL and model.
@@ -76,7 +80,7 @@ Reasoning:
 - **LLM-compressed summary**: Older messages beyond the window are not discarded — they are periodically compressed into a one-sentence summary by a lightweight LLM call. This preserves key facts and preferences from earlier exchanges without consuming token budget.
 - **SQLite persistence**: Summaries and messages survive process restarts, unlike LangGraph's in-memory `MemorySaver` which is only for single-session graph checkpointing.
 - **Automatic compression trigger**: When a user exceeds 24 total messages, the oldest 12 are compressed. This keeps the message table bounded without manual cleanup.
-- **Intent-conditional memory**: Not all agents/contexts benefit from context. `log_training` (one-shot record) and Summary agents (independent per call) skip memory loading. QA, Fitness `today_plan`, and Meal always load it.
+- **Intent-conditional memory**: Not all agents/contexts benefit from context. Summary agents are independent per call. QA and private butler flows load conversation memory where useful.
 
 Trade-off: The compression prompt is a separate LLM call, adding latency and cost per ~12 exchanges. For the current single-user MVP scale this is negligible. At higher throughput, compression could be deferred to a background job.
 
@@ -116,7 +120,7 @@ Trade-off: JSON 文件比单行 `.env` 多一个本地文件，但明显降低�
 
 ## ADR-015: 企业微信群 Webhook 作为主动推送通道
 
-URL 回调模式继续负责智能机器人入站消息和 `response_url` 被动回复；主动推送改由企业微信群机器人 webhook 独立完成。APScheduler 通过 `SCHEDULER_TARGETS_FILE` 读取本地 JSON 目标配置，为每个群注册独立 cron job，到点后调用 `WebhookComposerAgent` 生成内容，再发送 markdown 到对应 webhook。
+URL 回调模式继续负责智能机器人入站消息和 `response_url` 被动回复；主动推送改由企业微信群机器人 webhook 独立完成。APScheduler 通过 `SCHEDULER_TARGETS_FILE` 读取本地 JSON 目标配置，为每个群注册独立 cron job。`mode="raw"` target 到点后原样发送 `message`，并可用 `weather_query` 直接查询天气后追加到同一条消息；`mode="compose"` target 到点后调用 `WebhookComposerAgent` 生成内容，再发送 markdown 到对应 webhook。
 
 Reasoning:
 - URL 回调模式负责入站和被动回复；主动群通知需要独立出站通道。
@@ -135,7 +139,7 @@ Private chat, group mention, and scheduled webhook push have different product b
 Decision:
 - Private chat uses `PrivateButlerAgent`.
 - Group mention uses `GroupMentionAgent`.
-- Scheduler webhook push uses `WebhookComposerAgent`.
+- Scheduler webhook push uses deterministic raw composition for fixed content and weather, and uses `WebhookComposerAgent` only for `mode="compose"` targets.
 - Local debug/dev message API, legacy long-connection compatibility, global intent routing package, and the old all-purpose controller package are removed.
 
 Reasoning:
@@ -143,3 +147,19 @@ Reasoning:
 - Group chat cannot accidentally access training or meal tools.
 - Webhook composition is no longer treated like a user chat request.
 - Real integration testing now uses WeChat Work URL callback through HTTPS tunneling.
+
+## ADR-017: Group Classification And Scheduler Module Ownership
+
+Group trigger classification is owned by `apply_group_policy()`. The selected category is passed through scene dispatch into `GroupMentionAgent`; the agent only classifies when called directly without a preclassified category.
+
+Scheduler responsibilities are split by ownership:
+- `models.py`: target data.
+- `config.py`: JSON loading and validation.
+- `client.py`: outbound webhook HTTP.
+- `manager.py`: APScheduler lifecycle and jobs.
+- `__init__.py`: stable public exports only.
+
+Reasoning:
+- One classification result prevents policy and agent keyword rules from drifting during the normal callback flow.
+- Focused scheduler modules are easier to test and change independently.
+- Re-exporting the existing public API avoids unnecessary call-site migration.

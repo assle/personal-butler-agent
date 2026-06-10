@@ -1,10 +1,10 @@
 """
 知识库 ORM 模型
-定义知识库文档和文档切块两张 SQLite 表，用于 RAG 检索
+定义知识库文档、文档切块和 chunk 向量索引表，用于 RAG 检索
 
 Workflow:
   文档导入 → KnowledgeDocument 记录来源和权限 → KnowledgeChunk 保存可检索片段
-  → KnowledgeService 按 scope/domain 过滤后检索 chunk
+  → KnowledgeChunkEmbedding 保存本地向量 → KnowledgeService 按 scope/domain 过滤后混合检索
 """
 from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -62,3 +62,21 @@ class KnowledgeChunk(Base):
     created_at: Mapped[str] = mapped_column(String(40), nullable=False)
 
     document: Mapped[KnowledgeDocument] = relationship(back_populates="chunks")
+
+
+class KnowledgeChunkEmbedding(Base):
+    """知识库 chunk 向量索引表，保存本地 embedding JSON"""
+
+    __tablename__ = "knowledge_chunk_embeddings"
+    __table_args__ = (
+        Index("ix_knowledge_chunk_embeddings_model", "model_name"),
+    )
+
+    chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_chunks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    dimension: Mapped[int] = mapped_column(Integer, nullable=False)
+    vector_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)

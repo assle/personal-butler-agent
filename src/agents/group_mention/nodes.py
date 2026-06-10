@@ -5,7 +5,7 @@
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.config import get_config
 
-from src.agents.group_mention.classifier import classify_group_message
+from src.agents.group_mention.classifier import ALLOWED_CATEGORIES, classify_group_message
 from src.agents.group_mention.prompts import GROUP_QA_PROMPT, GROUP_TOOL_PROMPT
 
 
@@ -18,6 +18,10 @@ async def classify_node(state: dict) -> dict:
     返回:
         dict: 包含 category 的状态更新
     """
+    existing_category = state.get("category")
+    if existing_category in ALLOWED_CATEGORIES:
+        return {"category": existing_category}
+
     llm = state["llm"]
     category = await classify_group_message(state.get("message", ""), llm)
     return {"category": category}
@@ -33,7 +37,7 @@ def route_by_category(state: dict) -> str:
         str: 下一个节点名
     """
     category = state.get("category", "unsupported")
-    if category in {"summarize_group", "weather_placeholder", "simple_qa"}:
+    if category in {"summarize_group", "weather", "simple_qa"}:
         return category
     return "unsupported"
 
@@ -105,7 +109,7 @@ async def extract_tool_reply(state: dict) -> dict:
     return {"reply": "天气回复生成失败，请稍后再试。"}
 
 
-async def weather_placeholder_node(state: dict) -> dict:
+async def weather_unavailable_node(state: dict) -> dict:
     """返回天气工具未启用提示
 
     参数:

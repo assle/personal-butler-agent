@@ -92,6 +92,7 @@ Check:
 - Inspect `group_messages` for the saved row.
 - Confirm the content includes an allowed trigger: summary keywords, weather keywords, or a simple question marker.
 - Confirm unsupported training or meal requests are expected to be rejected by `GroupMentionAgent`, not handled by private tools.
+- Confirm `dispatch_message()` passes `group_category` from `apply_group_policy()`; normal callback flow should not classify the same message twice.
 
 ## Scheduler Webhook Push Does Not Send
 
@@ -102,12 +103,16 @@ Check:
 - `SCHEDULER_TARGETS_FILE` points to an existing JSON array.
 - Each target has non-empty `name`, `cron`, `webhook_url`, and `message`.
 - The target is not disabled with `"enabled": false`.
-- `WebhookComposerAgent.handle()` is called with `intent="webhook_compose"`.
+- For fixed text, use `"mode": "raw"` so `message` is sent directly.
+- For fixed text plus weather, use `"mode": "raw"` and set `"weather_query": "今天杭州天气"` on the same target instead of creating a second weather-only target.
+- `WebhookComposerAgent.handle()` is called with `intent="webhook_compose"` for `"mode": "compose"` targets; `compose` targets cannot also configure `weather_query`.
 - `WebhookPushClient.send_markdown()` receives the generated markdown body.
 
 Fix pattern:
 - Treat webhook composition as scheduler-only content generation.
-- The composer should generate final markdown body only; sending belongs to `WebhookPushClient`.
+- Fixed content and weather should be deterministic raw composition in `SchedulerManager`; LLM composition is only for targets that explicitly need generated copy.
+- The composer should generate final markdown body only for compose targets; sending belongs to `WebhookPushClient`.
+- Import public scheduler APIs from `src.scheduler`; patch implementation details in tests through their owning modules such as `src.scheduler.manager.AsyncIOScheduler`.
 
 ## Private Reminder Confirmation Shows Wrong Group Name Or UTC
 

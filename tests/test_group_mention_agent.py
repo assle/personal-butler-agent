@@ -1,6 +1,6 @@
 """
 群聊 @ 机器人 Agent 测试
-验证群聊场景只允许总结、天气占位和简单问答，不暴露私聊训练/食谱能力。
+验证群聊场景只允许总结、天气和简单问答，不暴露未开放的训练/食谱能力。
 """
 from unittest.mock import AsyncMock
 
@@ -28,8 +28,8 @@ async def test_group_mention_rejects_training_request(db_session, mock_llm):
 
 
 @pytest.mark.asyncio
-async def test_group_mention_weather_placeholder(db_session, mock_llm):
-    """验证天气查询第一阶段返回待配置占位回复"""
+async def test_group_mention_weather_unavailable(db_session, mock_llm):
+    """验证未注入天气服务时返回明确的不可用回复"""
     from src.agents.group_mention import GroupMentionAgent
 
     agent = GroupMentionAgent(llm_client=mock_llm, summary_agent=AsyncMock())
@@ -93,3 +93,45 @@ async def test_group_mention_simple_qa_uses_llm(db_session, mock_llm):
 
     assert result.reply == "可以，简单来说就是先验签再处理。"
     mock_llm.chat.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_group_mention_uses_preclassified_category(
+    db_session,
+    mock_llm,
+    monkeypatch,
+):
+    """验证场景分发提供分类时不重复执行群聊分类
+
+    参数:
+        db_session: 测试数据库会话 fixture
+        mock_llm: 测试 LLM fixture
+        monkeypatch: pytest monkeypatch fixture
+
+    返回:
+        None
+    """
+    from src.agents.group_mention import GroupMentionAgent
+
+    classify = AsyncMock(return_value="unsupported")
+    monkeypatch.setattr(
+        "src.agents.group_mention.nodes.classify_group_message",
+        classify,
+    )
+    mock_llm.chat.return_value = "预分类后的简单回答"
+    agent = GroupMentionAgent(llm_client=mock_llm, summary_agent=AsyncMock())
+
+    result = await agent.handle(
+        "group_mention",
+        "这条消息不包含问号",
+        "user-a",
+        db_session,
+        extra_state={
+            "chat_type": "group",
+            "chat_id": "chat-1",
+            "group_category": "simple_qa",
+        },
+    )
+
+    assert result.reply == "预分类后的简单回答"
+    classify.assert_not_awaited()

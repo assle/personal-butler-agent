@@ -15,7 +15,7 @@ from src.agents.group_mention.nodes import (
     simple_qa_node,
     summarize_group_node,
     unsupported_node,
-    weather_placeholder_node,
+    weather_unavailable_node,
 )
 from src.agents.group_mention.state import GroupMentionState
 from src.agents.group_mention.tools import query_weather
@@ -54,7 +54,7 @@ class GroupMentionAgent:
         builder = StateGraph(GroupMentionState)
         builder.add_node("classify", classify_node)
         builder.add_node("summarize_group", summarize_group_node)
-        builder.add_node("weather_placeholder", weather_placeholder_node)
+        builder.add_node("weather_unavailable", weather_unavailable_node)
         builder.add_node("simple_qa", simple_qa_node)
         builder.add_node("unsupported", unsupported_node)
         if self._tools:
@@ -63,19 +63,19 @@ class GroupMentionAgent:
             builder.add_node("extract_tool_reply", extract_tool_reply)
 
         builder.add_edge(START, "classify")
-        weather_route = "agent" if self._tools else "weather_placeholder"
+        weather_route = "agent" if self._tools else "weather_unavailable"
         builder.add_conditional_edges(
             "classify",
             route_by_category,
             {
                 "summarize_group": "summarize_group",
-                "weather_placeholder": weather_route,
+                "weather": weather_route,
                 "simple_qa": "simple_qa",
                 "unsupported": "unsupported",
             },
         )
         builder.add_edge("summarize_group", END)
-        builder.add_edge("weather_placeholder", END)
+        builder.add_edge("weather_unavailable", END)
         builder.add_edge("simple_qa", END)
         builder.add_edge("unsupported", END)
         if self._tools:
@@ -115,6 +115,7 @@ class GroupMentionAgent:
             "user_id": user_id,
             "chat_type": extra_state.get("chat_type", "group"),
             "chat_id": extra_state.get("chat_id"),
+            "category": extra_state.get("group_category"),
             "messages": build_initial_messages(message),
             "llm": self._llm,
             "summary_agent": self._summary_agent,

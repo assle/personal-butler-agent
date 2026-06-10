@@ -12,14 +12,14 @@ BLOCKED_KEYWORDS = ("训练", "打卡", "练什么", "食谱", "吃什么", "饮
 QUESTION_MARKERS = ("?", "？", "吗", "怎么", "如何", "为什么", "什么")
 ALLOWED_CATEGORIES = {
     "summarize_group",
-    "weather_placeholder",
+    "weather",
     "simple_qa",
     "unsupported",
 }
 
 CLASSIFIER_PROMPT = """你是群聊机器人意图分类器。只允许返回以下类别：
 - summarize_group: 用户要求总结群聊
-- weather_placeholder: 用户询问天气、气温、下雨等
+- weather: 用户询问天气、气温、下雨等
 - simple_qa: 简单问题或轻量问答
 - unsupported: 训练、食谱、私密陪伴、复杂任务或无法判断
 
@@ -42,7 +42,7 @@ def classify_group_message_by_rules(message: str) -> str | None:
     if any(keyword in normalized for keyword in SUMMARY_KEYWORDS):
         return "summarize_group"
     if any(keyword in normalized for keyword in WEATHER_KEYWORDS):
-        return "weather_placeholder"
+        return "weather"
     if any(keyword in normalized for keyword in BLOCKED_KEYWORDS):
         return "unsupported"
     if any(marker in normalized for marker in QUESTION_MARKERS):

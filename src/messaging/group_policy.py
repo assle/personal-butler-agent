@@ -46,7 +46,7 @@ def classify_group_trigger(content: str) -> str | None:
     if any(keyword in normalized for keyword in SUMMARY_KEYWORDS):
         return "summarize_group"
     if any(keyword in normalized for keyword in WEATHER_KEYWORDS):
-        return "weather_placeholder"
+        return "weather"
     if any(marker in normalized for marker in QUESTION_MARKERS):
         return "simple_qa"
     return None

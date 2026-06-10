@@ -68,59 +68,37 @@ def _runtime_config(db_session):
     }
 
 
-@pytest.mark.asyncio
-async def test_log_training_reads_runtime_context_and_calls_fitness_agent(db_session):
-    """验证记录训练工具从 config 读取上下文并调用健身 agent
+def test_private_butler_exposes_only_current_scene_tools():
+    """验证私聊场景只暴露当前产品允许的工具
 
     参数:
-        db_session: 测试数据库会话 fixture
+        无
 
     返回:
         None
     """
-    fitness_agent = FakeAgent(reply="已记录卧推")
     context = PrivateButlerToolContext(
-        fitness_agent=fitness_agent,
-        meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=AsyncMock(),
     )
-    tool = _tool_by_name(create_private_butler_tools(context), "log_training")
 
-    result = await tool.ainvoke(
-        {"message": "今天卧推 80kg 5x5"},
-        config=_runtime_config(db_session),
-    )
-
-    assert result == "已记录卧推"
-    fitness_agent.handle.assert_awaited_once_with(
-        "log_training",
-        "今天卧推 80kg 5x5",
-        "assle",
-        db_session,
-        extra_state={"chat_type": "single", "chat_id": None},
-    )
+    assert {tool.name for tool in create_private_butler_tools(context)} == {
+        "summarize_text",
+        "summarize_group_chat",
+        "search_local_knowledge",
+        "search_web",
+        "query_weather",
+        "create_group_webhook_reminder",
+        "list_reminders",
+        "cancel_reminder",
+    }
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("tool_name", "input_payload", "agent_name", "expected_intent", "expected_message"),
     [
-        (
-            "get_today_training_plan",
-            {"message": "今天练什么"},
-            "fitness_agent",
-            "today_plan",
-            "今天练什么",
-        ),
-        (
-            "make_meal_plan",
-            {"message": "今天吃什么"},
-            "meal_agent",
-            "make_meal_plan",
-            "今天吃什么",
-        ),
         (
             "summarize_text",
             {"text": "会议决定周五上线。"},
@@ -158,12 +136,8 @@ async def test_domain_tools_forward_existing_intent_conventions(
     返回:
         None
     """
-    fitness_agent = FakeAgent(reply="fitness ok")
-    meal_agent = FakeAgent(reply="meal ok")
     summary_agent = FakeAgent(reply="summary ok")
     context = PrivateButlerToolContext(
-        fitness_agent=fitness_agent,
-        meal_agent=meal_agent,
         summary_agent=summary_agent,
         knowledge_service=AsyncMock(),
         web_search_service=AsyncMock(),
@@ -201,8 +175,6 @@ async def test_search_web_formats_search_results(db_session):
         )
     ]
     context = PrivateButlerToolContext(
-        fitness_agent=FakeAgent(),
-        meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=web_search_service,
@@ -231,8 +203,6 @@ async def test_search_web_returns_disabled_message_when_no_results(db_session):
     web_search_service = AsyncMock()
     web_search_service.search.return_value = []
     context = PrivateButlerToolContext(
-        fitness_agent=FakeAgent(),
-        meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=AsyncMock(),
         web_search_service=web_search_service,
@@ -269,8 +239,6 @@ async def test_search_local_knowledge_reads_runtime_context_and_formats_results(
         )
     ]
     context = PrivateButlerToolContext(
-        fitness_agent=FakeAgent(),
-        meal_agent=FakeAgent(),
         summary_agent=FakeAgent(),
         knowledge_service=knowledge_service,
         web_search_service=AsyncMock(),

@@ -49,13 +49,11 @@ def _direct_reminder_intent(message: str) -> str | None:
 
 
 class PrivateButlerAgent:
-    """小管家总控 agent，负责用工具调用编排领域 agent 和检索服务"""
+    """小管家总控 agent，负责用工具调用编排私聊知识问答和提醒服务"""
 
     def __init__(
         self,
         llm_client,
-        fitness_agent,
-        meal_agent,
         summary_agent,
         knowledge_service,
         web_search_service,
@@ -66,8 +64,6 @@ class PrivateButlerAgent:
 
         参数:
             llm_client: 支持 bind_tools().ainvoke() 和 chat() 的 LLM 客户端
-            fitness_agent: 健身领域 agent
-            meal_agent: 饮食领域 agent
             summary_agent: 摘要领域 agent
             knowledge_service: 本地知识库检索服务
             web_search_service: 联网搜索服务
@@ -79,8 +75,6 @@ class PrivateButlerAgent:
         """
         self._llm = llm_client
         self._tool_context = PrivateButlerToolContext(
-            fitness_agent=fitness_agent,
-            meal_agent=meal_agent,
             summary_agent=summary_agent,
             knowledge_service=knowledge_service,
             web_search_service=web_search_service,

@@ -17,7 +17,7 @@ class GroupMentionState(TypedDict, total=False):
     user_id: str
     chat_type: str
     chat_id: str | None
-    category: str
+    category: str | None
     messages: Annotated[list[AnyMessage], add_messages]
     reply: str
     data: dict | None

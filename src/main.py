@@ -3,7 +3,7 @@ Personal Butler Agent 应用入口
 负责 FastAPI 应用初始化、单例组件创建和路由注册
 
 Workflow:
-1. 创建 LLMClient、领域 agent 和 scene agent 单例
+1. 创建 LLMClient、知识库/提醒等服务和 scene agent 单例
 2. 私聊、群聊 @、scheduler webhook 分别由场景 agent 处理
 3. lifespan 中初始化数据库表结构
 4. 注册智能机器人 URL 回调路由
@@ -16,10 +16,7 @@ from fastapi import FastAPI
 
 from src.config import settings
 from src.llm.client import LLMClient
-from src.agents.fitness import FitnessAgent
 from src.agents.summary import SummaryAgent
-from src.agents.meal import MealAgent
-from src.agents.qa import QAAgent
 from src.agents.group_mention import GroupMentionAgent
 from src.agents.private_butler import PrivateButlerAgent
 from src.agents.reminder import ReminderAgent
@@ -39,10 +36,7 @@ if not logger.handlers:
 
 llm_client = LLMClient()
 reminder_service = ReminderService([])
-fitness_agent = FitnessAgent(llm_client=llm_client)
 summary_agent = SummaryAgent(llm_client=llm_client)
-meal_agent = MealAgent(llm_client=llm_client)
-qa_agent = QAAgent(llm_client=llm_client)
 knowledge_service = KnowledgeService()
 web_search_service = WebSearchService()
 weather_service = WeatherService()
@@ -52,8 +46,6 @@ reminder_agent = ReminderAgent(
 )
 private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
-    fitness_agent=fitness_agent,
-    meal_agent=meal_agent,
     summary_agent=summary_agent,
     knowledge_service=knowledge_service,
     web_search_service=web_search_service,
@@ -97,6 +89,7 @@ async def lifespan(app: FastAPI):
             webhook_composer_agent=webhook_composer_agent,
             webhook_client=WebhookPushClient(),
             webhook_targets=webhook_targets,
+            weather_service=weather_service,
             enable_reminder_scan=True,
         )
         scheduler_manager.start()
