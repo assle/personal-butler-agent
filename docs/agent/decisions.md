@@ -13,16 +13,21 @@ Reasoning:
 
 ## ADR-002: SQLite as the Memory Layer
 
-The MVP stores training records and user preferences in SQLite through async SQLAlchemy.
+The MVP stores group messages, conversation memory, knowledge-base records, inbound messages, and reminders in SQLite through async SQLAlchemy.
 
 Reasoning:
 - SQLite is enough for local single-user or small private use.
 - SQLAlchemy keeps the model layer portable if the app later moves to PostgreSQL.
-- JSON preferences allow new domains to add namespaces without immediate migrations.
+
+Historical note:
+- The original MVP also stored training records and user preferences. Their ORM mappings were removed after those product capabilities were retired.
+- Existing SQLite files may still contain unmapped `training_records` and `user_preferences` tables. They remain untouched until a future Alembic migration explicitly handles historical data.
 
 ## ADR-004: Agent-per-Domain Boundaries
 
-Fitness, summary, meal, and Q&A behavior live in separate agent packages, each implemented as a LangGraph `StateGraph`.
+Status: Retired from the current runtime on 2026-06-11.
+
+The original architecture placed fitness, summary, meal, and Q&A behavior in separate LangGraph packages.
 
 Reasoning:
 - Each agent can own domain prompts, DB access, validation, and response shaping.
@@ -30,9 +35,9 @@ Reasoning:
 - Tests stay focused by domain.
 - Future modules can follow the same interface (state + nodes + graph + handle method) without rewriting scene dispatch.
 
-Status update:
-- `FitnessAgent` and `MealAgent` remain as legacy source packages, but the runtime private-chat path no longer wires or exposes them.
-- The current product direction keeps private chat focused on knowledge Q&A and reminders, while group scenarios focus on passive collection, allowed group replies, scheduled webhook pushes, and reminder pushes.
+Retirement note:
+- Fitness, meal, and standalone QA packages were removed after the product direction narrowed.
+- The current runtime uses scene agents plus focused Summary and Reminder agents.
 
 ## ADR-006: DeepSeek Through LangChain ChatOpenAI
 
@@ -46,14 +51,14 @@ Reasoning:
 
 ## ADR-007: LangGraph StateGraph for Agent Orchestration
 
-Each agent is implemented as a LangGraph `StateGraph` rather than a linear class method chain.
+Graph-backed agents use LangGraph `StateGraph` rather than linear class method chains.
 
 Reasoning:
 - StateGraph provides a first-class state machine that natively supports multi-step workflows, conditional routing, error recovery, and checkpointing.
 - Node-per-responsibility decomposition makes agents easier to test, extend, and reason about.
 - LangGraph's `MemorySaver` checkpointing gives multi-turn conversation memory with near-zero custom code.
 - LangGraph is the current industry standard for agent development and aligns with interview expectations.
-- Simple agents (QA, Summary) stay simple with a linear graph. Complex agents (Fitness) gain conditional routing between sub-intents.
+- Simple agents such as Summary and Reminder stay linear; scene agents use conditional routing or tool loops where needed.
 - The `handle()` interface remains identical — callers (routes, tests, schedulers) are unaffected.
 
 ## ADR-008: 智能机器人 URL 回调作为可靠入站通道
@@ -86,6 +91,8 @@ Trade-off: The compression prompt is a separate LLM call, adding latency and cos
 
 ## ADR-010: Single TrainingRecord Table for Strength and Cardio
 
+Status: Retired from the current runtime on 2026-06-11.
+
 The `training_records` table was extended with nullable cardio columns (`duration_minutes`, `speed`, `incline`, `calories`) rather than creating a separate `cardio_records` table or using table inheritance.
 
 Reasoning:
@@ -95,6 +102,10 @@ Reasoning:
 - **LLM extraction coherence**: The `EXTRACTION_PROMPT` returns a unified JSON array where each item declares its `training_type`. Persisting to one table matches this mental model.
 
 Trade-off: Many columns will be NULL depending on training type. For a small-scale MVP this is acceptable. At higher throughput with analytics needs, a separate `cardio_records` table or a normalized schema may be more appropriate.
+
+Retirement note:
+- The training ORM mapping and agent code were removed.
+- Existing SQLite files may retain the historical table until a future Alembic migration decides whether to export or drop it.
 
 ## ADR-012: 移除自建应用服务端 API 依赖
 

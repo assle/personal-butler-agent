@@ -51,7 +51,7 @@ summary
 - `active-context.md` 删除遗留 Agent 和旧表的当前状态描述。
 - `patterns.md` 删除 fitness/meal 专用偏好模式。
 - `upgrade-roadmap.md` 的周期报告改为复用当前运行中的 `SummaryAgent` 和 `WebhookComposerAgent`。
-- `decisions.md` 保留 ADR-002、ADR-004 和 ADR-010，但标记为已退役，解释旧数据库中历史表的来源。
+- `decisions.md` 更新 ADR-002 的当前 SQLite 持久化范围，并将 ADR-004、ADR-010 标记为已退役，解释旧数据库中历史表的来源。
 - `troubleshooting.md` 不再把训练记录表列为当前必需表。
 
 ## Verification

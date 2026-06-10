@@ -29,25 +29,12 @@ Fix pattern:
 ## SQLite Tables Are Missing
 
 Symptom:
-- Runtime or tests fail with missing tables such as `training_records`, `group_messages`, or `inbound_messages`.
+- Runtime or tests fail with missing tables such as `group_messages`, `knowledge_documents`, `reminders`, or `inbound_messages`.
 
 Check:
 - App startup should run the FastAPI lifespan in `src/main.py`.
 - Tests should create metadata through `Base.metadata.create_all`.
 - Ensure model modules are imported so metadata knows about all tables.
-
-## LLM JSON Parsing Fails
-
-Symptom:
-- Training extraction or group mention fallback classification returns a parse error.
-
-Check:
-- Confirm prompts ask for JSON only.
-- Confirm parsing code handles malformed JSON without raising to the API layer.
-
-Fix pattern:
-- Keep safe fallback behavior.
-- Add tests with malformed JSON before tightening parsing.
 
 ## URL Callback Mode Message Flow
 

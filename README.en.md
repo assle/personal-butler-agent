@@ -69,10 +69,8 @@ personal_butler_agent/
 │   │   ├── private_butler/      # Private-chat tool-calling controller
 │   │   ├── group_mention/       # Restricted group mention agent
 │   │   ├── webhook_composer/    # Scheduler-only markdown composer
-│   │   ├── fitness/             # Legacy source package, not wired at runtime
-│   │   ├── summary/
-│   │   ├── meal/                # Legacy source package, not wired at runtime
-│   │   └── qa/                  # Legacy standalone QA agent
+│   │   ├── summary/              # Text and group-chat summaries
+│   │   └── reminder/             # Group webhook reminder actions
 │   ├── knowledge/
 │   ├── memory/
 │   ├── models/

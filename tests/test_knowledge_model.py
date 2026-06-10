@@ -41,11 +41,11 @@ def test_knowledge_document_defaults():
     """
     now = datetime.now(UTC).isoformat()
     doc = KnowledgeDocument(
-        title="健身原则",
-        source="fitness.md",
+        title="总结规范",
+        source="summary.md",
         scope_type="public",
         scope_id=None,
-        domain="fitness",
+        domain="summary",
         checksum="abc123",
         created_by="user_a",
         created_at=now,
@@ -53,10 +53,10 @@ def test_knowledge_document_defaults():
     )
 
     assert doc.__tablename__ == "knowledge_documents"
-    assert doc.title == "健身原则"
+    assert doc.title == "总结规范"
     assert doc.scope_type == "public"
     assert doc.scope_id is None
-    assert doc.domain == "fitness"
+    assert doc.domain == "summary"
 
 
 def test_knowledge_chunk_defaults():
@@ -72,19 +72,19 @@ def test_knowledge_chunk_defaults():
     chunk = KnowledgeChunk(
         document_id=1,
         chunk_index=0,
-        content="训练计划应逐步增加负荷。",
+        content="总结应突出结论、行动项和风险。",
         scope_type="public",
         scope_id=None,
-        domain="fitness",
+        domain="summary",
         token_count=12,
-        source="fitness.md",
+        source="summary.md",
         created_at=now,
     )
 
     assert chunk.__tablename__ == "knowledge_chunks"
     assert chunk.document_id == 1
     assert chunk.chunk_index == 0
-    assert chunk.content == "训练计划应逐步增加负荷。"
+    assert chunk.content == "总结应突出结论、行动项和风险。"
 
 
 async def test_sqlite_foreign_keys_enabled(db_session):
@@ -118,7 +118,7 @@ async def test_knowledge_chunk_requires_existing_document(db_session):
             content="不存在父文档的切块。",
             scope_type="public",
             scope_id=None,
-            domain="fitness",
+            domain="summary",
             token_count=10,
             source="missing.md",
             created_at=now,
@@ -140,11 +140,11 @@ async def test_raw_delete_knowledge_document_cascades_chunks(db_session):
     """
     now = datetime.now(UTC).isoformat()
     document = KnowledgeDocument(
-        title="健身原则",
-        source="fitness.md",
+        title="总结规范",
+        source="summary.md",
         scope_type="public",
         scope_id=None,
-        domain="fitness",
+        domain="summary",
         checksum="abc123",
         created_by="user_a",
         created_at=now,
@@ -153,12 +153,12 @@ async def test_raw_delete_knowledge_document_cascades_chunks(db_session):
     document.chunks.append(
         KnowledgeChunk(
             chunk_index=0,
-            content="训练计划应逐步增加负荷。",
+            content="总结应突出结论、行动项和风险。",
             scope_type="public",
             scope_id=None,
-            domain="fitness",
+            domain="summary",
             token_count=12,
-            source="fitness.md",
+            source="summary.md",
             created_at=now,
         )
     )

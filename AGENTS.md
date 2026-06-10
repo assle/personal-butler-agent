@@ -7,7 +7,7 @@
 
 - Name: Personal Butler Agent
 - Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, SQLite, Pydantic v2, uv, pytest
-- Purpose: AI personal butler for WeChat Work style natural-language workflows: fitness logging and plans, meal planning, group-chat summaries, and personalized Q&A.
+- Purpose: AI personal butler for WeChat Work style natural-language workflows: private Q&A, group-chat summaries, weather lookup, reminders, and scheduled group pushes.
 - Runtime entry: `src.main:app`
 - Current interfaces: `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing; scheduler jobs push to Enterprise WeChat group webhooks through configured target JSON.
 
@@ -32,7 +32,7 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus business agents for fitness, summary, meal, and Q&A.
 - `src/graph/`: shared graph utilities, MemorySaver checkpoint instance.
 - `src/db/`: async SQLAlchemy engine, session factory, declarative base.
-- `src/models/`: SQLite ORM models for training records and user preferences.
+- `src/models/`: SQLite ORM models for messaging, conversation memory, knowledge, and reminders.
 - `src/llm/`: LangChain ChatOpenAI wrapper pointed at DeepSeek.
 - `tests/`: existing pytest coverage; read only when needed and do not create new test files by default.
 

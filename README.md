@@ -69,10 +69,8 @@ personal_butler_agent/
 │   │   ├── private_butler/      # 私聊 tool-calling 总控 agent
 │   │   ├── group_mention/       # 群聊 @ 受限 agent
 │   │   ├── webhook_composer/    # scheduler-only 群 markdown 生成 agent
-│   │   ├── fitness/             # 旧版健身记录和计划 agent（当前运行路径未接入）
 │   │   ├── summary/             # 文本/群聊摘要
-│   │   ├── meal/                # 旧版饮食计划 agent（当前运行路径未接入）
-│   │   └── qa/                  # 旧版独立问答 agent（当前运行路径未接入）
+│   │   └── reminder/            # 群 webhook 提醒创建、查看和取消
 │   ├── knowledge/               # Stage 2 QA-first 混合知识库检索
 │   ├── memory/                  # 对话记忆和摘要压缩
 │   ├── models/                  # SQLAlchemy ORM models

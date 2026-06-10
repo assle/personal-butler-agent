@@ -9,7 +9,7 @@ Workflow:
 from dataclasses import dataclass
 
 VALID_SCOPE_TYPES = {"public", "user", "group"}
-VALID_DOMAINS = {"global", "qa", "fitness", "meal", "summary"}
+VALID_DOMAINS = {"global", "qa", "summary"}
 
 
 @dataclass(frozen=True)

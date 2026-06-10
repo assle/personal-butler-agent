@@ -23,7 +23,7 @@
 - Delete: `tests/test_qa.py`
 - Modify: `src/agents/summary/graph.py`
 
-- [ ] **Step 1: Record the focused legacy test baseline**
+- [x] **Step 1: Record the focused legacy test baseline**
 
 Run:
 
@@ -33,11 +33,11 @@ DEEPSEEK_API_KEY=test uv run pytest tests/test_fitness.py tests/test_meal.py tes
 
 Expected: all legacy-agent tests pass before deletion.
 
-- [ ] **Step 2: Delete the legacy packages and dedicated tests**
+- [x] **Step 2: Delete the legacy packages and dedicated tests**
 
 Delete the listed agent directories, shared registry/base modules, and their dedicated test files. Do not modify `src/main.py`; it already imports only current runtime agents.
 
-- [ ] **Step 3: Remove the stale registry description from SummaryAgent**
+- [x] **Step 3: Remove the stale registry description from SummaryAgent**
 
 Replace the `AgentRegistry.get(...)` workflow text in `src/agents/summary/graph.py` with:
 
@@ -46,7 +46,7 @@ Replace the `AgentRegistry.get(...)` workflow text in `src/agents/summary/graph.
 → handle() 构建初始状态 → _graph.ainvoke() → AgentResponse
 ```
 
-- [ ] **Step 4: Verify no executable code imports deleted modules**
+- [x] **Step 4: Verify no executable code imports deleted modules**
 
 Run:
 
@@ -68,7 +68,7 @@ Expected: no matches.
 - Modify: `tests/test_knowledge_model.py`
 - Modify: `tests/test_knowledge_service.py`
 
-- [ ] **Step 1: Remove legacy model registration**
+- [x] **Step 1: Remove legacy model registration**
 
 Delete the two model files and remove these imports and exports from `src/models/__init__.py`:
 
@@ -82,7 +82,7 @@ from src.models.preference import UserPreference
 "UserPreference",
 ```
 
-- [ ] **Step 2: Assert current metadata excludes retired tables**
+- [x] **Step 2: Assert current metadata excludes retired tables**
 
 Update `test_base_metadata_has_tables()` to verify current tables remain registered and retired tables are absent:
 
@@ -95,7 +95,7 @@ assert "user_preferences" not in table_names
 
 This checks Python metadata only and does not inspect or modify `butler.db`.
 
-- [ ] **Step 3: Restrict supported knowledge domains**
+- [x] **Step 3: Restrict supported knowledge domains**
 
 Set:
 
@@ -109,7 +109,7 @@ Set the CLI choices to:
 choices=["global", "qa", "summary"]
 ```
 
-- [ ] **Step 4: Keep generic knowledge tests domain-valid**
+- [x] **Step 4: Keep generic knowledge tests domain-valid**
 
 In `tests/test_knowledge_model.py`, replace fitness-specific sample titles, sources, content, and `domain="fitness"` with summary-oriented examples using `domain="summary"`.
 
@@ -121,7 +121,7 @@ domain="summary"
 
 Expected: the QA-domain search returns no results.
 
-- [ ] **Step 5: Run focused database and knowledge tests**
+- [x] **Step 5: Run focused database and knowledge tests**
 
 Run:
 
@@ -141,8 +141,10 @@ Expected: all selected tests pass.
 - Modify: `docs/agent/decisions.md`
 - Modify: `docs/agent/troubleshooting.md`
 - Modify: `docs/agent/upgrade-roadmap.md`
+- Modify: `AGENTS.md`
+- Modify: `CLAUDE.md`
 
-- [ ] **Step 1: Remove legacy packages from README trees**
+- [x] **Step 1: Remove legacy packages from README trees**
 
 The current agent tree must list only:
 
@@ -156,13 +158,15 @@ reminder/
 
 Keep user-facing statements that training and meal requests are unavailable or rejected; those statements describe current product behavior.
 
-- [ ] **Step 2: Update active context**
+- [x] **Step 2: Update active context**
 
 Remove `training_records` and `user_preferences` from current persistence. Remove deferred-work statements that legacy Agent packages remain. Describe Stage 2 RAG as private-butler knowledge-tool injection rather than QAAgent injection.
 
-- [ ] **Step 3: Retire historical ADRs without erasing history**
+- [x] **Step 3: Update and retire historical ADRs without erasing history**
 
-Add a status note to ADR-002, ADR-004, and ADR-010:
+Update ADR-002 to describe the current SQLite-backed tables and retain a historical note about removed training/preference mappings.
+
+Add a status note to ADR-004 and ADR-010:
 
 ```text
 Status: Retired from the current runtime on 2026-06-11.
@@ -172,15 +176,15 @@ Explain that their ORM mappings were removed, while old SQLite files may retain 
 
 Update ADR-007 examples so they refer only to current scene/domain agents.
 
-- [ ] **Step 4: Remove obsolete patterns and roadmap dependencies**
+- [x] **Step 4: Remove obsolete patterns and roadmap dependencies**
 
 Remove fitness/meal-specific preference guidance. Change periodic report planning to reuse `SummaryAgent` and `WebhookComposerAgent`; remove OCR training-record wording because that capability is no longer planned.
 
-- [ ] **Step 5: Update troubleshooting**
+- [x] **Step 5: Update troubleshooting**
 
 Remove `training_records` from the current required-table example and remove the training-extraction JSON failure case. Keep group rejection troubleshooting because it remains current behavior.
 
-- [ ] **Step 6: Scan current documentation**
+- [x] **Step 6: Scan current documentation**
 
 Run:
 
@@ -195,7 +199,7 @@ Expected: only explicitly retired historical ADR notes may mention old table or 
 **Files:**
 - Verify all changed files
 
-- [ ] **Step 1: Run the complete test suite**
+- [x] **Step 1: Run the complete test suite**
 
 Run:
 
@@ -205,7 +209,7 @@ DEEPSEEK_API_KEY=test uv run pytest -q
 
 Expected: all remaining tests pass.
 
-- [ ] **Step 2: Compile and build**
+- [x] **Step 2: Compile and build**
 
 Run:
 
@@ -217,7 +221,7 @@ uv build --out-dir /tmp/personal-butler-legacy-removal-dist
 
 Expected: compile and wheel/sdist build exit successfully.
 
-- [ ] **Step 3: Verify repository invariants**
+- [x] **Step 3: Verify repository invariants**
 
 Run:
 
@@ -229,7 +233,7 @@ rg -n "FitnessAgent|MealAgent|QAAgent|AgentRegistry|BaseGraphAgent|src\.agents\.
 
 Expected: formatting and root-doc checks pass; residual matches exist only in retired ADR history where intentionally documented.
 
-- [ ] **Step 4: Confirm data safety**
+- [x] **Step 4: Confirm data safety**
 
 Run:
 
@@ -239,7 +243,7 @@ git diff --name-only | rg '(^|/)(butler\.db|.*\.db(-shm|-wal)?)$'
 
 Expected: no output. No SQLite data file is changed or staged.
 
-- [ ] **Step 5: Commit the deletion**
+- [x] **Step 5: Commit the deletion**
 
 ```bash
 git add -u

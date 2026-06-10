@@ -191,24 +191,24 @@ async def test_domain_filter_blocks_unrelated_chunks(db_session):
         db_session: 测试数据库会话
 
     返回:
-        None；通过断言确认 QA 检索不会拿到 fitness-only chunk
+        None；通过断言确认 QA 检索不会拿到 summary-only chunk
     """
     service = KnowledgeService()
     await service.ingest(
         KnowledgeIngestRequest(
-            title="健身专用资料",
-            source="fitness.md",
-            content="训练计划需要渐进超负荷。",
+            title="总结专用资料",
+            source="summary.md",
+            content="会议总结需要突出行动项。",
             scope_type="public",
             scope_id=None,
-            domain="fitness",
+            domain="summary",
             created_by="admin",
         ),
         db_session,
     )
 
     results = await service.search(
-        query="训练计划",
+        query="会议总结",
         user_id="user_a",
         chat_type="single",
         chat_id=None,

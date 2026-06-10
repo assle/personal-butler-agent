@@ -3,8 +3,8 @@ Summary Agent - StateGraph 组装和 handle 入口
 负责构建 Summary StateGraph，将文本/群聊消息总结为结构化摘要
 
 在总流程中的位置:
-  意图路由 → AgentRegistry.get("summarize_text") 或 AgentRegistry.get("summarize_group")
-  → SummaryAgent.handle() 构建初始状态 → _graph.ainvoke() → AgentResponse
+  场景 Agent 或工具调用 SummaryAgent.handle()
+  → handle() 构建初始状态 → _graph.ainvoke() → AgentResponse
 
 Workflow:
   chat_type="group" → summarize_group_messages → format_summary_response

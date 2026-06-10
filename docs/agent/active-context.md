@@ -17,7 +17,7 @@ Current implementation baseline:
 - Scheduler push: `SchedulerManager` reads `SCHEDULER_TARGETS_FILE`, sends `mode="raw"` content directly with optional `weather_query` appended, or calls `WebhookComposerAgent` for `mode="compose"` targets, then sends markdown with `WebhookPushClient`
 - Runtime agents: `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, `SummaryAgent`, `ReminderAgent`
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek through `LLMClient`
-- Persistence: `training_records`, `user_preferences`, `group_messages`, conversation memory, knowledge-base tables, and `inbound_messages`
+- Persistence: `group_messages`, conversation memory, knowledge-base tables, reminders, reminder runs, and `inbound_messages`
 - Multi-turn memory: SQLite conversation memory plus LangGraph `MemorySaver` checkpointing for graph execution
 - Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_TOKEN` + `WECOM_AIBOT_ENCODING_AES_KEY`; `SCHEDULER_TARGETS_FILE` enables APScheduler-driven Enterprise WeChat group webhook push
 
@@ -33,7 +33,7 @@ Current implementation baseline:
 - Structured chat summarization — private text and group chat history.
 - Knowledge-based private Q&A and lightweight group Q&A.
 - Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite.
-- Stage 2 QA-first knowledge-base RAG: SQLite-backed public/user/group scoped knowledge documents and chunks, local `.md`/`.txt` import CLI, scoped retrieval service, QA/private-butler knowledge-context injection, and hybrid lexical + SQLite FTS + local embedding retrieval.
+- Stage 2 QA-first knowledge-base RAG: SQLite-backed public/user/group scoped knowledge documents and chunks, local `.md`/`.txt` import CLI, scoped retrieval service, private-butler knowledge-tool injection, and hybrid lexical + SQLite FTS + local embedding retrieval.
 - Web search tool: disabled by default, configurable through `WEB_SEARCH_*`, and available to `PrivateButlerAgent` as `search_web` for current/external information.
 - Weather lookup: Open-Meteo-backed weather data is available in private chat through `PrivateButlerAgent` tools, in group @ through a restricted `GroupMentionAgent` ToolNode loop, and in scheduler webhook raw composition through `weather_query`; no API key is required.
 
@@ -42,8 +42,6 @@ Current implementation baseline:
 The README and MVP spec list these as future scope:
 - RAG Stage 3: PDF/web imports, file upload UI, persisted index rebuild operations, optional external vector store, and broader summary/webhook composition integration if needed.
 - Reminder Stage 2: 日报/周报提醒内容生成，优先复用 Summary/WebhookComposer 等当前运行 agent 生成周期报告。
-- Legacy source packages for `FitnessAgent` and `MealAgent` remain in the repository for now, but they are no longer wired into the runtime private-chat path.
-- `QAAgent`, `AgentRegistry`, and `BaseGraphAgent` remain as legacy standalone source modules but are not instantiated by the current scene-agent runtime.
 
 ## Working Guidance
 

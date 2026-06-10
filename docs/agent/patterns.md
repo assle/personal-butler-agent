@@ -38,7 +38,6 @@ Rules:
 - Tools read `db`, `user_id`, `chat_type`, and `chat_id` from LangGraph config, not from model-supplied arguments.
 - Tool functions return short text; they do not return `AgentResponse` objects.
 - Existing domain agents remain the source of truth for summary and reminder workflows.
-- Fitness and meal source packages are legacy code only unless a future product decision reintroduces them.
 - Group non-trigger messages stay outside private tool calling and are collected silently.
 - Do not add or modify test files unless the user explicitly asks for tests, except when an approved implementation plan explicitly requires test changes.
 
@@ -74,7 +73,6 @@ agents/<domain_or_scene>/
 - Use SQLAlchemy async APIs only.
 - Use `select(...)` queries with the injected `AsyncSession` from config or function parameters.
 - Add ORM objects to the session and `flush()` when tests or response data need generated state before route completion.
-- Store extensible user preferences as JSON text under namespace keys such as `fitness` and `meal`.
 
 ## Conversation Memory Pattern
 

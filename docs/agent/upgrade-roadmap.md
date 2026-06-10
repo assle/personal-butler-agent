@@ -35,7 +35,7 @@
 ### 2.2 定时提醒和摘要
 
 - **当前**: 已支持私聊创建群 webhook 提醒；提醒默认 @ 私聊回调 `from.userid`，可通过 target 级 `mention_user_overrides` 覆盖；Scheduler 每分钟扫描到期任务并推送到配置群；私聊确认展示 target `display_name` 和本地时区时间。
-- **下一步**: 增加训练日报/周报、群聊日报/周报等周期报告型提醒，复用现有 Fitness/Summary/Meal agent 生成正文。
+- **下一步**: 增加群聊日报/周报等周期报告型提醒，复用现有 `SummaryAgent` 和 `WebhookComposerAgent` 生成正文。
 - **剩余工作量**: 中
 
 ---
@@ -45,8 +45,8 @@
 ### 3.1 多消息类型支持
 
 - **当前**: 文本 + 语音消息已支持。语音消息使用企业微信内置语音识别结果（JSON `voice.content`），提取后走正常意图路由和 agent 管线，空识别静默忽略。图片、文件等其他类型仍回复"暂不支持"
-- **目标**: 支持图片消息（OCR 识别训练记录）
-- **工作量**: 中（语音已实现；剩余图片 OCR 需接入 OCR 服务，无需自建 ASR）
+- **目标**: 支持图片文字识别，并将识别结果交给当前私聊问答流程处理
+- **工作量**: 中（需接入 OCR 服务，无需自建 ASR）
 
 ### 3.2 企业微信 OAuth 用户身份映射
 
@@ -61,7 +61,7 @@
 
 ### 4.1 知识库集成
 
-- **当前**: Stage 2 QA-first 已支持 SQLite 知识库、public/user/group scope 隔离、QAAgent RAG 注入、本地 `.md`/`.txt` 导入脚本，以及关键词 + SQLite FTS + 本地 embedding 的混合检索。
+- **当前**: Stage 2 QA-first 已支持 SQLite 知识库、public/user/group scope 隔离、PrivateButler 知识工具注入、本地 `.md`/`.txt` 导入脚本，以及关键词 + SQLite FTS + 本地 embedding 的混合检索。
 - **下一步**: PDF/网页导入、文件上传 UI、持久化索引重建操作、可选外部向量库，并按需扩展到摘要或 webhook 内容生成。
 - **收益**: 回答更专业、更个性化，减少 LLM 幻觉，同时保留多用户/多群聊知识隔离。
 - **剩余工作量**: 中到大（主要取决于向量数据库、文件管理和后台索引重建需求）。

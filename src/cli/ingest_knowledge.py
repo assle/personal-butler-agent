@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--domain",
         required=True,
-        choices=["global", "qa", "fitness", "meal", "summary"],
+        choices=["global", "qa", "summary"],
     )
     parser.add_argument("--created-by", default=None, help="Creator user_id")
     return parser.parse_args()

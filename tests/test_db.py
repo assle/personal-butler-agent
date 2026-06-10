@@ -25,10 +25,20 @@ async def test_session_connects(db_session):
 async def test_base_metadata_has_tables():
     """验证 ORM 模型正确注册到 Base.metadata
 
-    确保 training_records 和 user_preferences 两张表在 metadata 中注册。
+    参数:
+        无
+
+    返回:
+        None；确认当前运行表已注册，退役表不再进入 ORM metadata
     """
     from src.db.base import Base
 
-    table_names = Base.metadata.tables.keys()
-    assert "training_records" in table_names
-    assert "user_preferences" in table_names
+    table_names = set(Base.metadata.tables)
+    assert {
+        "group_messages",
+        "knowledge_documents",
+        "inbound_messages",
+        "reminders",
+    } <= table_names
+    assert "training_records" not in table_names
+    assert "user_preferences" not in table_names
