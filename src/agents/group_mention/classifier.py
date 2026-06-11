@@ -15,6 +15,10 @@ ALLOWED_CATEGORIES = {
     "weather",
     "simple_qa",
     "unsupported",
+    "poll_create",
+    "poll_vote",
+    "poll_view",
+    "poll_end",
 }
 
 CLASSIFIER_PROMPT = """你是群聊机器人意图分类器。只允许返回以下类别：

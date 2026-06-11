@@ -25,4 +25,5 @@ class GroupMentionState(TypedDict, total=False):
     llm: object
     summary_agent: object
     weather_service: object
+    poll_agent: object  # 新增
     db: object

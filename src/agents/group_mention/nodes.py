@@ -39,6 +39,8 @@ def route_by_category(state: dict) -> str:
     category = state.get("category", "unsupported")
     if category in {"summarize_group", "weather", "simple_qa"}:
         return category
+    if category in {"poll_create", "poll_vote", "poll_view", "poll_end"}:
+        return "poll"
     return "unsupported"
 
 
@@ -149,3 +151,38 @@ async def unsupported_node(state: dict) -> dict:
         dict: 不支持能力回复
     """
     return {"reply": "群聊里我只处理总结、天气和简单问答，训练和食谱请私聊我。"}
+
+
+async def poll_node(state: dict) -> dict:
+    """将投票请求委派给 PollAgent 处理
+
+    参数:
+        state: 当前图状态
+
+    返回:
+        dict: 回复和数据
+    """
+    poll_agent = state.get("poll_agent")
+    if poll_agent is None:
+        return {"reply": "投票功能暂不可用。"}
+
+    category = state.get("category", "")
+    intent_map = {
+        "poll_create": "create_poll",
+        "poll_vote": "cast_vote",
+        "poll_view": "view_results",
+        "poll_end": "end_poll",
+    }
+    intent = intent_map.get(category, "view_results")
+
+    result = await poll_agent.handle(
+        intent=intent,
+        message=state.get("message", ""),
+        user_id=state.get("user_id", ""),
+        db=state["db"],
+        extra_state={
+            "chat_type": state.get("chat_type", "group"),
+            "chat_id": state.get("chat_id"),
+        },
+    )
+    return {"reply": result.reply, "data": result.data}

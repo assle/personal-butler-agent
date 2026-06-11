@@ -11,6 +11,7 @@ from src.agents.group_mention.nodes import (
     call_model_with_tools,
     classify_node,
     extract_tool_reply,
+    poll_node,
     route_by_category,
     simple_qa_node,
     summarize_group_node,
@@ -25,13 +26,14 @@ from src.schemas.response import AgentResponse
 class GroupMentionAgent:
     """群聊 @ 机器人场景 agent"""
 
-    def __init__(self, llm_client, summary_agent, weather_service=None):
+    def __init__(self, llm_client, summary_agent, weather_service=None, poll_agent=None):
         """初始化群聊 @ agent
 
         参数:
             llm_client: LLM 客户端
             summary_agent: 群聊总结领域 agent
             weather_service: 天气服务；未注入时天气工具返回降级提示
+            poll_agent: 群投票领域 agent；未注入时投票功能不可用
 
         返回:
             None
@@ -39,6 +41,7 @@ class GroupMentionAgent:
         self._llm = llm_client
         self._summary_agent = summary_agent
         self._weather_service = weather_service
+        self._poll_agent = poll_agent
         self._tools = [query_weather] if weather_service is not None else []
         self._graph = self._build_graph()
 
@@ -57,6 +60,7 @@ class GroupMentionAgent:
         builder.add_node("weather_unavailable", weather_unavailable_node)
         builder.add_node("simple_qa", simple_qa_node)
         builder.add_node("unsupported", unsupported_node)
+        builder.add_node("poll", poll_node)
         if self._tools:
             builder.add_node("agent", call_model_with_tools)
             builder.add_node("tools", ToolNode(self._tools))
@@ -72,12 +76,14 @@ class GroupMentionAgent:
                 "weather": weather_route,
                 "simple_qa": "simple_qa",
                 "unsupported": "unsupported",
+                "poll": "poll",
             },
         )
         builder.add_edge("summarize_group", END)
         builder.add_edge("weather_unavailable", END)
         builder.add_edge("simple_qa", END)
         builder.add_edge("unsupported", END)
+        builder.add_edge("poll", END)
         if self._tools:
             builder.add_conditional_edges(
                 "agent",
@@ -120,6 +126,7 @@ class GroupMentionAgent:
             "llm": self._llm,
             "summary_agent": self._summary_agent,
             "weather_service": self._weather_service,
+            "poll_agent": self._poll_agent,
             "db": db,
         }
         config = {
