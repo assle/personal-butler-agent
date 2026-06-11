@@ -4,7 +4,7 @@
 
 ## Application Wiring
 
-- `src/main.py` constructs only runtime singleton objects: `LLMClient`, `SummaryAgent`, `ReminderAgent`, scene agents, search/knowledge/weather services, and scheduler support.
+- `src/main.py` constructs only runtime singleton objects: `LLMClient`, `SummaryAgent`, `ReminderAgent`, `PollAgent`, scene agents, search/knowledge/weather services, and scheduler support.
 - The FastAPI lifespan creates DB tables through `Base.metadata.create_all` and disposes the async engine on shutdown.
 - URL callback routes use factory functions for injected scene agents and database session factories.
 
@@ -27,6 +27,7 @@ Rules:
 - Empty group voice recognition returns `empty_content` and is not saved.
 - Missing `chat_id` returns `missing_chat_id` and is not saved.
 - Summary/weather/simple-QA triggers may reply.
+- Poll (create/vote/view/end) and translate triggers route to their respective nodes.
 - Unsupported group requests should not reach private tools.
 - `apply_group_policy()` owns deterministic trigger classification. `dispatch_message()` passes `group_category` to `GroupMentionAgent`, whose classifier only runs when the agent is called without a preclassified category.
 
@@ -111,3 +112,13 @@ Knowledge retrieval is centralized in `src/knowledge/service.py`.
 - Use `conftest.py` fixtures such as `mock_llm` and isolated async DB setup.
 - Prefer focused module tests plus callback/scheduler smoke tests when adding behavior.
 - Graph agents are tested through `handle()`, the same interface used by scene dispatch and scheduler composition.
+
+## Shared Utility Pattern
+
+For single-step LLM operations that don't need state, persistence, or multi-step routing, place a plain async function in a shared module under `src/agents/` rather than creating a full agent package.
+
+- Example: `src/agents/translate.py` exports `translate_text(text, target_lang, llm)`.
+- Both `PrivateButlerAgent` (as a LangChain tool) and `GroupMentionAgent` (as a graph node) call the same function.
+- No state TypedDict, no graph compilation, no agent class.
+
+Use this pattern when the operation is a pure LLM transformation. Use the full agent pattern (state + nodes + graph + handle) when the operation needs DB access, multi-step workflow, or conditional routing.

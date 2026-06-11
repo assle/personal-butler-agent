@@ -174,3 +174,36 @@ Reasoning:
 - One classification result prevents policy and agent keyword rules from drifting during the normal callback flow.
 - Focused scheduler modules are easier to test and change independently.
 - Re-exporting the existing public API avoids unnecessary call-site migration.
+
+## ADR-018: GroupWebhook DB Table for Dynamic Push Targets
+
+Static `SCHEDULER_TARGETS_FILE` is designed for fixed cron-driven recurring pushes. Dynamic one-shot tasks (such as poll auto-end) need to resolve a `chat_id` to a webhook URL at runtime, without requiring every group to appear in the static JSON config.
+
+Decision:
+- Add a `group_webhooks` table mapping `chat_id` → `webhook_url` (+ optional `display_name`).
+- `PollAgent` and `SchedulerManager._push_poll_result` query this table to find the webhook URL for the target group.
+- The static `SCHEDULER_TARGETS_FILE` is preserved for its existing use case (recurring scheduled pushes). Both mechanisms coexist.
+
+Reasoning:
+- Creating a poll should not require editing a JSON config file.
+- A DB table is the natural storage for runtime-discovered group metadata.
+- The static config remains the right choice for fixed recurring content; the DB table serves dynamic one-shot push needs.
+
+Trade-off: Two webhook-resolution paths exist (file-based and DB-based). Merging them into a single table is deferred until the static config use case justifies the migration cost.
+
+## ADR-019: Shared Utility over Standalone Agent for Simple LLM Operations
+
+Translation is a single LLM call ("translate X to Y"). Creating a full agent (state + nodes + graph + handle) for this would be excessive ceremony.
+
+Decision:
+- Place `translate_text()` in a shared `src/agents/translate.py` module, not a standalone `TranslationAgent`.
+- Both `PrivateButlerAgent` (via LangChain tool) and `GroupMentionAgent` (via graph node) call the same function.
+- No new state, graph, or ORM model is required.
+
+Reasoning:
+- A single async function is the right abstraction for a single LLM call.
+- The "shared utility" pattern is simpler than the "agent per domain" pattern and should be the default for capabilities that are pure LLM transformations with no state, persistence, or multi-step workflow.
+
+When to use each pattern:
+- **Shared utility** (`translate_text`): single LLM call, no state, no persistence, no multi-step flow.
+- **Domain agent** (`PollAgent`, `SummaryAgent`): multi-step workflow, DB persistence, conditional routing, or state management.
