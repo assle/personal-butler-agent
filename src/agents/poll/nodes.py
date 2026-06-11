@@ -3,13 +3,14 @@ PollAgent 节点函数
 实现投票意图分类、创建投票、投票、查看结果和结束投票五个节点。
 
 Workflow:
-  classify_poll_intent 根据关键词或状态中的 category 分流
+  classify_poll_intent 使用状态中已设置的 intent，未识别时返回提示
   → create_poll_node / cast_vote_node / view_results_node / end_poll_node
   → 返回 reply 和 data
 """
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 
@@ -18,6 +19,8 @@ from sqlalchemy import func, select
 
 from src.models.poll import Poll, PollVote
 from src.models.group_webhook import GroupWebhook
+
+logger = logging.getLogger(__name__)
 
 # ── 常量 ──────────────────────────────────────────────
 
@@ -278,7 +281,7 @@ async def create_poll_node(state: dict) -> dict:
     scheduler_manager = config.get("scheduler_manager")
     message = state.get("message", "")
     user_id = state.get("user_id", "")
-    chat_id = state.get("chat_id", "")
+    chat_id = state.get("chat_id") or ""
 
     options = _parse_poll_options(message)
     if options is None:
@@ -302,7 +305,7 @@ async def create_poll_node(state: dict) -> dict:
         try:
             scheduler_manager.schedule_poll_end(poll.id, end_time)
         except Exception:
-            pass
+            logger.warning("Failed to schedule poll end for poll_id=%s", poll.id, exc_info=True)
 
     return {"reply": _format_poll_card(poll), "data": {"poll_id": poll.id}}
 
@@ -320,7 +323,7 @@ async def cast_vote_node(state: dict) -> dict:
     db = config["db"]
     message = state.get("message", "")
     user_id = state.get("user_id", "")
-    chat_id = state.get("chat_id", "")
+    chat_id = state.get("chat_id") or ""
 
     active_polls = await _get_active_polls(db, chat_id)
     if not active_polls:
@@ -400,7 +403,7 @@ async def view_results_node(state: dict) -> dict:
     """
     config = get_config()["configurable"]
     db = config["db"]
-    chat_id = state.get("chat_id", "")
+    chat_id = state.get("chat_id") or ""
 
     poll = await _get_active_poll(db, chat_id)
     if poll is None:
@@ -421,7 +424,7 @@ async def end_poll_node(state: dict) -> dict:
     """
     config = get_config()["configurable"]
     db = config["db"]
-    chat_id = state.get("chat_id", "")
+    chat_id = state.get("chat_id") or ""
     scheduler_manager = config.get("scheduler_manager")
     webhook_client = config.get("webhook_client")
 
