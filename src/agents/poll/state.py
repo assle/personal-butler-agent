@@ -31,3 +31,6 @@ class PollState(TypedDict, total=False):
 
     data: dict[str, Any]
     """结构化结果数据，如投票统计"""
+
+    error: str
+    """执行过程中的错误信息"""
