@@ -241,3 +241,116 @@ class SchedulerManager:
                         target.name,
                     )
             await db.commit()
+
+    def schedule_poll_end(self, poll_id: int, end_time):
+        """注册投票到期一次性任务
+
+        参数:
+            poll_id: Poll.id
+            end_time: 到期时间 datetime 对象
+
+        返回:
+            None
+        """
+        from datetime import datetime, timezone
+
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+        self._scheduler.add_job(
+            self._push_poll_result,
+            trigger="date",
+            run_date=end_time,
+            id=f"poll_end:{poll_id}",
+            name=f"投票到期推送: poll_id={poll_id}",
+            replace_existing=True,
+            args=[poll_id],
+        )
+        logger.info("Poll scheduler: registered end job poll_id=%s at %s", poll_id, end_time)
+
+    def cancel_poll_end(self, poll_id: int):
+        """取消投票到期任务
+
+        参数:
+            poll_id: Poll.id
+
+        返回:
+            None
+        """
+        job_id = f"poll_end:{poll_id}"
+        try:
+            self._scheduler.remove_job(job_id)
+            logger.info("Poll scheduler: cancelled end job poll_id=%s", poll_id)
+        except Exception:
+            pass
+
+    async def _push_poll_result(self, poll_id: int):
+        """投票到期回调：统计结果、推送 webhook、标记结束
+
+        参数:
+            poll_id: Poll.id
+
+        返回:
+            None
+        """
+        if self._webhook_client is None:
+            logger.error("Poll scheduler: webhook_client is None, cannot push poll_id=%s", poll_id)
+            return
+        if self._db_session_factory is None:
+            logger.error("Poll scheduler: db_session_factory is None, cannot push poll_id=%s", poll_id)
+            return
+
+        from sqlalchemy import func, select
+
+        from src.models.poll import Poll, PollVote
+        from src.models.group_webhook import GroupWebhook
+
+        async with self._db_session_factory() as db:
+            try:
+                poll_result = await db.execute(select(Poll).where(Poll.id == poll_id))
+                poll = poll_result.scalar_one_or_none()
+                if poll is None:
+                    logger.warning("Poll scheduler: poll_id=%s not found", poll_id)
+                    return
+                if poll.status != "active":
+                    logger.info("Poll scheduler: poll_id=%s already ended", poll_id)
+                    return
+
+                poll.status = "ended"
+
+                count_result = await db.execute(
+                    select(PollVote.option_index, func.count(PollVote.id))
+                    .where(PollVote.poll_id == poll_id)
+                    .group_by(PollVote.option_index)
+                )
+                counts = {row[0]: row[1] for row in count_result.all()}
+
+                import json
+                options = poll.options
+                if isinstance(options, str):
+                    options = json.loads(options)
+                total = sum(counts.values())
+                max_votes = max(counts.values()) if counts else 0
+                lines = []
+                for i, opt in enumerate(options):
+                    cnt = counts.get(i, 0)
+                    marker = " （获胜）" if cnt == max_votes and cnt > 0 else ""
+                    lines.append(f"{chr(65 + i)}.{opt} {cnt}票{marker}")
+                result_text = f"投票结束「{poll.title}」\n" + " | ".join(lines) + f"\n共{total}人参与"
+
+                webhook_result = await db.execute(
+                    select(GroupWebhook).where(GroupWebhook.chat_id == poll.chat_id)
+                )
+                wh = webhook_result.scalar_one_or_none()
+                if wh is not None:
+                    ok = await self._webhook_client.send_markdown(wh.webhook_url, result_text)
+                    if ok:
+                        logger.info("Poll scheduler: pushed result poll_id=%s to chat_id=%s", poll_id, poll.chat_id)
+                    else:
+                        logger.error("Poll scheduler: push failed poll_id=%s", poll_id)
+                else:
+                    logger.info("Poll scheduler: no webhook for chat_id=%s, poll_id=%s ended silently", poll.chat_id, poll_id)
+
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                logger.exception("Poll scheduler: error pushing poll_id=%s", poll_id)
