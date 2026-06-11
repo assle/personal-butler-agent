@@ -7,7 +7,9 @@ Workflow:
 2. PollAgent 到期推送时通过 chat_id 查找 webhook_url
 3. 后续可替换或补充现有的 SCHEDULER_TARGETS_FILE 静态配置
 """
-from sqlalchemy import Column, String
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, DateTime, String
 
 from src.db.base import Base
 
@@ -25,3 +27,6 @@ class GroupWebhook(Base):
 
     display_name = Column(String(256), nullable=True)
     """用户可见的群名称，用于展示"""
+
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    """记录创建时间"""
