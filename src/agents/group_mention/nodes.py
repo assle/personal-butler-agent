@@ -7,6 +7,7 @@ from langgraph.config import get_config
 
 from src.agents.group_mention.classifier import ALLOWED_CATEGORIES, classify_group_message
 from src.agents.group_mention.prompts import GROUP_QA_PROMPT, GROUP_TOOL_PROMPT
+from src.agents.translate import translate_text
 
 
 async def classify_node(state: dict) -> dict:
@@ -41,6 +42,8 @@ def route_by_category(state: dict) -> str:
         return category
     if category in {"poll_create", "poll_vote", "poll_view", "poll_end"}:
         return "poll"
+    if category == "translate":
+        return "translate"
     return "unsupported"
 
 
@@ -186,3 +189,29 @@ async def poll_node(state: dict) -> dict:
         },
     )
     return {"reply": result.reply, "data": result.data}
+
+
+async def translate_node(state: dict) -> dict:
+    """将翻译请求翻译成目标语言
+
+    参数:
+        state: 当前图状态
+
+    返回:
+        dict: 包含翻译结果的 reply
+    """
+    import re
+
+    message = state.get("message", "")
+    llm = state["llm"]
+
+    m = re.match(r"翻译(?:成|为|到)?\s*([a-zA-Z一-鿿]+)[：:]\s*(.+)", message, re.DOTALL)
+    if m:
+        target_lang = m.group(1).strip()
+        text = m.group(2).strip()
+    else:
+        text = re.sub(r"^翻译(?:成|为|到)?\s*", "", message).strip()
+        target_lang = "英文"
+
+    reply = await translate_text(text=text, target_lang=target_lang, llm=llm)
+    return {"reply": reply}

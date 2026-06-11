@@ -19,6 +19,7 @@ ALLOWED_CATEGORIES = {
     "poll_vote",
     "poll_view",
     "poll_end",
+    "translate",
 }
 
 CLASSIFIER_PROMPT = """你是群聊机器人意图分类器。只允许返回以下类别：

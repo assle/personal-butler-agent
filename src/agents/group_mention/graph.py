@@ -15,6 +15,7 @@ from src.agents.group_mention.nodes import (
     route_by_category,
     simple_qa_node,
     summarize_group_node,
+    translate_node,
     unsupported_node,
     weather_unavailable_node,
 )
@@ -61,6 +62,7 @@ class GroupMentionAgent:
         builder.add_node("simple_qa", simple_qa_node)
         builder.add_node("unsupported", unsupported_node)
         builder.add_node("poll", poll_node)
+        builder.add_node("translate", translate_node)
         if self._tools:
             builder.add_node("agent", call_model_with_tools)
             builder.add_node("tools", ToolNode(self._tools))
@@ -77,6 +79,7 @@ class GroupMentionAgent:
                 "simple_qa": "simple_qa",
                 "unsupported": "unsupported",
                 "poll": "poll",
+                "translate": "translate",
             },
         )
         builder.add_edge("summarize_group", END)
@@ -84,6 +87,7 @@ class GroupMentionAgent:
         builder.add_edge("simple_qa", END)
         builder.add_edge("unsupported", END)
         builder.add_edge("poll", END)
+        builder.add_edge("translate", END)
         if self._tools:
             builder.add_conditional_edges(
                 "agent",
