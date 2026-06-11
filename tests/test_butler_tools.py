@@ -93,6 +93,11 @@ def test_private_butler_exposes_only_current_scene_tools():
         "list_reminders",
         "cancel_reminder",
         "translate",
+        "add_memory",
+        "update_memory",
+        "delete_memory",
+        "search_memory",
+        "list_memories",
     }
 
 
