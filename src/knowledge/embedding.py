@@ -16,7 +16,7 @@ import httpx
 class EmbeddingService:
     """嵌入服务，优先使用 DashScope API，失败时降级为本地哈希"""
 
-    _DASHSCOPE_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    _DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     def __init__(
         self,
