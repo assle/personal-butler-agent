@@ -1,6 +1,6 @@
 # Personal Butler Agent Instructions
 
-<!-- Keep this file and CLAUDE.md byte-for-byte identical. -->
+<!-- Keep this file and AGENTS.md byte-for-byte identical. -->
 <!-- Template 2 style: concise root guidance plus on-demand project memory docs. -->
 
 ## Project Overview
