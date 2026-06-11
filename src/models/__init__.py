@@ -7,6 +7,8 @@ from src.models.knowledge import (
     KnowledgeDocument,
 )
 from src.models.inbound_message import InboundMessage
+from src.models.poll import Poll, PollVote
+from src.models.group_webhook import GroupWebhook
 from src.models.reminder import Reminder, ReminderRun
 
 __all__ = [
@@ -17,6 +19,9 @@ __all__ = [
     "KnowledgeChunk",
     "KnowledgeChunkEmbedding",
     "InboundMessage",
+    "Poll",
+    "PollVote",
+    "GroupWebhook",
     "Reminder",
     "ReminderRun",
 ]
