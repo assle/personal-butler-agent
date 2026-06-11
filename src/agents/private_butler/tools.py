@@ -1,6 +1,6 @@
 """
 Butler 工具封装
-把私聊可用的摘要、知识库、联网搜索、天气和提醒能力包装为 LangChain tools
+把私聊可用的摘要、知识库、联网搜索、天气、提醒、翻译和记忆能力包装为 LangChain tools
 
 Workflow:
   create_private_butler_tools(context) 接收运行期单例依赖
@@ -16,6 +16,7 @@ from langgraph.config import get_config
 
 from src.weather import format_weather_report
 from src.agents.translate import translate_text
+from src.agents.memory.service import MemoryService
 
 
 @dataclass
@@ -32,6 +33,8 @@ class PrivateButlerToolContext:
     weather_service: Any = None
     # 提醒 agent，用于创建、查看和取消群 webhook 提醒
     reminder_agent: Any = None
+    # 记忆服务，用于个性化记忆的增删改查和语义检索
+    memory_service: Any = None
 
 
 def _runtime():
@@ -49,6 +52,18 @@ def _runtime():
     chat_type = configurable.get("chat_type", "single")
     chat_id = configurable.get("chat_id")
     return db, user_id, chat_type, chat_id
+
+
+def _get_memory_service(context: PrivateButlerToolContext):
+    """获取 memory service，未注入时返回 None
+
+    参数:
+        context: PrivateButlerToolContext 工具依赖上下文
+
+    返回:
+        MemoryService | None
+    """
+    return context.memory_service
 
 
 async def _call_agent(agent: Any, intent: str, message: str) -> str:
@@ -126,7 +141,7 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         context: PrivateButlerToolContext，包含领域 agent 与检索服务依赖
 
     返回:
-        list[Any]: 九个 LangChain tool，供模型工具调用使用
+        list[Any]: 十四个 LangChain tool，供模型工具调用使用
     """
     @tool
     async def summarize_text(text: str) -> str:
@@ -276,6 +291,102 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
 
         return await translate_text(text=text, target_lang=target_lang, llm=llm)
 
+    @tool
+    async def add_memory(content: str) -> str:
+        """添加一条关于用户的个性化记忆
+
+        参数:
+            content: 记忆内容，例如"用户不喝咖啡，偏好喝茶"
+
+        返回:
+            str: 添加结果
+        """
+        db, user_id, _, _ = _runtime()
+        service = _get_memory_service(context)
+        if service is None:
+            return "记忆功能暂不可用。"
+        memory = await service.add_memory(db, user_id, content, source="explicit")
+        return f"已记住：{memory.content}"
+
+    @tool
+    async def list_memories(message: str = "") -> str:
+        """查看当前用户的所有个性化记忆
+
+        参数:
+            message: 用户查看请求，可忽略
+
+        返回:
+            str: 记忆列表
+        """
+        db, user_id, _, _ = _runtime()
+        service = _get_memory_service(context)
+        if service is None:
+            return "记忆功能暂不可用。"
+        memories = await service.list_memories(db, user_id)
+        if not memories:
+            return "你还没有保存过记忆。可以跟我说"记住：xxx"来添加。"
+        lines = [f"{i+1}. {m.content}" for i, m in enumerate(memories)]
+        return "我记得以下关于你的信息：\n" + "\n".join(lines)
+
+    @tool
+    async def update_memory(memory_id: int, new_content: str) -> str:
+        """更新一条个性化记忆
+
+        参数:
+            memory_id: 记忆编号（从 list_memories 获取）
+            new_content: 新的记忆内容
+
+        返回:
+            str: 更新结果
+        """
+        db, user_id, _, _ = _runtime()
+        service = _get_memory_service(context)
+        if service is None:
+            return "记忆功能暂不可用。"
+        memory = await service.update_memory(db, memory_id, user_id, new_content)
+        if memory is None:
+            return f"没有找到编号为 {memory_id} 的记忆，或你没有权限修改。"
+        return f"已更新：{memory.content}"
+
+    @tool
+    async def delete_memory(memory_id: int) -> str:
+        """删除一条个性化记忆
+
+        参数:
+            memory_id: 记忆编号（从 list_memories 获取）
+
+        返回:
+            str: 删除结果
+        """
+        db, user_id, _, _ = _runtime()
+        service = _get_memory_service(context)
+        if service is None:
+            return "记忆功能暂不可用。"
+        ok = await service.delete_memory(db, memory_id, user_id)
+        if not ok:
+            return f"没有找到编号为 {memory_id} 的记忆，或你没有权限删除。"
+        return f"已删除编号为 {memory_id} 的记忆。"
+
+    @tool
+    async def search_memory(query: str) -> str:
+        """搜索与用户查询相关的个性化记忆
+
+        参数:
+            query: 要搜索的关键词或问题
+
+        返回:
+            str: 相关的记忆内容
+        """
+        db, user_id, _, _ = _runtime()
+        service = _get_memory_service(context)
+        if service is None:
+            return "记忆功能暂不可用。"
+        results = await service.search(db, user_id, query)
+        if not results:
+            return "没有找到相关记忆。"
+        lines = [f"- {r['content']}" for r in results]
+        return "相关记忆：\n" + "\n".join(lines)
+
     return [
         summarize_text,
         summarize_group_chat,
@@ -286,4 +397,9 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         list_reminders,
         cancel_reminder,
         translate,
+        add_memory,
+        list_memories,
+        update_memory,
+        delete_memory,
+        search_memory,
     ]
