@@ -92,6 +92,7 @@ def test_private_butler_exposes_only_current_scene_tools():
         "create_group_webhook_reminder",
         "list_reminders",
         "cancel_reminder",
+        "translate",
     }
 
 
