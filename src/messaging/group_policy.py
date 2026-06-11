@@ -26,6 +26,7 @@ QUESTION_MARKERS = ("?", "？", "吗", "怎么", "如何", "为什么", "什么"
 POLL_CREATE_KEYWORDS = ("创建投票", "发起投票", "新建投票")
 POLL_VIEW_KEYWORDS = ("投票结果", "查看投票", "投票情况")
 POLL_END_KEYWORDS = ("结束投票", "关闭投票", "停止投票")
+TRANSLATE_KEYWORDS = ("翻译成", "翻译为", "翻译")
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,8 @@ def classify_group_trigger(content: str) -> str | None:
         return "poll_end"
     if any(keyword in normalized for keyword in POLL_VIEW_KEYWORDS):
         return "poll_view"
+    if any(keyword in normalized for keyword in TRANSLATE_KEYWORDS):
+        return "translate"
     if any(marker in normalized for marker in QUESTION_MARKERS):
         return "simple_qa"
     return None
