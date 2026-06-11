@@ -54,6 +54,7 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 
 **Verification & safety:**
 - Before declaring done, re-check requirements, run relevant tests, and state what changed and what could not be verified.
+- After any code change that adds/removes directories, agents, models, or dependencies: verify CLAUDE.md Architecture and Purpose sections still match current code.
 - Ask before destructive or hard-to-reverse actions: deleting files or branches, force pushes, hard resets, or `--no-verify`.
 - Edit existing files in place where practical. Do not create scratch files unless needed, and clean them up.
 - Never commit secrets or real `.env` values.
@@ -104,3 +105,6 @@ All files are part of the shared project documentation. If you update one root e
 | Added or changed env vars or config fields | `docs/agent/config-variables.md` — update tables and examples |
 | Established a reusable implementation pattern | `docs/agent/patterns.md` — add pattern section |
 | Modified CLAUDE.md | Copy to `AGENTS.md` to keep them byte-for-byte identical |
+| Added, removed, or renamed a directory, dependency, or runtime component | CLAUDE.md — update Architecture and Purpose sections to reflect current project structure |
+
+**After writing docs:** Verify CLAUDE.md's agent list, model names, and directory structure match the current codebase. Docs that drift from reality are worse than no docs.
