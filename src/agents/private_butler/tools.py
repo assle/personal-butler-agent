@@ -15,6 +15,7 @@ from langchain_core.tools import tool
 from langgraph.config import get_config
 
 from src.weather import format_weather_report
+from src.agents.translate import translate_text
 
 
 @dataclass
@@ -125,7 +126,7 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         context: PrivateButlerToolContext，包含领域 agent 与检索服务依赖
 
     返回:
-        list[Any]: 八个 LangChain tool，供模型工具调用使用
+        list[Any]: 九个 LangChain tool，供模型工具调用使用
     """
     @tool
     async def summarize_text(text: str) -> str:
@@ -249,6 +250,32 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
             return "提醒功能尚未初始化，请先配置 scheduler target。"
         return await _call_agent(context.reminder_agent, "cancel_reminder", message)
 
+    @tool
+    async def translate(message: str) -> str:
+        """将文本翻译成用户指定的目标语言
+
+        参数:
+            message: 用户的完整翻译请求，应包含目标语言和待翻译文本，例如"翻译成英文：今天天气很好"
+
+        返回:
+            str: 翻译后的文本
+        """
+        import re
+        from langgraph.config import get_config
+
+        configurable = get_config()["configurable"]
+        llm = configurable["llm"]
+
+        m = re.match(r"翻译(?:成|为|到)?\s*([a-zA-Z一-鿿]+)[：:]\s*(.+)", message, re.DOTALL)
+        if m:
+            target_lang = m.group(1).strip()
+            text = m.group(2).strip()
+        else:
+            text = re.sub(r"^翻译(?:成|为|到)?\s*", "", message).strip()
+            target_lang = "英文"
+
+        return await translate_text(text=text, target_lang=target_lang, llm=llm)
+
     return [
         summarize_text,
         summarize_group_chat,
@@ -258,4 +285,5 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         create_group_webhook_reminder,
         list_reminders,
         cancel_reminder,
+        translate,
     ]
