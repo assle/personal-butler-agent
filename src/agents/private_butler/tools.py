@@ -324,7 +324,7 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
             return "记忆功能暂不可用。"
         memories = await service.list_memories(db, user_id)
         if not memories:
-            return "你还没有保存过记忆。可以跟我说"记住：xxx"来添加。"
+            return "你还没有保存过记忆。可以跟我说'记住：xxx'来添加。"
         lines = [f"{i+1}. {m.content}" for i, m in enumerate(memories)]
         return "我记得以下关于你的信息：\n" + "\n".join(lines)
 

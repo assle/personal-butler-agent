@@ -59,6 +59,7 @@ class PrivateButlerAgent:
         web_search_service,
         weather_service=None,
         reminder_agent=None,
+        memory_service=None,
     ):
         """初始化 PrivateButlerAgent 并编译工具调用图
 
@@ -69,11 +70,13 @@ class PrivateButlerAgent:
             web_search_service: 联网搜索服务
             weather_service: 天气服务
             reminder_agent: 提醒 agent，用于创建、查看和取消群 webhook 提醒
+            memory_service: 个性化记忆服务，用于检索用户记忆上下文
 
         返回:
             None
         """
         self._llm = llm_client
+        self._memory_service = memory_service
         self._tool_context = PrivateButlerToolContext(
             summary_agent=summary_agent,
             knowledge_service=knowledge_service,
@@ -158,6 +161,17 @@ class PrivateButlerAgent:
         memory = ConversationMemory(self._llm)
         summary, recent = await memory.get_context(user_id, db)
 
+        # 检索个性化记忆
+        memory_context = ""
+        if self._memory_service is not None:
+            try:
+                results = await self._memory_service.search(db, user_id, message, top_k=3, threshold=0.5)
+                if results:
+                    lines = [f"- {r['content']}" for r in results]
+                    memory_context = "\n".join(lines)
+            except Exception:
+                pass
+
         initial_state: dict = {
             "messages": build_initial_messages(message),
             "user_id": user_id,
@@ -165,6 +179,7 @@ class PrivateButlerAgent:
             "chat_id": chat_id,
             "conversation_summary": summary,
             "recent_messages": recent,
+            "memory_context": memory_context,
         }
         config = {
             "configurable": {
