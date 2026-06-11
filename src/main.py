@@ -18,6 +18,7 @@ from src.config import settings
 from src.llm.client import LLMClient
 from src.agents.summary import SummaryAgent
 from src.agents.group_mention import GroupMentionAgent
+from src.agents.poll import PollAgent
 from src.agents.private_butler import PrivateButlerAgent
 from src.agents.reminder import ReminderAgent
 from src.agents.webhook_composer import WebhookComposerAgent
@@ -52,10 +53,17 @@ private_butler_agent = PrivateButlerAgent(
     weather_service=weather_service,
     reminder_agent=reminder_agent,
 )
+# 模块级别：先创建 PollAgent（scheduler 尚未就绪，传 None）
+poll_agent = PollAgent(
+    llm_client=llm_client,
+    scheduler_manager=None,
+    webhook_client=None,
+)
 group_mention_agent = GroupMentionAgent(
     llm_client=llm_client,
     summary_agent=summary_agent,
     weather_service=weather_service,
+    poll_agent=poll_agent,
 )
 webhook_composer_agent = WebhookComposerAgent(
     llm_client=llm_client,
@@ -93,6 +101,9 @@ async def lifespan(app: FastAPI):
             enable_reminder_scan=True,
         )
         scheduler_manager.start()
+        # scheduler_manager 就绪后，注入到 PollAgent
+        poll_agent._scheduler_manager = scheduler_manager
+        poll_agent._webhook_client = WebhookPushClient()
 
     yield
 
