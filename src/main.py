@@ -24,6 +24,7 @@ from src.agents.reminder import ReminderAgent
 from src.agents.memory import MemoryService
 from src.agents.webhook_composer import WebhookComposerAgent
 from src.knowledge import KnowledgeService
+from src.knowledge.embedding import EmbeddingService
 from src.reminders import ReminderService
 from src.search import WebSearchService
 from src.weather import WeatherService
@@ -46,7 +47,9 @@ reminder_agent = ReminderAgent(
     llm_client=llm_client,
     reminder_service=reminder_service,
 )
-memory_service = MemoryService()
+memory_service = MemoryService(
+    embedding_service=EmbeddingService(api_key=settings.dashscope_api_key),
+)
 private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
     summary_agent=summary_agent,

@@ -40,5 +40,8 @@ class Settings(BaseSettings):
     # 定时推送配置
     scheduler_targets_file: str = ""
 
+    # 向量嵌入配置；DashScope API（Qwen3-Embedding），不配则使用本地哈希嵌入
+    dashscope_api_key: str = ""
+
 
 settings = Settings()

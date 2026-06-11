@@ -103,7 +103,7 @@ class KnowledgeService:
                     model_name=self.embedding_service.model_name,
                     dimension=self.embedding_service.dimension,
                     vector_json=json.dumps(
-                        self.embedding_service.embed(
+                        await self.embedding_service.embed(
                             f"{document.title}\n{chunk.content}"
                         )
                     ),
@@ -158,13 +158,13 @@ class KnowledgeService:
             .where(KnowledgeChunk.domain.in_(allowed_domains))
         )
         fts_scores = await self._search_fts(db, query)
-        query_vector = self.embedding_service.embed(query)
+        query_vector = await self.embedding_service.embed(query)
 
         scored: list[tuple[float, KnowledgeChunk, str]] = []
         for chunk, title, vector_json in result.all():
             lexical_score = self._score(query, chunk.content, title)
             fts_score = fts_scores.get(chunk.id, 0.0)
-            vector_score = self._vector_score(
+            vector_score = await self._vector_score(
                 query_vector,
                 vector_json,
                 fallback_text=f"{title}\n{chunk.content}",
@@ -376,7 +376,7 @@ class KnowledgeService:
         )
         return compact[:64]
 
-    def _vector_score(
+    async def _vector_score(
         self,
         query_vector: list[float],
         vector_json: str | None,
@@ -397,7 +397,7 @@ class KnowledgeService:
                 return 0.0
             return self.embedding_service.similarity(
                 query_vector,
-                self.embedding_service.embed(fallback_text),
+                await self.embedding_service.embed(fallback_text),
             )
         try:
             chunk_vector = json.loads(vector_json)

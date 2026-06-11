@@ -48,7 +48,7 @@ class MemoryService:
         返回:
             None
         """
-        self._embedding = embedding_service or EmbeddingService(256)
+        self._embedding = embedding_service or EmbeddingService()
 
     # ── CRUD ──────────────────────────────────────────
 
@@ -66,7 +66,7 @@ class MemoryService:
         返回:
             UserMemory: 新创建的记忆对象
         """
-        embedding = self._embedding.embed(content)
+        embedding = await self._embedding.embed(content)
         memory = UserMemory(
             user_id=user_id,
             content=content,
@@ -116,7 +116,7 @@ class MemoryService:
         if memory is None or memory.user_id != user_id:
             return None
         memory.content = new_content
-        memory.embedding_json = json.dumps(self._embedding.embed(new_content))
+        memory.embedding_json = json.dumps(await self._embedding.embed(new_content))
         memory.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await db.flush()
         logger.info("Memory: updated id=%s for user_id=%s", memory_id, user_id)
@@ -171,7 +171,7 @@ class MemoryService:
         if not memories:
             return []
 
-        query_vec = self._embedding.embed(query)
+        query_vec = await self._embedding.embed(query)
         scored = []
         for m in memories:
             if m.embedding_json is None:
