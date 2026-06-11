@@ -21,6 +21,7 @@ from src.agents.group_mention import GroupMentionAgent
 from src.agents.poll import PollAgent
 from src.agents.private_butler import PrivateButlerAgent
 from src.agents.reminder import ReminderAgent
+from src.agents.memory import MemoryService
 from src.agents.webhook_composer import WebhookComposerAgent
 from src.knowledge import KnowledgeService
 from src.reminders import ReminderService
@@ -45,6 +46,7 @@ reminder_agent = ReminderAgent(
     llm_client=llm_client,
     reminder_service=reminder_service,
 )
+memory_service = MemoryService()
 private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
     summary_agent=summary_agent,
@@ -52,6 +54,7 @@ private_butler_agent = PrivateButlerAgent(
     web_search_service=web_search_service,
     weather_service=weather_service,
     reminder_agent=reminder_agent,
+    memory_service=memory_service,
 )
 # 模块级别：先创建 PollAgent（scheduler 尚未就绪，传 None）
 poll_agent = PollAgent(
