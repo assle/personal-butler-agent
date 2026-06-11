@@ -11,6 +11,34 @@
 - Runtime entry: `src.main:app`
 - Current interfaces: `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing; scheduler jobs push to Enterprise WeChat group webhooks through configured target JSON.
 
+## Development Workflow
+
+Three-session, two-model development pipeline. Design and review use a strong model; coding uses a cheap model.
+
+```
+会话 1（Pro）：设计
+  /superpowers:brainstorming "需求"
+    → spec doc → writing-plans → plan doc
+    → commit + push
+
+会话 2（Flash/Cheap）：编码
+  /superpowers:executing-plans <plan-file>
+    → 逐任务执行 → commit（每任务一次）
+    → 无自动审查（用 executing-plans，不用 subagent-driven）
+    → 会话必须是全新的（不继承会话 1 上下文）
+
+会话 3（Pro）：审查
+  git log --oneline    ← 检查所有 commit
+  uv run pytest tests/ ← 运行测试
+  逐文件 diff review    ← 整体审查
+  git push
+```
+
+Key rules:
+- 会话 2 用 `executing-plans` 而非 `subagent-driven-development`，因为后者的自动审查子代理也消耗 Pro 模型配额。
+- 会话 2 必须是全新会话，历史设计讨论不灌入上下文。
+- 设计完成后、开 Flash 会话前，确保 plan doc 已 commit。
+
 ## Build, Test & Verify
 
 For build, test, and verification steps, see `deployment.en.md` in the project root.
