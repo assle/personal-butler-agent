@@ -7,7 +7,7 @@
 
 - Name: Personal Butler Agent
 - Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, SQLite, Pydantic v2, uv, pytest
-- Purpose: AI personal butler for WeChat Work style natural-language workflows: private Q&A, group-chat summaries, weather lookup, reminders, and scheduled group pushes.
+- Purpose: AI personal butler for WeChat Work style natural-language workflows: private Q&A, group-chat summaries, weather lookup, reminders, polls, group translation, personalized memory, and scheduled group pushes.
 - Runtime entry: `src.main:app`
 - Current interfaces: `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing; scheduler jobs push to Enterprise WeChat group webhooks through configured target JSON.
 
@@ -29,11 +29,12 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/main.py`: FastAPI app, lifespan DB initialization, singleton wiring for domain agents and scene agents.
 - `src/messaging/`: normalized inbound messages, group message policy, and private/group scene dispatch.
 - `src/wechat/`: WeChat Work intelligent robot integration — URL callback crypto, callback router, inbound inbox, response_url reply handling.
-- `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus business agents for fitness, summary, meal, and Q&A.
+- `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate, embedding).
 - `src/graph/`: shared graph utilities, MemorySaver checkpoint instance.
 - `src/db/`: async SQLAlchemy engine, session factory, declarative base.
-- `src/models/`: SQLite ORM models for messaging, conversation memory, knowledge, and reminders.
+- `src/models/`: SQLite ORM models for messaging, conversation memory, knowledge, reminders, polls, group webhooks, and user memories.
 - `src/llm/`: LangChain ChatOpenAI wrapper pointed at DeepSeek.
+- `src/knowledge/`: Knowledge base RAG, and `EmbeddingService` (DashScope Qwen3-Embedding API with local hashing fallback).
 - `tests/`: existing pytest coverage; read only when needed and do not create new test files by default.
 
 ---

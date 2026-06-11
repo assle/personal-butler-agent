@@ -61,7 +61,7 @@
 
 ### 4.1 知识库集成
 
-- **当前**: Stage 2 QA-first 已支持 SQLite 知识库、public/user/group scope 隔离、PrivateButler 知识工具注入、本地 `.md`/`.txt` 导入脚本，以及关键词 + SQLite FTS + 本地 embedding 的混合检索。
+- **当前**: Stage 2 QA-first 已支持 SQLite 知识库、public/user/group scope 隔离、PrivateButler 知识工具注入、本地 `.md`/`.txt` 导入脚本，以及关键词 + SQLite FTS + 向量嵌入的混合检索。向量嵌入已升级为 DashScope Qwen3-Embedding API（1024 维语义向量），本地哈希 embedding 作为 fallback。
 - **下一步**: PDF/网页导入、文件上传 UI、持久化索引重建操作、可选外部向量库，并按需扩展到摘要或 webhook 内容生成。
 - **收益**: 回答更专业、更个性化，减少 LLM 幻觉，同时保留多用户/多群聊知识隔离。
 - **剩余工作量**: 中到大（主要取决于向量数据库、文件管理和后台索引重建需求）。
@@ -115,4 +115,4 @@
 | 中 | 预计 1-3 小时 |
 | 大 | 预计半天以上 |
 
-最后更新: 2026-06-11（完成 scene-agent 结构收口、群聊单次分类、scheduler 模块拆分和 CLI 入口整理）
+最后更新: 2026-06-11（新增群投票、翻译、个性化记忆、Qwen3 语义嵌入；升级 embedding 为 API 模式 + 本地 fallback）
