@@ -10,6 +10,7 @@ from src.models.inbound_message import InboundMessage
 from src.models.poll import Poll, PollVote
 from src.models.group_webhook import GroupWebhook
 from src.models.reminder import Reminder, ReminderRun
+from src.agents.memory.models import UserMemory
 
 __all__ = [
     "GroupMessage",
@@ -24,4 +25,5 @@ __all__ = [
     "GroupWebhook",
     "Reminder",
     "ReminderRun",
+    "UserMemory",
 ]
