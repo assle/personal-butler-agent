@@ -13,6 +13,7 @@ Configuration is loaded by `src/config.py` with Pydantic Settings. The app reads
 | `DEEPSEEK_MODEL` | No | `deepseek-chat` | Chat model used by `LLMClient` |
 | `DATABASE_URL` | No | `sqlite+aiosqlite:///butler.db` | SQLAlchemy async database URL |
 | `WEATHER_TIMEOUT_SECONDS` | No | `8` | Open-Meteo geocoding/forecast HTTP timeout in seconds |
+| `DASHSCOPE_API_KEY` | No | `""` | 阿里云百炼 DashScope API key，用于 Qwen3-Embedding 语义向量模型。不配则使用本地字符 n-gram 哈希嵌入 |
 
 ## Local Development
 

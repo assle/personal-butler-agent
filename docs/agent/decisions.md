@@ -207,3 +207,21 @@ Reasoning:
 When to use each pattern:
 - **Shared utility** (`translate_text`): single LLM call, no state, no persistence, no multi-step flow.
 - **Domain agent** (`PollAgent`, `SummaryAgent`): multi-step workflow, DB persistence, conditional routing, or state management.
+
+## ADR-020: API-First Embedding with Local Fallback
+
+`EmbeddingService` now supports two modes: DashScope Qwen3-Embedding API (semantic, 1024-dim) and local character n-gram hashing (lexical, 256-dim).
+
+Decision:
+- When `DASHSCOPE_API_KEY` is configured, `embed()` calls the DashScope API first.
+- If the API call fails (network error, auth failure, rate limit), `embed()` silently falls back to local hashing.
+- `similarity()` is mode-agnostic — it computes cosine similarity regardless of how the vectors were produced.
+- Callers (`MemoryService`, `KnowledgeService`) are unaware of which mode is active; they only see the `embed()` and `similarity()` interface.
+
+Reasoning:
+- Qwen3-Embedding provides true semantic matching (e.g., "不喝咖啡" ≈ "不喜欢咖啡"), enabling the personalized memory feature.
+- Local hashing costs nothing, requires no API key, and works offline — appropriate as the zero-config default.
+- Silent fallback means the app never crashes because the embedding API is down; it degrades gracefully to a lower-quality but functional mode.
+- The fallback is invisible to callers, keeping the EmbeddingService abstraction clean.
+
+Trade-off: Silent fallback means the operator won't be alerted when the API is down unless they proactively check. For a personal bot this is acceptable; for production, logging or metrics would be added.

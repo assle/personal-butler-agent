@@ -38,6 +38,8 @@ Current implementation baseline:
 - Weather lookup: Open-Meteo-backed weather data is available in private chat through `PrivateButlerAgent` tools, in group @ through a restricted `GroupMentionAgent` ToolNode loop, and in scheduler webhook raw composition through `weather_query`; no API key is required.
 - Group poll voting: `PollAgent` handles full lifecycle — create polls with natural-language end time, cast/change votes via @bot, view live results, and end polls manually. `SchedulerManager` registers one-shot APScheduler jobs for auto-ending; results are pushed to the group via webhook. `GroupWebhook` table maps `chat_id` to webhook URL, enabling dynamic push without static config.
 - LLM translation: `translate_text` function shared by `PrivateButlerAgent` (as a LangChain tool) and `GroupMentionAgent` (as a keyword-triggered node). Supports any language pair via LLM prompting, with target-language parsing from natural-language requests like "翻译成英文：你好世界".
+- Personalized memory: `MemoryService` stores user facts in `user_memories` table with vector embeddings. `PrivateButlerAgent` exposes 5 memory tools (add/list/update/delete/search_memory) and injects top-3 semantically relevant memories into the system prompt. Supports both explicit ("记住：xxx") and auto-extracted fact creation.
+- Semantic embedding: `EmbeddingService` uses DashScope Qwen3-Embedding API (`text-embedding-v4`, 1024-dim) for semantic vector matching. Falls back to local character n-gram hashing when API key is not configured or the API call fails, ensuring zero-downtime degradation.
 
 ## Deferred Work
 
