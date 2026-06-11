@@ -13,7 +13,7 @@
 
 ## Build, Test & Verify
 
-For build, test, and verification steps, see `deployment-guide.en.md` in the project root.
+For build, test, and verification steps, see `deployment.en.md` in the project root.
 
 ## Code Style & Conventions
 

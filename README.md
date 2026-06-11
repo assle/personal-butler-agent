@@ -79,10 +79,9 @@ personal_butler_agent/
 │   └── db/                      # async engine/session/base
 ├── tests/                       # pytest 测试
 ├── docs/agent/                  # 当前上下文、模式、决策、排障、配置说明
-├── i18n/                        # 历史翻译快照，不作为当前实现依据
 ├── config/scheduler_targets.example.json
-├── deployment-guide.en.md
-├── 部署指南.md
+├── deployment.en.md
+├── deployment.md
 ├── AGENTS.md
 ├── CLAUDE.md
 └── README.md
@@ -114,7 +113,7 @@ uv run butler-ingest-knowledge notes.md --scope-type public --domain qa
 https://<你的域名>/api/wechat/aibot/callback
 ```
 
-生产部署详见 [部署指南.md](部署指南.md)。
+生产部署详见 [deployment.md](deployment.md)。
 
 ## 配置
 

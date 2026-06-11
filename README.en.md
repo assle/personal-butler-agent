@@ -79,10 +79,9 @@ personal_butler_agent/
 │   └── db/
 ├── tests/
 ├── docs/agent/
-├── i18n/                        # Historical translation snapshots
 ├── config/scheduler_targets.example.json
-├── deployment-guide.en.md
-├── 部署指南.md
+├── deployment.en.md
+├── deployment.md
 ├── AGENTS.md
 ├── CLAUDE.md
 └── README.md
@@ -114,7 +113,7 @@ Configure this callback URL in WeChat Work intelligent robot admin:
 https://<your-domain>/api/wechat/aibot/callback
 ```
 
-See [deployment-guide.en.md](deployment-guide.en.md) for production setup.
+See [deployment.en.md](deployment.en.md) for production setup.
 
 ## Configuration
 
