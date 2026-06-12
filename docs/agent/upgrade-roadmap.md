@@ -59,12 +59,11 @@
 
 ## 四、知识库与 RAG
 
-### 4.1 知识库集成
+### 4.1 知识库集成 (Stage 3 已完成)
 
-- **当前**: Stage 2 QA-first 已支持 SQLite 知识库、public/user/group scope 隔离、PrivateButler 知识工具注入、本地 `.md`/`.txt` 导入脚本，以及关键词 + SQLite FTS + 向量嵌入的混合检索。向量嵌入已升级为 DashScope Qwen3-Embedding API（1024 维语义向量），本地哈希 embedding 作为 fallback。
-- **下一步**: PDF/网页导入、文件上传 UI、持久化索引重建操作、可选外部向量库，并按需扩展到摘要或 webhook 内容生成。
-- **收益**: 回答更专业、更个性化，减少 LLM 幻觉，同时保留多用户/多群聊知识隔离。
-- **剩余工作量**: 中到大（主要取决于向量数据库、文件管理和后台索引重建需求）。
+- **当前**: ChromaDB 嵌入式向量数据库替代 SQLite JSON 向量存储；Query Rewriting + 多路粗筛（关键词/FTS/Chroma） + LLM Re-rank 精排两阶段检索；段落感知分块 + overlap；支持 `.md`/`.txt`/`.pdf`/网页多格式导入；`KnowledgeService` 向后兼容。PDF/网页导入已通过 `butler-ingest-knowledge` CLI 和 `src/knowledge/parsers/` 实现。
+- **下一步**: 文件上传 UI、持久化索引重建、可选外部向量库（Milvus 等），按需集成到摘要/webhook 内容生成。
+- **工作量**: 已完成。
 
 ---
 

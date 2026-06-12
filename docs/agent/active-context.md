@@ -29,7 +29,7 @@ Current implementation baseline:
 - Group message passive collection: non-trigger group messages are saved and not replied to.
 - Group mention restricted replies: group summary, real weather lookup, simple Q&A, polls, translation, and short rejection for unavailable capabilities. Dispatch-provided categories prevent duplicate classification.
 - APScheduler 企业微信群 webhook 主动推送：按本地 JSON 配置为多个群注册独立 cron；`mode="raw"` 原样发送固定正文并可通过 `weather_query` 追加当天真实天气，`mode="compose"` 继续触发 `WebhookComposerAgent` 生成正文，再推送 markdown 到对应群 webhook。
-- 私聊创建群 webhook 提醒：`ReminderAgent` 将自然语言提醒解析为 SQLite 提醒任务；`SchedulerManager` 每分钟扫描到期提醒，并通过对应群 webhook 以 `<@userid> 事项` 形式提醒；私聊确认和提醒列表使用 target `display_name` 与本地时区展示。
+- 私聊提醒：`ReminderAgent` 解析自然语言创建提醒，支持显式提醒词（"提醒我开会"）和隐含表达（"制定会议"、"10分钟后"、"半小时后"）；`SchedulerManager` 每分钟扫描到期并通过群 webhook 以 `<@userid> 事项` 推送；私聊确认展示 target `display_name` 与本地时区。`WebhookPushClient` 检查响应 body 的 `errcode`，避免 WeChat 返回 HTTP 200 但业务失败静默丢失。
 - Structured chat summarization — private text and group chat history.
 - Knowledge-based private Q&A and lightweight group Q&A.
 - Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite.
@@ -43,9 +43,10 @@ Current implementation baseline:
 
 ## Deferred Work
 
-The README and MVP spec list these as future scope:
-- RAG Stage 3: PDF/web imports, file upload UI, persisted index rebuild operations, optional external vector store, and broader summary/webhook composition integration if needed.
 - Reminder Stage 2: 日报/周报提醒内容生成，优先复用 Summary/WebhookComposer 等当前运行 agent 生成周期报告。
+- 自建应用消息 API：私聊主动推送（需 CorpID + CorpSecret）。
+- 图片 OCR 识别。
+- Docker 化部署、CI/CD、E2E 测试。
 
 ## Working Guidance
 
