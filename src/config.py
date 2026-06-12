@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     # 定时推送配置
     scheduler_targets_file: str = ""
 
+    # 异步研究任务配置；默认关闭，启用时要求 Redis 和企微自建应用配置
+    research_enabled: bool = False
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    research_queue_name: str = "butler-research"
+    research_max_rounds: int = 4
+    research_timeout_seconds: int = 300
+
+    # 企业微信自建应用主动私聊配置，与智能机器人回调配置相互独立
+    wecom_app_corp_id: str = ""
+    wecom_app_secret: str = ""
+    wecom_app_agent_id: int = 0
+
     # 向量嵌入配置；DashScope API（Qwen3-Embedding），不配则使用本地哈希嵌入
     dashscope_api_key: str = ""
 

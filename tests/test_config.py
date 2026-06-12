@@ -96,6 +96,49 @@ def test_settings_web_search_use_defaults():
         assert settings.web_search_timeout_seconds == 8
 
 
+def test_settings_loads_research_and_wecom_app_config():
+    """验证研究队列和企微自建应用配置可从环境变量加载"""
+    env_vars = {
+        "DEEPSEEK_API_KEY": "sk-test-key",
+        "RESEARCH_ENABLED": "true",
+        "REDIS_URL": "redis://redis.test:6379/2",
+        "RESEARCH_QUEUE_NAME": "butler-research-test",
+        "RESEARCH_MAX_ROUNDS": "4",
+        "RESEARCH_TIMEOUT_SECONDS": "300",
+        "WECOM_APP_CORP_ID": "ww-test",
+        "WECOM_APP_SECRET": "secret-test",
+        "WECOM_APP_AGENT_ID": "1000002",
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+        assert settings.research_enabled is True
+        assert settings.redis_url == "redis://redis.test:6379/2"
+        assert settings.research_queue_name == "butler-research-test"
+        assert settings.research_max_rounds == 4
+        assert settings.research_timeout_seconds == 300
+        assert settings.wecom_app_corp_id == "ww-test"
+        assert settings.wecom_app_secret == "secret-test"
+        assert settings.wecom_app_agent_id == 1000002
+
+
+def test_settings_research_defaults_are_disabled():
+    """验证未配置 Redis 和自建应用时研究功能默认关闭"""
+    with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "sk-test-key"}, clear=True):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+        assert settings.research_enabled is False
+        assert settings.redis_url == "redis://127.0.0.1:6379/0"
+        assert settings.research_queue_name == "butler-research"
+        assert settings.research_max_rounds == 4
+        assert settings.research_timeout_seconds == 300
+        assert settings.wecom_app_corp_id == ""
+        assert settings.wecom_app_secret == ""
+        assert settings.wecom_app_agent_id == 0
+
+
 def test_legacy_self_built_app_env_is_ignored():
     """验证旧自建应用环境变量不再被 Settings 暴露
 
