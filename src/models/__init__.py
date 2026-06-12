@@ -11,6 +11,13 @@ from src.models.poll import Poll, PollVote
 from src.models.group_webhook import GroupWebhook
 from src.models.reminder import Reminder, ReminderRun
 from src.agents.memory.models import MemoryFragment, UserMemory, UserProfile
+from src.models.research import (
+    ResearchDelivery,
+    ResearchReport,
+    ResearchTask,
+    UserGroupAccess,
+    WeComUserBinding,
+)
 
 __all__ = [
     "GroupMessage",
@@ -28,4 +35,9 @@ __all__ = [
     "MemoryFragment",
     "UserMemory",
     "UserProfile",
+    "ResearchTask",
+    "ResearchReport",
+    "ResearchDelivery",
+    "UserGroupAccess",
+    "WeComUserBinding",
 ]
