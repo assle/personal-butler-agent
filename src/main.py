@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.config import settings
+from src.db.session import async_session
 from src.llm.client import LLMClient
 from src.agents.summary import SummaryAgent
 from src.agents.group_mention import GroupMentionAgent
@@ -58,6 +59,7 @@ private_butler_agent = PrivateButlerAgent(
     weather_service=weather_service,
     reminder_agent=reminder_agent,
     memory_service=memory_service,
+    db_session_factory=async_session,
 )
 # 模块级别：先创建 PollAgent（scheduler 尚未就绪，传 None）
 poll_agent = PollAgent(

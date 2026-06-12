@@ -9,7 +9,7 @@ Workflow:
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Float, Integer, String, Text
 
 from src.db.base import Base
 

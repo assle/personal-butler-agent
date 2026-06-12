@@ -60,6 +60,7 @@ class PrivateButlerAgent:
         weather_service=None,
         reminder_agent=None,
         memory_service=None,
+        db_session_factory=None,
     ):
         """初始化 PrivateButlerAgent 并编译工具调用图
 
@@ -69,20 +70,23 @@ class PrivateButlerAgent:
             knowledge_service: 本地知识库检索服务
             web_search_service: 联网搜索服务
             weather_service: 天气服务
-            reminder_agent: 提醒 agent，用于创建、查看和取消群 webhook 提醒
-            memory_service: 个性化记忆服务，用于检索用户记忆上下文
+            reminder_agent: 提醒 agent
+            memory_service: 个性化记忆服务
+            db_session_factory: 异步数据库会话工厂，供旁路提取任务创建独立 session
 
         返回:
             None
         """
         self._llm = llm_client
         self._memory_service = memory_service
+        self._db_session_factory = db_session_factory
         self._tool_context = PrivateButlerToolContext(
             summary_agent=summary_agent,
             knowledge_service=knowledge_service,
             web_search_service=web_search_service,
             weather_service=weather_service,
             reminder_agent=reminder_agent,
+            memory_service=memory_service,
         )
         self._tools = create_private_butler_tools(self._tool_context)
         self._graph = self._build_graph()
@@ -203,4 +207,78 @@ class PrivateButlerAgent:
             reply = "LLM 服务暂时不可用，请稍后重试。"
 
         await memory.save_exchange(user_id, message, reply, db)
+
+        # ── 旁路：异步提取画像碎片 ──
+        if (
+            chat_type == "single"
+            and self._memory_service is not None
+            and self._db_session_factory is not None
+        ):
+            import asyncio
+            asyncio.create_task(
+                _extract_fragments_side_path(
+                    message=message,
+                    user_id=user_id,
+                    db_session_factory=self._db_session_factory,
+                    memory_service=self._memory_service,
+                    llm=self._llm,
+                )
+            )
+
         return AgentResponse(reply=reply, data={"intent": "private_butler"})
+
+
+import logging as _logging
+
+from src.agents.memory.extractor import extract_fragments as _extract_fragments
+from src.agents.memory.extractor import build_profile_summary as _build_profile_summary
+
+_logger = _logging.getLogger(__name__)
+
+
+async def _extract_fragments_side_path(
+    message: str,
+    user_id: str,
+    db_session_factory,
+    memory_service,
+    llm,
+) -> None:
+    """旁路异步提取画像碎片：不阻塞主回复，失败不影响主功能
+
+    参数:
+        message: 用户原始消息
+        user_id: 用户 ID
+        db_session_factory: 返回 AsyncSession 的工厂函数
+        memory_service: MemoryService 实例
+        llm: LLMClient 实例
+    """
+    try:
+        async with db_session_factory() as db:
+            grouped = await memory_service.get_profiles_grouped(db, user_id)
+            profile_summary = _build_profile_summary(grouped)
+    except Exception:
+        return
+
+    fragments = await _extract_fragments(message, profile_summary, llm)
+    if not fragments:
+        return
+
+    try:
+        async with db_session_factory() as db:
+            for f in fragments:
+                await memory_service.add_fragment(
+                    db=db,
+                    user_id=user_id,
+                    fragment_type=f["type"],
+                    content=f["content"],
+                    signal_strength=f["signal_strength"],
+                )
+            new_profiles = await memory_service.aggregate_fragments(db, user_id)
+            await db.commit()
+            if new_profiles:
+                _logger.info(
+                    "Memory side-path: %s new profiles for user_id=%s",
+                    len(new_profiles), user_id,
+                )
+    except Exception:
+        pass
