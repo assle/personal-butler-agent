@@ -122,3 +122,47 @@ For single-step LLM operations that don't need state, persistence, or multi-step
 - No state TypedDict, no graph compilation, no agent class.
 
 Use this pattern when the operation is a pure LLM transformation. Use the full agent pattern (state + nodes + graph + handle) when the operation needs DB access, multi-step workflow, or conditional routing.
+
+## Chat-Based Knowledge Ingestion Pattern
+
+The `add_to_knowledge` tool allows users to add content to the knowledge base directly from chat, without CLI access.
+
+Rules:
+- Tool is defined in both `private_butler/tools.py` and `group_mention/tools.py` with the same name and signature.
+- Private chat tool sets `scope_type="user"`, `scope_id=user_id`; group chat tool sets `scope_type="group"`, `scope_id=chat_id`.
+- Source is synthetic: `f"chat://{chat_type}/{user_id}"` for traceability.
+- Tool calls `KnowledgeService.ingest()` which handles SHA-256 dedup and Chroma indexing.
+- Domain defaults to `"qa"`; title defaults to first 40 chars of content if not provided.
+
+## Chroma Integration Pattern
+
+`ChromaStore` wraps `chromadb.PersistentClient` for embedded vector storage. Used by `KnowledgeService` for chunk embeddings.
+
+Rules:
+- `ChromaStore()` initializes at module level in `main.py` as a singleton, same pattern as `LLMClient`.
+- `index_chunks()` is called during `ingest()` with batch-embedded vectors from `EmbeddingService.batch_embed()`.
+- `query()` includes metadata filtering for scope/domain permissions, replacing the old SQLite JOIN approach.
+- `KnowledgeService.__init__(chroma_store=None)` — when `None`, Chroma path is silently skipped (backward compat).
+- Data directory `chroma_data/` is git-ignored; migration from SQLite vectors via `butler-migrate-to-chroma`.
+
+## Side-Path Async Extraction Pattern
+
+Memory profile extraction runs as a fire-and-forget async task after the main reply is generated.
+
+Rules:
+- `PrivateButlerAgent.handle()` calls `asyncio.create_task(_extract_fragments_side_path(...))` after `memory.save_exchange()` and before `return`.
+- `_extract_fragments_side_path()` creates its own DB session via `db_session_factory()` — never reuses the request session.
+- Three guard layers: `try/except` at session open, extraction call, and write+commit.
+- Extraction pre-filter (`_should_extract`) skips messages without personal signals before any LLM call.
+- Full trace logging with `[trace:sidepath]` prefix including stage timings.
+
+## RAG Two-Stage Retrieval Pattern
+
+`KnowledgeService.search()` now implements coarse retrieval → fine re-ranking.
+
+Rules:
+- `llm` parameter is optional (keyword, default `None`). When `None`, falls back to coarse scores only.
+- Coarse retrieval runs 2 paths: Chroma vector (ANN) + SQLite FTS (keyword). Each returns up to 20 results, merged and deduped by chunk_id.
+- Re-ranking uses `reranker.rerank_chunks()` which calls LLM with a pointwise scoring prompt (0-10 scale).
+- `llm` is passed by the calling agent from `configurable["llm"]`.
+- All traces logged with `[trace:search]` prefix: query, user, result count, source titles with scores.

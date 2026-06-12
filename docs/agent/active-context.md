@@ -12,12 +12,12 @@ Current implementation baseline:
 - Message normalization: `src/messaging/inbound.py` converts callback dictionaries into `InboundMessage`
 - Scene dispatch: `src/messaging/dispatch.py` routes private chat to `PrivateButlerAgent` and group chat through `apply_group_policy()`
 - Group policy: `src/messaging/group_policy.py` saves group messages, cleans history, classifies allowed triggers, and passes the category to `GroupMentionAgent`
-- Private chat: `PrivateButlerAgent` uses LangGraph tool calling to reach summary, local knowledge, web search, weather, and reminder tools
-- Group mention: `GroupMentionAgent` supports group summaries, weather lookups, lightweight Q&A, polls (create/vote/view/end), and translation; training and meal requests are rejected in group context
+- Private chat: `PrivateButlerAgent` uses LangGraph tool calling (ReAct pattern) with 15 tools: summary, RAG search, web search, weather, reminders, translation, memory CRUD, chat-based knowledge ingestion (add_to_knowledge)
+- Group mention: `GroupMentionAgent` supports weather, polls, translation, and chat-based knowledge ingestion (add_to_knowledge, auto-scoped to group)
 - Scheduler push: `SchedulerManager` reads `SCHEDULER_TARGETS_FILE`, sends `mode="raw"` content directly with optional `weather_query` appended, or calls `WebhookComposerAgent` for `mode="compose"` targets, then sends markdown with `WebhookPushClient`
 - Runtime agents: `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, `SummaryAgent`, `ReminderAgent`, `PollAgent`
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek through `LLMClient`
-- Persistence: `group_messages`, conversation memory, knowledge-base tables, reminders, reminder runs, `inbound_messages`, polls, poll_votes, group_webhooks, `memory_fragments`, `user_profile`
+- Persistence: SQLite (`group_messages`, conversation memory, knowledge-base tables, reminders, reminder runs, `inbound_messages`, polls, poll_votes, group_webhooks, `memory_fragments`, `user_profile`) + ChromaDB (`chroma_data/` for knowledge chunks vector index)
 - Multi-turn memory: SQLite conversation memory plus LangGraph `MemorySaver` checkpointing for graph execution
 - Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_TOKEN` + `WECOM_AIBOT_ENCODING_AES_KEY`; `SCHEDULER_TARGETS_FILE` enables APScheduler-driven Enterprise WeChat group webhook push
 
@@ -40,6 +40,7 @@ Current implementation baseline:
 - LLM translation: `translate_text` function shared by `PrivateButlerAgent` (as a LangChain tool) and `GroupMentionAgent` (as a keyword-triggered node). Supports any language pair via LLM prompting, with target-language parsing from natural-language requests like "翻译成英文：你好世界".
 - Deep personalized memory (Stage 1): 双层存储——`memory_fragments` 碎片池 + `user_profile` 确认画像。`MemoryService` 支持碎片管理、聚合升级（occurrences ≥ 3）、重要性计算（来源×0.4 + 置信度×0.4 + 信号强度×0.2）、衰减和矛盾检测。`extractor.py` 隐式从每条私聊消息中提取画像碎片（preference/fact/habit/relationship），旁路异步执行不阻塞回复。prompt 注入升级为分类结构化画像 + 行为指导。`EmbeddingService` 新增 `batch_embed()` 批量 API 支持，碎片创建时缓存向量。
 - Semantic embedding: `EmbeddingService` uses DashScope Qwen3-Embedding API (`text-embedding-v4`, 1024-dim) for semantic vector matching. Falls back to local character n-gram hashing when API key is not configured or the API call fails, ensuring zero-downtime degradation.
+- Observability: Full-chain trace logging (`[trace:inject]` / `[trace:sidepath]` for memory extraction pipeline, `[trace:search]` for RAG retrieval). Logs include elapsed timings per stage, candidate counts, and source attribution.
 
 ## Deferred Work
 
@@ -50,7 +51,7 @@ Current implementation baseline:
 
 ## Working Guidance
 
-- Treat the current app as a working scene-agent MVP with LangGraph, not a blank scaffold.
+- Treat the current app as a production-stage scene-agent application with LangGraph, not a blank scaffold.
 - Real message testing now goes through the WeChat Work URL callback via HTTPS tunneling or production HTTPS.
 - Before feature work, read `docs/agent/patterns.md` and relevant tests.
 - Before changing scope or architecture, read `docs/agent/decisions.md`.

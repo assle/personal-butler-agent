@@ -2,26 +2,23 @@
 
 > Recorded architecture decisions and rationale. Load before making design choices or scope changes.
 
-## ADR-001: Single-Process FastAPI MVP
+## ADR-001: Single-Process FastAPI Application
 
-The MVP is a single-process FastAPI application. It avoids Redis, Celery, Kafka, Docker, and Kubernetes until the product needs them.
-
-Reasoning:
-- The current goal is a local, understandable personal-butler demo.
-- A single process keeps debugging and deployment simple.
-- Future scheduling can start with APScheduler before introducing external workers.
-
-## ADR-002: SQLite as the Memory Layer
-
-The MVP stores group messages, conversation memory, knowledge-base records, inbound messages, and reminders in SQLite through async SQLAlchemy.
+The application is a single-process FastAPI app backed by SQLite + ChromaDB (embedded). It avoids Redis, Celery, Kafka, Docker, and Kubernetes until the product needs them.
 
 Reasoning:
-- SQLite is enough for local single-user or small private use.
-- SQLAlchemy keeps the model layer portable if the app later moves to PostgreSQL.
+- A single process keeps debugging and deployment simple for a personal butler.
+- APScheduler handles timed jobs in-process; ChromaDB runs embedded (same process, local file).
+- Future scaling can introduce external workers or a standalone vector DB when needed.
 
-Historical note:
-- The original MVP also stored training records and user preferences. Their ORM mappings were removed after those product capabilities were retired.
-- Existing SQLite files may still contain unmapped `training_records` and `user_preferences` tables. They remain untouched until a future Alembic migration explicitly handles historical data.
+## ADR-002: SQLite + ChromaDB Dual Storage
+
+SQLite (via async SQLAlchemy) stores structured data: documents, chunks, reminders, polls, user profiles, memory fragments, conversation messages. ChromaDB (embedded) stores knowledge chunk embeddings for vector search.
+
+Reasoning:
+- SQLite is sufficient for structured data at personal scale; SQLAlchemy keeps the model layer portable to PostgreSQL.
+- ChromaDB provides native ANN search with metadata filtering, replacing the previous JSON-vector-in-SQLite approach.
+- Both are zero-config, single-file (or single-directory) storage compatible with ADR-001.
 
 ## ADR-004: Agent-per-Domain Boundaries
 
@@ -225,3 +222,32 @@ Reasoning:
 - The fallback is invisible to callers, keeping the EmbeddingService abstraction clean.
 
 Trade-off: Silent fallback means the operator won't be alerted when the API is down unless they proactively check. For a personal bot this is acceptable; for production, logging or metrics would be added.
+
+## ADR-021: ReAct Single-Agent Architecture
+
+Private chat and group chat agents use the ReAct (Reasoning + Acting) pattern via LangGraph StateGraph: `agent(call_model) → tools_condition → ToolNode → agent → extract_reply`. Domain agents (Summary, Reminder, Poll) are invoked synchronously as tools, not as independent ReAct agents.
+
+Reasoning:
+- Single-agent ReAct covers 95% of personal assistant use cases: LLM reasons about the user's intent, selects the right tool, observes the result, and decides whether to continue or reply.
+- Domain agents (SummaryAgent, ReminderAgent, PollAgent) have focused, linear workflows — wrapping them as tools is simpler than giving each its own ReAct loop.
+- LangGraph's compiled StateGraph with checkpointing provides multi-turn memory without custom state management.
+- ReAct is the current industry standard for agent development and aligns with interview expectations.
+
+Trade-off: Domain agents cannot independently reason or chain multiple tools. If a future use case requires multi-step domain reasoning (e.g., "check reminders, then create a summary based on them"), a multi-agent Supervisor pattern would be the natural upgrade path.
+
+## ADR-022: Chat-Based Knowledge Ingestion
+
+Users can add content to the knowledge base directly from chat via `add_to_knowledge` tool. Private chat auto-scopes to `user` (private), group chat auto-scopes to `group`. The tool internally calls `KnowledgeService.ingest()` with a synthetic source (`chat://{chat_type}/{user_id}`).
+
+Reasoning:
+- CLI-based import (`butler-ingest-knowledge`) is powerful but requires terminal access. Chat-based ingestion removes this friction.
+- Auto-scoping eliminates the need for users to understand scope concepts (public/user/group).
+- This pattern is used by ChatGPT Memory, Slack bots, Coze, and other production AI assistants.
+
+## ADR-023: Webhook Delivery Verification
+
+`WebhookPushClient.send_markdown()` checks the WeChat API response body `errcode` field in addition to HTTP status. The WeChat webhook API returns HTTP 200 even on business errors (e.g., invalid key), so HTTP status alone is insufficient.
+
+Reasoning:
+- Silent delivery failures waste user trust — reminders appear "sent" but never arrive.
+- The fix is minimal (one JSON parse + errcode check) with zero breaking changes.
