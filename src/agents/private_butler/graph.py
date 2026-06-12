@@ -247,6 +247,23 @@ from src.agents.memory.extractor import build_profile_summary as _build_profile_
 _logger = _logging.getLogger(__name__)
 
 
+# 意图 → 记忆应用提示框架
+_ACTIVE_MEMORY_TRIGGERS: list[tuple[tuple[str, ...], str]] = []
+
+
+def _detect_active_memory_trigger(message: str, profile_context: str) -> str:
+    """检测用户消息是否触发主动记忆应用
+
+    参数:
+        message: 用户消息
+        profile_context: 已注入的画像上下文
+
+    返回:
+        str: 额外的记忆提示文本，当前暂不追加额外文本
+    """
+    return ""
+
+
 async def _extract_fragments_side_path(
     message: str,
     user_id: str,
@@ -274,6 +291,7 @@ async def _extract_fragments_side_path(
     if not fragments:
         return
 
+    contradiction_flags: list[str] = []
     try:
         async with db_session_factory() as db:
             for f in fragments:
@@ -284,12 +302,26 @@ async def _extract_fragments_side_path(
                     content=f["content"],
                     signal_strength=f["signal_strength"],
                 )
+                # 检测矛盾
+                contradicted = await memory_service.detect_contradiction(
+                    db, user_id, f["content"],
+                )
+                if contradicted is not None:
+                    contradiction_flags.append(
+                        f"'{f['content']}' 与已有记忆 '{contradicted.content}' 不一致"
+                    )
+
             new_profiles = await memory_service.aggregate_fragments(db, user_id)
             await db.commit()
             if new_profiles:
                 _logger.info(
                     "Memory side-path: %s new profiles for user_id=%s",
                     len(new_profiles), user_id,
+                )
+            if contradiction_flags:
+                _logger.info(
+                    "Memory side-path: contradictions for user_id=%s: %s",
+                    user_id, contradiction_flags,
                 )
     except Exception:
         pass
