@@ -12,6 +12,7 @@ from pathlib import Path
 
 from src.db.base import Base
 from src.db.session import async_session, engine
+from src.knowledge.chroma_store import ChromaStore
 from src.knowledge.schemas import KnowledgeIngestRequest
 from src.knowledge.service import KnowledgeService
 
@@ -97,7 +98,7 @@ async def main() -> None:
         domain=args.domain,
         created_by=args.created_by,
     )
-    service = KnowledgeService()
+    service = KnowledgeService(chroma_store=ChromaStore())
 
     await _ensure_tables()
     async with async_session() as db:

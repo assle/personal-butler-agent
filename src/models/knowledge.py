@@ -65,7 +65,11 @@ class KnowledgeChunk(Base):
 
 
 class KnowledgeChunkEmbedding(Base):
-    """知识库 chunk 向量索引表，保存本地 embedding JSON"""
+    """知识库 chunk 向量索引表（已废弃）
+
+    Chroma 迁移后不再写入此表。保留 ORM 映射供迁移脚本读取历史数据，
+    新代码请使用 src.knowledge.ChromaStore。
+    """
 
     __tablename__ = "knowledge_chunk_embeddings"
     __table_args__ = (
