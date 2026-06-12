@@ -33,7 +33,7 @@ EXTRACT_FRAGMENTS_PROMPT = """你是用户画像碎片提取器。从用户的�
 - 没有值得提取的信息时返回空数组
 
 返回 JSON 数组，不要返回其他内容：
-[{"type": "preference", "content": "用户不喝咖啡", "signal_strength": 0.9}]"""
+[{{"type": "preference", "content": "用户不喝咖啡", "signal_strength": 0.9}}]"""
 
 # 预过滤关键词：消息必须包含至少一个才进入 LLM 提取
 _SHOULD_EXTRACT_PATTERNS = [
