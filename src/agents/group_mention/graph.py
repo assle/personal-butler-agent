@@ -20,14 +20,14 @@ from src.agents.group_mention.nodes import (
     weather_unavailable_node,
 )
 from src.agents.group_mention.state import GroupMentionState
-from src.agents.group_mention.tools import query_weather
+from src.agents.group_mention.tools import add_to_knowledge, query_weather
 from src.schemas.response import AgentResponse
 
 
 class GroupMentionAgent:
     """群聊 @ 机器人场景 agent"""
 
-    def __init__(self, llm_client, summary_agent, weather_service=None, poll_agent=None):
+    def __init__(self, llm_client, summary_agent, weather_service=None, poll_agent=None, knowledge_service=None):
         """初始化群聊 @ agent
 
         参数:
@@ -35,6 +35,7 @@ class GroupMentionAgent:
             summary_agent: 群聊总结领域 agent
             weather_service: 天气服务；未注入时天气工具返回降级提示
             poll_agent: 群投票领域 agent；未注入时投票功能不可用
+            knowledge_service: 知识库服务；用于群聊知识库添加工具
 
         返回:
             None
@@ -43,7 +44,12 @@ class GroupMentionAgent:
         self._summary_agent = summary_agent
         self._weather_service = weather_service
         self._poll_agent = poll_agent
-        self._tools = [query_weather] if weather_service is not None else []
+        self._knowledge_service = knowledge_service
+        self._tools = []
+        if weather_service is not None:
+            self._tools.append(query_weather)
+        if knowledge_service is not None:
+            self._tools.append(add_to_knowledge)
         self._graph = self._build_graph()
 
     def _build_graph(self):
@@ -135,9 +141,13 @@ class GroupMentionAgent:
         }
         config = {
             "configurable": {
+                "db": db,
                 "llm": self._llm,
                 "tools": self._tools,
+                "user_id": user_id,
+                "chat_id": extra_state.get("chat_id"),
                 "weather_service": self._weather_service,
+                "knowledge_service": self._knowledge_service,
                 "thread_id": f"group_mention:{extra_state.get('chat_id') or user_id}",
             },
             "recursion_limit": 6,

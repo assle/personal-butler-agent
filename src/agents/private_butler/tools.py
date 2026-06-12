@@ -190,6 +190,44 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         return _format_knowledge_results(results)
 
     @tool
+    async def add_to_knowledge(content: str, title: str = "") -> str:
+        """将内容存放到当前用户或群聊的知识库
+
+        当用户说"把这个加到知识库"、"帮我存一下"、"记录这个"等内容时调用。
+        会自动根据私聊/群聊设置合适的权限范围。
+
+        参数:
+            content: 要存入知识库的文本内容
+            title: 可选标题，为空时自动截取内容前 40 字符
+
+        返回:
+            str: 入库结果
+        """
+        from src.knowledge.schemas import KnowledgeIngestRequest
+        db, user_id, chat_type, chat_id = _runtime()
+        if context.knowledge_service is None:
+            return "知识库服务暂不可用。"
+        title_text = title.strip() or content.strip()[:40]
+        source = f"chat://{chat_type}/{user_id}"
+        scope_type = "group" if chat_type == "group" else "user"
+        scope_id = chat_id if chat_type == "group" else user_id
+        try:
+            request = KnowledgeIngestRequest(
+                title=title_text,
+                source=source,
+                content=content.strip(),
+                scope_type=scope_type,
+                scope_id=scope_id,
+                domain="qa",
+            )
+            doc = await context.knowledge_service.ingest(request, db)
+            if doc is None:
+                return "该内容已存在于知识库中，跳过重复导入。"
+            return f"已添加到{'群' if chat_type == 'group' else '你的个人'}知识库：\"{title_text}\""
+        except Exception as e:
+            return f"知识库添加失败：{e}"
+
+    @tool
     async def search_web(query: str) -> str:
         """使用联网搜索服务查询外部网页资料
 
@@ -397,6 +435,7 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         summarize_text,
         summarize_group_chat,
         search_local_knowledge,
+        add_to_knowledge,
         search_web,
         query_weather,
         create_group_webhook_reminder,

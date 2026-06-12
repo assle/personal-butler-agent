@@ -76,6 +76,7 @@ group_mention_agent = GroupMentionAgent(
     summary_agent=summary_agent,
     weather_service=weather_service,
     poll_agent=poll_agent,
+    knowledge_service=knowledge_service,
 )
 webhook_composer_agent = WebhookComposerAgent(
     llm_client=llm_client,

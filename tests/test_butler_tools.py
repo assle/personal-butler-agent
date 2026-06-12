@@ -87,6 +87,7 @@ def test_private_butler_exposes_only_current_scene_tools():
         "summarize_text",
         "summarize_group_chat",
         "search_local_knowledge",
+        "add_to_knowledge",
         "search_web",
         "query_weather",
         "create_group_webhook_reminder",
