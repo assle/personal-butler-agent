@@ -96,9 +96,19 @@
 
 ---
 
-## 六、多用户与群聊
+## 七、异步研究
 
-### 6.1 多用户群聊消息收集
+### 7.1 Phase 1: 基础异步研究（已完成）
+
+- **当前**: 私聊提交"深度研究：<问题>" → Redis Stream (Taskiq) 入队 → Worker 生成 unreviewed_foundation 初稿 → 企微自建应用主动私聊投递。回调 msgid 提供幂等，每用户单任务限制，研究和投递独立任务队列，token 缓存 + 重试。
+- **已完成**: ORM 模型、Taskiq broker/queue、执行器、投递服务、Worker 任务、私聊入口、127 测试。
+- **下一步**: Phase 2 — 确定性规划、授权检索、综合、引用验证；Phase 3 — Supervisor + 多 agent 协同；Phase 4 — 持久化 checkpoint + 仪表盘；Phase 5 — PostgreSQL 迁移 + 独立 Worker 池。
+
+---
+
+## 八、多用户与群聊
+
+### 8.1 多用户群聊消息收集
 
 - **当前**: 已实现 — 群聊消息通过智能机器人 URL 回调接收并被动收集到 `GroupMessage` 表；策略层分类后将结果传给 `GroupMentionAgent`
 - **目标**: 增强多群支持、跨群用户身份映射、按用户/时间段聚合摘要

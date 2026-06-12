@@ -2,14 +2,18 @@
 
 > Recorded architecture decisions and rationale. Load before making design choices or scope changes.
 
-## ADR-001: Single-Process FastAPI Application
+## ADR-001: FastAPI Producer + Optional Taskiq Workers
 
-The application is a single-process FastAPI app backed by SQLite + ChromaDB (embedded). It avoids Redis, Celery, Kafka, Docker, and Kubernetes until the product needs them.
+The default deployment is a single-process FastAPI app backed by SQLite + ChromaDB (embedded). When async research is enabled (`RESEARCH_ENABLED=true`), the architecture becomes multi-process: the FastAPI producer enqueues tasks via Redis Stream, and one or more Taskiq worker processes execute research and delivery jobs independently.
 
 Reasoning:
-- A single process keeps debugging and deployment simple for a personal butler.
+- The default single-process mode keeps debugging and deployment simple for everyday chatbot use.
 - APScheduler handles timed jobs in-process; ChromaDB runs embedded (same process, local file).
-- Future scaling can introduce external workers or a standalone vector DB when needed.
+- Redis is only required when research is enabled. The feature gate defaults to false, preserving zero-dependency startup for the base case.
+- Taskiq workers decouple long-running LLM calls from HTTP request handling, preventing callback timeouts.
+- Worker processes open their own SQLite sessions, avoiding cross-process session conflicts.
+
+## ADR-002: SQLite + ChromaDB Dual Storage
 
 ## ADR-002: SQLite + ChromaDB Dual Storage
 
@@ -251,3 +255,26 @@ Reasoning:
 Reasoning:
 - Silent delivery failures waste user trust — reminders appear "sent" but never arrive.
 - The fix is minimal (one JSON parse + errcode check) with zero breaking changes.
+
+## ADR-024: Redis Stream + Taskiq for Async Research
+
+When research is enabled, Redis Stream (via Taskiq) serves as the message queue between the FastAPI producer and independent worker processes. Database state is authoritative; the queue carries only task IDs.
+
+Reasoning:
+- **Decoupling**: Long-running LLM research calls must not block HTTP callback responses. Workers run in separate processes.
+- **Delivery isolation**: Research execution and report delivery are independent Taskiq tasks. If delivery fails, the completed report is preserved; if research fails, delivery is never enqueued.
+- **Feature gate**: `RESEARCH_ENABLED` defaults to false. Without Redis, the application runs as a single process with zero queue dependencies.
+- **Taskiq over Celery**: Taskiq is async-native (no sync workers), simpler configuration, and integrates cleanly with existing async SQLAlchemy sessions.
+- **Authoritative DB**: Task state lives in SQLite, not in the queue. Workers reopen sessions and re-derive state. This prevents split-brain between queue state and DB state.
+
+Trade-off: SQLite concurrent writers (API + 3 workers) may show `database is locked` under high load. PostgreSQL migration (Phase 5) addresses this.
+
+## ADR-025: Independent WeChat Custom-Application Delivery Channel
+
+Research results are delivered via WeChat Work custom-application API (`WECOM_APP_*`), completely separate from the intelligent robot URL callback (`WECOM_AIBOT_*`).
+
+Reasoning:
+- The intelligent robot can only reply within 30 minutes via `response_url` — insufficient for async research that may take minutes.
+- Custom-application messages can be sent to any user at any time, enabling true async push.
+- The old `WECOM_CORP_ID`/`WECOM_CORP_SECRET` fields (retired in ADR-012) were removed because the intelligent robot callback does not need them. The new `WECOM_APP_*` fields are deliberately named differently to avoid confusion.
+- `open_userid` (from robot callback) and `userid` (for app messages) are different ID spaces. `WeComUserBinding` table caches the conversion.

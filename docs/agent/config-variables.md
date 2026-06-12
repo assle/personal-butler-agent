@@ -121,6 +121,32 @@ SCHEDULER_TARGETS_FILE=config/scheduler_targets.local.json
 
 如果生产日志出现 `GET /`、`GET /health`、`GET /v1/models` 等 404，这通常是公网探测请求命中了未注册路径，不是 scheduler 配置触发的定时推送失败，详见 `docs/agent/troubleshooting.md`。
 
+## 异步研究任务
+
+Phase 1 异步研究：私聊提交问题，Worker 在独立进程中生成 LLM 初稿，通过企微自建应用主动推送给用户。默认关闭。
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `RESEARCH_ENABLED` | No | `false` | 启用异步研究任务 |
+| `REDIS_URL` | If enabled | `redis://127.0.0.1:6379/0` | Redis 连接地址 |
+| `RESEARCH_QUEUE_NAME` | If enabled | `butler-research` | Redis Stream 队列名称 |
+| `RESEARCH_MAX_ROUNDS` | If enabled | `4` | 研究最大迭代轮次 |
+| `RESEARCH_TIMEOUT_SECONDS` | If enabled | `300` | 单次研究硬超时（秒） |
+
+## 企业微信自建应用主动私聊
+
+研究报告投递使用自建应用 API，与智能机器人 URL 回调配置相互独立。
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `WECOM_APP_CORP_ID` | If research | `""` | 自建应用 CorpID |
+| `WECOM_APP_SECRET` | If research | `""` | 自建应用 Secret |
+| `WECOM_APP_AGENT_ID` | If research | `0` | 自建应用 AgentID |
+
+当 `RESEARCH_ENABLED=true` 时，`WECOM_APP_CORP_ID`、`WECOM_APP_SECRET` 和 `WECOM_APP_AGENT_ID`（>0）为必填。缺失时应用启动报 `RuntimeError`。
+
+这些变量与已退役的 `WECOM_CORP_ID`/`WECOM_CORP_SECRET` 无关：旧变量用于自建应用回调验证（已移除），新变量仅用于主动私聊消息推送。
+
 ## Change Guidance
 
 - Add new environment variables to `Settings` in `src/config.py`.

@@ -41,13 +41,15 @@ Current implementation baseline:
 - Deep personalized memory (Stage 1): 双层存储——`memory_fragments` 碎片池 + `user_profile` 确认画像。`MemoryService` 支持碎片管理、聚合升级（occurrences ≥ 3）、重要性计算（来源×0.4 + 置信度×0.4 + 信号强度×0.2）、衰减和矛盾检测。`extractor.py` 隐式从每条私聊消息中提取画像碎片（preference/fact/habit/relationship），旁路异步执行不阻塞回复。prompt 注入升级为分类结构化画像 + 行为指导。`EmbeddingService` 新增 `batch_embed()` 批量 API 支持，碎片创建时缓存向量。
 - Semantic embedding: `EmbeddingService` uses DashScope Qwen3-Embedding API (`text-embedding-v4`, 1024-dim) for semantic vector matching. Falls back to local character n-gram hashing when API key is not configured or the API call fails, ensuring zero-downtime degradation.
 - Observability: Full-chain trace logging (`[trace:inject]` / `[trace:sidepath]` for memory extraction pipeline, `[trace:search]` for RAG retrieval). Logs include elapsed timings per stage, candidate counts, and source attribution.
+- Async research foundation (Phase 1): Private chat submits "深度研究：<问题>" → durable SQLite task with callback msgid idempotency → Redis Stream (Taskiq) enqueue → independent worker generates unreviewed_foundation LLM draft → separate delivery task converts open_userid via WeCom custom-app API and pushes result to user. Feature gate: `RESEARCH_ENABLED` defaults to false. Worker command: `taskiq worker src.research.broker:broker src.research.tasks`.
+- Enterprise WeChat custom-application messaging: `WeComAppMessageClient` with `RedisAccessTokenCache`, open_userid-to-userid conversion, errcode validation, and token refresh (40014/42001).
 
 ## Deferred Work
 
 - Reminder Stage 2: 日报/周报提醒内容生成，优先复用 Summary/WebhookComposer 等当前运行 agent 生成周期报告。
-- 自建应用消息 API：私聊主动推送（需 CorpID + CorpSecret）。
 - 图片 OCR 识别。
 - Docker 化部署、CI/CD、E2E 测试。
+- Research Phase 2: Deterministic planning, authorized retrieval, synthesis, citation validation.
 
 ## Working Guidance
 

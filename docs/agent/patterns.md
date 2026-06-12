@@ -166,3 +166,24 @@ Rules:
 - Re-ranking uses `reranker.rerank_chunks()` which calls LLM with a pointwise scoring prompt (0-10 scale).
 - `llm` is passed by the calling agent from `configurable["llm"]`.
 - All traces logged with `[trace:search]` prefix: query, user, result count, source titles with scores.
+
+## Async Research Pattern
+
+Long-running research tasks run in separate worker processes via Redis Stream (Taskiq), decoupled from HTTP request handling.
+
+Key principles:
+- **Feature gate**: `RESEARCH_ENABLED` defaults to false. Without Redis, the app runs as a single process.
+- **Deterministic routing**: `PrivateButlerAgent` matches "深度研究：<question>" and "查看研究任务 <id>" via regex — no LLM call for routing.
+- **Authoritative DB**: Task state lives in SQLite (`research_tasks`, `research_reports`, `research_deliveries`). The queue carries only task IDs. Workers reopen their own DB sessions.
+- **Idempotency**: Callback `msgid` provides dedup; `create_task()` returns existing task on duplicate.
+- **Per-user concurrency**: One active task per user; `UserResearchBusyError` blocks concurrent submissions.
+- **Separation of concerns**:
+  - `research/service.py` — task lifecycle CRUD
+  - `research/queue.py` — `ResearchDispatcher` protocol (decouples from Taskiq)
+  - `research/executor.py` — single LLM call, `unreviewed_foundation` quality tag
+  - `research/delivery.py` — identity conversion + WeChat custom-app push, isolated from research
+  - `research/tasks.py` — thin Taskiq wrappers, timeout + retry logic
+  - `research/submission.py` — private-chat facade
+- **Delivery isolation**: `execute_research_job` commits report then calls `dispatcher.enqueue_delivery(task_id)` — delivery is a separate task. Delivery failure does not roll back research.
+- **Worker startup**: `taskiq worker --ack-type when_executed --workers 1 --max-async-tasks 1 src.research.broker:broker src.research.tasks`
+- **Migration path**: `taskiq.akiq()` (deprecated) → `task.kiq()` (current) → eventually supervisor pattern (Phase 3).
