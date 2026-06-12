@@ -1,9 +1,9 @@
 """
 知识库文档切块工具
-将 Markdown/TXT 文本按段落聚合成稳定 chunk，供 KnowledgeService 入库
+将 Markdown/TXT 文本按段落聚合并带 overlap 切块，供 KnowledgeService 入库。
 
 Workflow:
-  文档文本 → 去除空白段落 → 跟踪 Markdown 标题 → 按 max_chars 聚合 → KnowledgeChunkInput
+  文档文本 → 去除空白段落 → 按段落边界聚合 → 相邻块 overlap → KnowledgeChunkInput
 """
 from src.knowledge.schemas import KnowledgeChunkInput
 
@@ -20,44 +20,46 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 2)
 
 
-def chunk_text(text: str, max_chars: int = 800) -> list[KnowledgeChunkInput]:
-    """将文档文本切成 chunk
+def chunk_text(
+    text: str,
+    chunk_size: int = 800,
+    overlap: int = 100,
+) -> list[KnowledgeChunkInput]:
+    """将文档文本切成 chunk，段落感知 + 相邻块重叠
 
     参数:
         text: Markdown 或 TXT 文档文本
-        max_chars: 每个 chunk 的目标最大字符数
+        chunk_size: 每个 chunk 的目标最大字符数
+        overlap: 相邻块的重叠字符数
 
     返回:
         list[KnowledgeChunkInput]: 按原文顺序排列的切块列表
     """
-    paragraphs = [part.strip() for part in text.split("\n\n") if part.strip()]
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     if not paragraphs:
         return []
 
     chunks: list[str] = []
-    current_parts: list[str] = []
-    current_heading = ""
+    current = ""
 
-    for paragraph in paragraphs:
-        if paragraph.startswith("#"):
-            current_heading = paragraph
+    for para in paragraphs:
+        if not current:
+            current = para
+            continue
 
-        candidate_parts = [*current_parts, paragraph]
-        candidate = "\n\n".join(candidate_parts)
-        is_heading_context_only = (
-            len(current_parts) == 1
-            and current_parts[0] == current_heading
-            and not paragraph.startswith("#")
-        )
-        if current_parts and len(candidate) > max_chars and not is_heading_context_only:
-            chunks.append("\n\n".join(current_parts))
-            current_parts = []
-            if current_heading and not paragraph.startswith("#"):
-                current_parts.append(current_heading)
-        current_parts.append(paragraph)
+        candidate = current + "\n\n" + para
+        if len(candidate) > chunk_size:
+            chunks.append(current)
+            # 保留最后 overlap 字符作为下一个 chunk 的前缀
+            if len(current) > overlap:
+                current = current[-overlap:] + "\n\n" + para
+            else:
+                current = para
+        else:
+            current = candidate
 
-    if current_parts:
-        chunks.append("\n\n".join(current_parts))
+    if current.strip():
+        chunks.append(current)
 
     return [
         KnowledgeChunkInput(
