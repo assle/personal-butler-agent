@@ -190,6 +190,10 @@ class KnowledgeService:
                     candidates.append(chunk_dict)
 
         if not candidates:
+            logger.info(
+                "Knowledge search: query='%.60s' user=%s type=%s → 0 results",
+                query, user_id, chat_type,
+            )
             return []
 
         # Step 3: LLM Re-rank
@@ -199,7 +203,7 @@ class KnowledgeService:
             candidates.sort(key=lambda x: x.get("score", 0), reverse=True)
             candidates = candidates[:limit]
 
-        return [
+        results = [
             KnowledgeChunkResult(
                 content=c["content"],
                 title=c.get("title", ""),
@@ -210,6 +214,15 @@ class KnowledgeService:
             )
             for c in candidates
         ]
+        sources = ", ".join(
+            f"{r.title}({r.score:.2f})" for r in results
+        )
+        logger.info(
+            "Knowledge search: query='%.60s' user=%s type=%s → %d results (from %d coarse) sources=[%s] chroma=%s",
+            query, user_id, chat_type, len(results), len(candidates), sources,
+            self._chroma is not None,
+        )
+        return results
 
     async def _coarse_retrieval(
         self,

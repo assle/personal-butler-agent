@@ -64,4 +64,17 @@ class WebhookPushClient:
                 response.text[:200],
             )
             return False
+        # 企业微信 API 返回 200 但 errcode≠0 表示业务失败
+        try:
+            body = response.json()
+            errcode = body.get("errcode", 0)
+            if errcode != 0:
+                logger.warning(
+                    "Scheduler webhook: wechat error errcode=%s errmsg=%s",
+                    errcode,
+                    body.get("errmsg", ""),
+                )
+                return False
+        except Exception:
+            pass  # 非 JSON 响应视为成功（兼容旧格式）
         return True

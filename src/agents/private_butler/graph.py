@@ -42,10 +42,16 @@ def _direct_reminder_intent(message: str) -> str | None:
         return "list_reminders"
     if re.search(r"(取消|删除|关掉|停止).{0,8}(#?\s*\d+|提醒)", text):
         return "cancel_reminder"
-    has_reminder_word = re.search(r"(提醒我|提醒一下|定个提醒|设置提醒|到点提醒|叫我|喊我)", text)
+    has_reminder_word = re.search(
+        r"(提醒我|提醒一下|定个提醒|设置提醒|到点提醒|叫我|喊我|"
+        r"制定会议|定个会议|安排会议|设个日程|添加日程|创建日程|"
+        r"帮我提醒|帮我定|帮我安排|帮我设)",
+        text,
+    )
     has_time_word = re.search(
         r"(今天|明天|后天|今晚|早上|上午|中午|下午|晚上|每天|每周|每月|"
-        r"\d{1,2}\s*[点:：]\s*\d{0,2}|周[一二三四五六日天])",
+        r"\d{1,2}\s*[点:：]\s*\d{0,2}|周[一二三四五六日天]|"
+        r"\d+\s*分钟后|\d+\s*小时后|半小时后|一会儿后)",
         text,
     )
     if has_reminder_word and has_time_word:
