@@ -29,13 +29,20 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/main.py`: FastAPI app, lifespan DB initialization, singleton wiring for domain agents, scene agents, and optional async research.
 - `src/messaging/`: normalized inbound messages, group message policy, and private/group scene dispatch.
 - `src/wechat/`: WeChat Work intelligent robot integration (URL callback crypto, callback router, inbox, response_url reply) and custom-application client (access token cache, ID conversion, proactive private messaging).
-- `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate, embedding).
+- `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate).
 - `src/research/`: async research subsystem — task lifecycle service, Redis Stream broker (Taskiq), queue dispatcher, foundation executor, delivery service, worker tasks, and private-chat submission facade.
+- `src/memory/`: conversation memory persistence and retrieval (sliding window + LLM-compressed summary).
+- `src/reminders/`: reminder lifecycle service — natural-language parsing, CRUD, and expiry.
+- `src/scheduler/`: APScheduler lifecycle, config loading, and webhook HTTP client for outbound group pushes.
 - `src/graph/`: shared graph utilities, MemorySaver checkpoint instance.
 - `src/db/`: async SQLAlchemy engine, session factory, declarative base.
 - `src/models/`: SQLite ORM models for messaging, conversation memory, knowledge, reminders, polls, group webhooks, research tasks, and user memories.
 - `src/llm/`: LangChain ChatOpenAI wrapper pointed at DeepSeek.
 - `src/knowledge/`: Knowledge base RAG, `EmbeddingService` (DashScope Qwen3-Embedding API with local hashing fallback), `ChromaStore` embedded vector DB, parsers (PDF/web).
+- `src/search/`: web search service (DuckDuckGo), configurable and disabled by default.
+- `src/weather/`: weather lookup service (Open-Meteo geocoding and forecast APIs).
+- `src/schemas/`: shared Pydantic response schemas (`AgentResponse`).
+- `src/cli/`: CLI entry points for knowledge ingestion and Chroma migration.
 - `tests/`: existing pytest coverage.
 
 ---
