@@ -325,7 +325,12 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         memories = await service.list_memories(db, user_id)
         if not memories:
             return "你还没有保存过记忆。可以跟我说'记住：xxx'来添加。"
-        lines = [f"{i+1}. {m.content}" for i, m in enumerate(memories)]
+
+        type_labels = {"preference": "偏好", "fact": "事实", "habit": "习惯", "relationship": "关系"}
+        lines = []
+        for i, m in enumerate(memories):
+            label = type_labels.get(m.type, m.type)
+            lines.append(f"{i+1}. [{label}] {m.content}")
         return "我记得以下关于你的信息：\n" + "\n".join(lines)
 
     @tool
@@ -384,7 +389,8 @@ def create_private_butler_tools(context: PrivateButlerToolContext) -> list[Any]:
         results = await service.search(db, user_id, query)
         if not results:
             return "没有找到相关记忆。"
-        lines = [f"- {r['content']}" for r in results]
+        type_labels = {"preference": "偏好", "fact": "事实", "habit": "习惯", "relationship": "关系"}
+        lines = [f"- [{type_labels.get(r['type'], r['type'])}] {r['content']}" for r in results]
         return "相关记忆：\n" + "\n".join(lines)
 
     return [
