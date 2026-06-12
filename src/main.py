@@ -24,7 +24,7 @@ from src.agents.private_butler import PrivateButlerAgent
 from src.agents.reminder import ReminderAgent
 from src.agents.memory import MemoryService
 from src.agents.webhook_composer import WebhookComposerAgent
-from src.knowledge import KnowledgeService
+from src.knowledge import ChromaStore, KnowledgeService
 from src.knowledge.embedding import EmbeddingService
 from src.reminders import ReminderService
 from src.search import WebSearchService
@@ -41,7 +41,11 @@ if not logger.handlers:
 llm_client = LLMClient()
 reminder_service = ReminderService([])
 summary_agent = SummaryAgent(llm_client=llm_client)
-knowledge_service = KnowledgeService()
+chroma_store = ChromaStore()
+knowledge_service = KnowledgeService(
+    embedding_service=EmbeddingService(api_key=settings.dashscope_api_key),
+    chroma_store=chroma_store,
+)
 web_search_service = WebSearchService()
 weather_service = WeatherService()
 reminder_agent = ReminderAgent(

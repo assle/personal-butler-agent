@@ -1,9 +1,9 @@
 """
 本地知识库导入命令
-解析命令行参数，读取 Markdown/TXT 文档，并通过 KnowledgeService 写入数据库。
+解析命令行参数，读取 Markdown/TXT/PDF 文档或网页 URL，并通过 KnowledgeService 写入数据库。
 
 Workflow:
-  命令行参数 → 读取文件 → 确保数据库表存在 → 创建 KnowledgeIngestRequest
+  命令行参数 → 读取文件或抓取网页 → 确保数据库表存在 → 创建 KnowledgeIngestRequest
   → KnowledgeService.ingest() → 提交事务并输出导入结果
 """
 import argparse
@@ -26,10 +26,11 @@ def parse_args() -> argparse.Namespace:
         argparse.Namespace: 包含文件路径、scope、domain 等导入参数
     """
     parser = argparse.ArgumentParser(
-        description="Import a Markdown/TXT document into the knowledge base."
+        description="Import a Markdown/TXT/PDF document or web URL into the knowledge base."
     )
-    parser.add_argument("path", help="Path to .md or .txt document")
-    parser.add_argument("--title", default="", help="Document title; defaults to filename")
+    parser.add_argument("path", nargs="?", default=None, help="Path to .md, .txt, or .pdf document")
+    parser.add_argument("--url", default=None, help="Web URL to import")
+    parser.add_argument("--title", default="", help="Document title; defaults to filename or URL path")
     parser.add_argument("--scope-type", required=True, choices=["public", "user", "group"])
     parser.add_argument("--scope-id", default=None, help="Required for user/group scopes")
     parser.add_argument(
@@ -64,14 +65,32 @@ async def main() -> None:
         None；导入结果打印到标准输出
     """
     args = parse_args()
-    path = Path(args.path)
-    if path.suffix.lower() not in {".md", ".txt"}:
-        raise SystemExit("Only .md and .txt files are supported in Stage 1")
 
-    content = path.read_text(encoding="utf-8")
+    if args.path:
+        path = Path(args.path)
+        suffix = path.suffix.lower()
+        if suffix == ".pdf":
+            from src.knowledge.parsers.pdf_parser import parse_pdf
+            chunks = parse_pdf(path.read_bytes())
+            content = "\n\n".join(c.content for c in chunks)
+        elif suffix in (".md", ".txt"):
+            content = path.read_text(encoding="utf-8")
+        else:
+            raise SystemExit(f"Unsupported file type: {suffix}. Use .md, .txt, or .pdf")
+        source = str(path)
+        title = args.title or path.stem
+    elif args.url:
+        from src.knowledge.parsers.web_parser import parse_web
+        chunks = parse_web(args.url)
+        content = "\n\n".join(c.content for c in chunks)
+        source = args.url
+        title = args.title or args.url.rsplit("/", 1)[-1]
+    else:
+        raise SystemExit("Provide either a file path or --url")
+
     request = KnowledgeIngestRequest(
-        title=args.title or path.stem,
-        source=str(path),
+        title=title,
+        source=source,
         content=content,
         scope_type=args.scope_type,
         scope_id=args.scope_id,
