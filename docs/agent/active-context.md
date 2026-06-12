@@ -33,7 +33,7 @@ Current implementation baseline:
 - Structured chat summarization — private text and group chat history.
 - Knowledge-based private Q&A and lightweight group Q&A.
 - Conversation memory: 6-turn recent messages + LLM-compressed summary persisted to SQLite.
-- Stage 2 QA-first knowledge-base RAG: SQLite-backed public/user/group scoped knowledge documents and chunks, local `.md`/`.txt` import CLI, scoped retrieval service, private-butler knowledge-tool injection, and hybrid lexical + SQLite FTS + local embedding retrieval.
+- Stage 3 Chroma-backed RAG: ChromaDB 向量存储（嵌入式，零运维）替代 SQLite JSON 向量；Query Rewriting + 多路粗筛（关键词/FTS/向量） + LLM Re-rank 精排；段落感知分块 + overlap；支持 `.md`/`.txt`/`.pdf`/网页 四种格式导入。`KnowledgeService` 兼容旧接口，不传 ChromaStore 则回退到旧检索逻辑。
 - Web search tool: disabled by default, configurable through `WEB_SEARCH_*`, and available to `PrivateButlerAgent` as `search_web` for current/external information.
 - Weather lookup: Open-Meteo-backed weather data is available in private chat through `PrivateButlerAgent` tools, in group @ through a restricted `GroupMentionAgent` ToolNode loop, and in scheduler webhook raw composition through `weather_query`; no API key is required.
 - Group poll voting: `PollAgent` handles full lifecycle — create polls with natural-language end time, cast/change votes via @bot, view live results, and end polls manually. `SchedulerManager` registers one-shot APScheduler jobs for auto-ending; results are pushed to the group via webhook. `GroupWebhook` table maps `chat_id` to webhook URL, enabling dynamic push without static config.
