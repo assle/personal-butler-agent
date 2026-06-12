@@ -47,7 +47,7 @@ async def call_model(state: dict) -> dict:
             content=build_system_prompt(
                 state.get("conversation_summary"),
                 state.get("recent_messages", []),
-                memory_context=state.get("memory_context", ""),
+                profile_context=state.get("profile_context", ""),
             )
         )
     ]

@@ -165,14 +165,25 @@ class PrivateButlerAgent:
         memory = ConversationMemory(self._llm)
         summary, recent = await memory.get_context(user_id, db)
 
-        # 检索个性化记忆
-        memory_context = ""
+        # 检索分组画像
+        profile_context = ""
         if self._memory_service is not None:
             try:
-                results = await self._memory_service.search(db, user_id, message, top_k=3, threshold=0.5)
-                if results:
-                    lines = [f"- {r['content']}" for r in results]
-                    memory_context = "\n".join(lines)
+                grouped = await self._memory_service.get_profiles_grouped(db, user_id)
+                if any(grouped.values()):
+                    type_labels = {
+                        "preference": "偏好",
+                        "fact": "事实",
+                        "habit": "习惯",
+                        "relationship": "关系",
+                    }
+                    lines = []
+                    for ptype, profiles in grouped.items():
+                        if profiles:
+                            label = type_labels.get(ptype, ptype)
+                            items = [p["content"] for p in profiles]
+                            lines.append(f"- {label}: {', '.join(items)}")
+                    profile_context = "\n".join(lines)
             except Exception:
                 pass
 
@@ -183,7 +194,7 @@ class PrivateButlerAgent:
             "chat_id": chat_id,
             "conversation_summary": summary,
             "recent_messages": recent,
-            "memory_context": memory_context,
+            "profile_context": profile_context,
         }
         config = {
             "configurable": {

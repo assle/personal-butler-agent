@@ -23,8 +23,15 @@ PRIVATE_BUTLER_SYSTEM_PROMPT = """你是"小管家"，用户私聊里的总控�
 - 工具返回资料后，要用自然中文整合结果，不要暴露工具调用细节。
 - 不确定、资料不足或工具无结果时，如实说明，不要编造。
 
-已知用户信息：
-{memory_context}
+[用户画像]
+{profile_context}
+
+[行为指导]
+- 回答时参考用户画像中的偏好、事实和习惯，自然地调整推荐和建议
+- 用户表达过不喜欢的事物，避免推荐
+- 讨论技术问题时，优先用用户熟悉的工具和语言举例
+- 用户提到画像中有记录的人名时，可以自然关联
+- 不要生硬地背诵用户画像，要在对话中自然地体现对用户的了解
 
 历史摘要：
 {conversation_summary}
@@ -36,14 +43,14 @@ PRIVATE_BUTLER_SYSTEM_PROMPT = """你是"小管家"，用户私聊里的总控�
 def build_system_prompt(
     conversation_summary: str | None,
     recent_messages: list[dict] | None,
-    memory_context: str = "",
+    profile_context: str = "",
 ) -> str:
     """构建 PrivateButlerAgent system prompt
 
     参数:
         conversation_summary: ConversationMemory 返回的历史摘要，可为空
         recent_messages: ConversationMemory 返回的最近消息列表，可为空
-        memory_context: 个性化记忆上下文，由 handle() 注入
+        profile_context: 个性化画像上下文，由 handle() 注入
 
     返回:
         str: 可放入 SystemMessage 的完整提示词
@@ -60,5 +67,5 @@ def build_system_prompt(
     return PRIVATE_BUTLER_SYSTEM_PROMPT.format(
         conversation_summary=summary_text,
         recent_messages=recent_text,
-        memory_context=memory_context or "（暂无已知信息）",
+        profile_context=profile_context or "（暂无已知信息）",
     )

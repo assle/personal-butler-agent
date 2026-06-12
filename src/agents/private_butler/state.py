@@ -32,5 +32,5 @@ class PrivateButlerState(TypedDict, total=False):
     reply: str
     # 图执行过程中的错误信息
     error: str | None
-    # 个性化记忆上下文，由 handle() 检索并注入
-    memory_context: str
+    # 个性化画像上下文，由 handle() 检索并注入
+    profile_context: str
