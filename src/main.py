@@ -55,6 +55,29 @@ reminder_agent = ReminderAgent(
 memory_service = MemoryService(
     embedding_service=EmbeddingService(api_key=settings.dashscope_api_key),
 )
+
+# 异步研究任务（默认关闭，需 Redis + 企微自建应用配置）
+from src.research.service import ResearchTaskService as _ResearchTaskService
+
+research_task_service = _ResearchTaskService(
+    max_rounds=settings.research_max_rounds,
+    timeout_seconds=settings.research_timeout_seconds,
+)
+research_submitter = None
+if settings.research_enabled:
+    from src.research.broker import broker as _research_broker
+    from src.research.queue import TaskiqResearchDispatcher as _TaskiqResearchDispatcher
+    from src.research.submission import ResearchSubmissionService as _ResearchSubmissionService
+    from src.research.tasks import (
+        deliver_research_task as _deliver_task,
+        run_research_task as _run_task,
+    )
+
+    research_submitter = _ResearchSubmissionService(
+        research_task_service,
+        _TaskiqResearchDispatcher(_run_task, _deliver_task),
+    )
+
 private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
     summary_agent=summary_agent,
@@ -64,6 +87,7 @@ private_butler_agent = PrivateButlerAgent(
     reminder_agent=reminder_agent,
     memory_service=memory_service,
     db_session_factory=async_session,
+    research_submitter=research_submitter,
 )
 # 模块级别：先创建 PollAgent（scheduler 尚未就绪，传 None）
 poll_agent = PollAgent(

@@ -25,6 +25,11 @@ from src.schemas.response import AgentResponse
 
 _logger = _logging.getLogger(__name__)
 
+_RESEARCH_SUBMIT_PATTERN = re.compile(r"^(?:深度研究|研究任务)[：:]\s*(.+)$", re.DOTALL)
+_RESEARCH_STATUS_PATTERN = re.compile(
+    r"^查看研究任务\s+(R\d{8}-[A-F0-9]{8})$", re.IGNORECASE
+)
+
 
 def _direct_reminder_intent(message: str) -> str | None:
     """识别应绕过 LLM 工具选择的提醒请求
@@ -72,6 +77,7 @@ class PrivateButlerAgent:
         reminder_agent=None,
         memory_service=None,
         db_session_factory=None,
+        research_submitter=None,
     ):
         """初始化 PrivateButlerAgent 并编译工具调用图
 
@@ -84,6 +90,7 @@ class PrivateButlerAgent:
             reminder_agent: 提醒 agent
             memory_service: 个性化记忆服务
             db_session_factory: 异步数据库会话工厂，供旁路提取任务创建独立 session
+            research_submitter: 可选研究任务提交服务
 
         返回:
             None
@@ -91,6 +98,7 @@ class PrivateButlerAgent:
         self._llm = llm_client
         self._memory_service = memory_service
         self._db_session_factory = db_session_factory
+        self._research_submitter = research_submitter
         self._tool_context = PrivateButlerToolContext(
             summary_agent=summary_agent,
             knowledge_service=knowledge_service,
@@ -152,6 +160,27 @@ class PrivateButlerAgent:
         if extra_state:
             chat_type = extra_state.get("chat_type", chat_type)
             chat_id = extra_state.get("chat_id", chat_id)
+
+        # ── 研究任务提交/查询 ──
+        if chat_type == "single" and self._research_submitter is not None:
+            status_match = _RESEARCH_STATUS_PATTERN.match(message.strip())
+            if status_match:
+                reply = await self._research_submitter.status(
+                    db,
+                    task_id=status_match.group(1),
+                    requester_open_userid=user_id,
+                )
+                return AgentResponse(reply=reply, data={"intent": "research_status"})
+
+            submit_match = _RESEARCH_SUBMIT_PATTERN.match(message.strip())
+            if submit_match:
+                reply = await self._research_submitter.submit(
+                    db,
+                    source_msgid=(extra_state or {}).get("source_msgid", ""),
+                    requester_open_userid=user_id,
+                    question=submit_match.group(1).strip(),
+                )
+                return AgentResponse(reply=reply, data={"intent": "research_submit"})
 
         direct_reminder_intent = _direct_reminder_intent(message)
         if chat_type == "single" and direct_reminder_intent:

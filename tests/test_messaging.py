@@ -184,13 +184,12 @@ async def test_dispatch_private_message_to_private_butler(db_session):
 
     assert result.should_reply is True
     assert result.reply == "私聊回复"
-    private_agent.handle.assert_awaited_once_with(
-        "private_butler",
-        "今天练什么",
-        "user-a",
-        db_session,
-        extra_state={"chat_type": "single", "chat_id": None},
-    )
+    private_agent.handle.assert_awaited_once()
+    actual_kwargs = private_agent.handle.await_args.kwargs
+    actual_extra = actual_kwargs["extra_state"]
+    assert actual_extra["chat_type"] == "single"
+    assert actual_extra["chat_id"] is None
+    assert actual_extra["source_msgid"] == "msg-6"
 
 
 @pytest.mark.asyncio

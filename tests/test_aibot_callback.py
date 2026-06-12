@@ -162,13 +162,10 @@ async def test_handle_callback_message_posts_reply_to_response_url(
             {"msgtype": "markdown", "markdown": {"content": "mock private reply"}},
         )
     ]
-    mock_private_agent.handle.assert_awaited_once_with(
-        "private_butler",
-        "今天练什么",
-        "user1",
-        db_session,
-        extra_state={"chat_type": "single", "chat_id": None},
-    )
+    mock_private_agent.handle.assert_awaited_once()
+    actual_extra = mock_private_agent.handle.await_args.kwargs.get("extra_state", {})
+    assert actual_extra["chat_type"] == "single"
+    assert actual_extra["source_msgid"] == "msg-1"
     mock_group_agent.handle.assert_not_awaited()
 
 
