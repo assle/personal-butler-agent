@@ -58,6 +58,9 @@ class MemoryFragment(Base):
     content = Column(Text, nullable=False)
     """提取出的原始碎片文本，如"用户在杭州工作" """
 
+    embedding_json = Column(Text, nullable=True)
+    """向量嵌入 JSON，写入时计算一次，后续比较直接读取缓存"""
+
     signal_strength = Column(Float, nullable=False, default=0.5)
     """信号强度 0.0~1.0，越明确越高"""
 

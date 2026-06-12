@@ -7,18 +7,23 @@ Workflow:
   → tools → agent（有工具调用时循环）
   → extract_reply → END（无工具调用时输出最终回复）
 """
+import asyncio as _asyncio
+import logging as _logging
 import re
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from src.agents.memory.extractor import extract_fragments as _extract_fragments, build_profile_summary as _build_profile_summary
 from src.agents.private_butler.nodes import build_initial_messages, call_model, extract_reply
 from src.agents.private_butler.state import PrivateButlerState
 from src.agents.private_butler.tools import PrivateButlerToolContext, create_private_butler_tools
 from src.graph.memory import checkpointer as _checkpointer
 from src.memory.conversation import ConversationMemory
 from src.schemas.response import AgentResponse
+
+_logger = _logging.getLogger(__name__)
 
 
 def _direct_reminder_intent(message: str) -> str | None:
@@ -225,8 +230,7 @@ class PrivateButlerAgent:
             and self._memory_service is not None
             and self._db_session_factory is not None
         ):
-            import asyncio
-            asyncio.create_task(
+            _asyncio.create_task(
                 _extract_fragments_side_path(
                     message=message,
                     user_id=user_id,
@@ -237,14 +241,6 @@ class PrivateButlerAgent:
             )
 
         return AgentResponse(reply=reply, data={"intent": "private_butler"})
-
-
-import logging as _logging
-
-from src.agents.memory.extractor import extract_fragments as _extract_fragments
-from src.agents.memory.extractor import build_profile_summary as _build_profile_summary
-
-_logger = _logging.getLogger(__name__)
 
 
 # 意图 → 记忆应用提示框架

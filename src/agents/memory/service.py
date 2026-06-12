@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.agents.memory.models import MemoryFragment, UserMemory, UserProfile
+from src.agents.memory.models import MemoryFragment, UserProfile
 from src.knowledge.embedding import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -99,10 +99,12 @@ class MemoryService:
             return existing
 
         now = datetime.now(timezone.utc)
+        embedding_vec = await self._embedding.embed(content)
         fragment = MemoryFragment(
             user_id=user_id,
             type=fragment_type,
             content=content,
+            embedding_json=json.dumps(embedding_vec),
             signal_strength=signal_strength,
             occurrences=1,
             last_seen_at=now,
@@ -139,7 +141,12 @@ class MemoryService:
 
         query_vec = await self._embedding.embed(content)
         for f in fragments:
-            fragment_vec = await self._embedding.embed(f.content)
+            if f.embedding_json is None:
+                continue
+            try:
+                fragment_vec = json.loads(f.embedding_json)
+            except (json.JSONDecodeError, TypeError):
+                continue
             sim = self._embedding.similarity(query_vec, fragment_vec)
             if sim >= 0.85:
                 return f
@@ -169,8 +176,12 @@ class MemoryService:
         if not ready_fragments:
             return []
 
+        # 批量嵌入所有待升级碎片的文本，一次网络往返
+        upgrade_texts = [f.content for f in ready_fragments]
+        upgrade_vectors = await self._embedding.batch_embed(upgrade_texts)
+
         new_profiles: list[UserProfile] = []
-        for fragment in ready_fragments:
+        for idx, fragment in enumerate(ready_fragments):
             existing = await self._find_profile_by_content(
                 db, user_id, fragment.type, fragment.content
             )
@@ -191,7 +202,7 @@ class MemoryService:
                     confidence=confidence,
                     importance=self._calculate_importance("implicit", confidence, fragment.type),
                     source="implicit",
-                    embedding_json=json.dumps(await self._embedding.embed(fragment.content)),
+                    embedding_json=json.dumps(upgrade_vectors[idx]),
                 )
                 db.add(profile)
                 await db.flush()
@@ -408,8 +419,8 @@ class MemoryService:
             except (json.JSONDecodeError, TypeError):
                 continue
             sim = self._embedding.similarity(query_vec, p_vec)
-            # 按重要性加权
-            weighted_sim = sim * (0.6 + 0.4 * p.importance)
+            # 重要性作为加分而不是折扣：高重要性画像提升排序但不会压低低重要性画像
+            weighted_sim = sim + p.importance * 0.15
             if weighted_sim >= threshold:
                 scored.append({
                     "id": p.id,
@@ -503,6 +514,24 @@ class MemoryService:
 
     # ── 矛盾检测 ──────────────────────────────────────────
 
+    # 否定标记：一条含有而另一条不含时，可能是矛盾
+    _CONTRADICTION_NEGATION_MARKERS = ("不", "没", "别", "无", "否认", "拒绝")
+
+    @staticmethod
+    def _has_opposing_polarity(content_a: str, content_b: str) -> bool:
+        """检查两条内容是否一方否定另一方肯定
+
+        参数:
+            content_a: 已有画像内容
+            content_b: 新内容
+
+        返回:
+            bool: 存在相反极性
+        """
+        a_neg = any(m in content_a for m in MemoryService._CONTRADICTION_NEGATION_MARKERS)
+        b_neg = any(m in content_b for m in MemoryService._CONTRADICTION_NEGATION_MARKERS)
+        return a_neg != b_neg
+
     async def detect_contradiction(
         self,
         db: AsyncSession,
@@ -510,6 +539,9 @@ class MemoryService:
         new_content: str,
     ) -> UserProfile | None:
         """检测新信息是否与已有画像矛盾
+
+        策略：高语义相似度 + 相反极性（一方否定另一方肯定）才视为矛盾。
+        仅语义相似但极性相同（如"喜欢早起"和"喜欢早起去跑步"）不会被误判。
 
         参数:
             db: 异步数据库会话
@@ -532,16 +564,14 @@ class MemoryService:
             except (json.JSONDecodeError, TypeError):
                 continue
             sim = self._embedding.similarity(new_vec, p_vec)
-            # 高相似度但内容不同 → 可能是矛盾（需要更高层 LLM 判断）
-            if sim > 0.7:
-                # 降低已有画像置信度，标记为需澄清
-                p.confidence = max(0.3, p.confidence - 0.2)
+            if sim > 0.7 and self._has_opposing_polarity(p.content, new_content):
+                p.confidence = max(0.3, p.confidence - 0.15)
                 p.importance = self._calculate_importance(
                     p.source, p.confidence, p.type
                 )
                 p.updated_at = datetime.now(timezone.utc)
                 await db.flush()
-                logger.info("Memory: contradiction detected profile_id=%s", p.id)
+                logger.info("Memory: contradiction detected profile_id=%s old=%s new=%s", p.id, p.content[:40], new_content[:40])
                 return p
         return None
 
@@ -666,7 +696,7 @@ class MemoryService:
         返回:
             str: 画像类型
         """
-        preference_keywords = ("喜欢", "不喜欢", "爱", "讨厌", "偏好", "最爱", "不喜欢")
+        preference_keywords = ("喜欢", "不喜欢", "爱", "讨厌", "偏好", "最爱")
         habit_keywords = ("每天", "经常", "总是", "一直", "从来", "习惯")
         relationship_keywords = ("同事", "朋友", "老板", "领导", "家人", "同学")
         for kw in preference_keywords:

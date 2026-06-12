@@ -61,6 +61,24 @@ class EmbeddingService:
                 pass
         return self._local_embed(text)
 
+    async def batch_embed(self, texts: list[str]) -> list[list[float]]:
+        """批量将多个文本转换为归一化向量，减少网络往返
+
+        参数:
+            texts: 需要嵌入的文本列表
+
+        返回:
+            list[list[float]]: 与 texts 一一对应的向量列表
+        """
+        if not texts:
+            return []
+        if self._use_api:
+            try:
+                return await self._api_batch_embed(texts)
+            except Exception:
+                pass
+        return [self._local_embed(t) for t in texts]
+
     async def _api_embed(self, text: str) -> list[float]:
         """调用 DashScope API 生成语义向量
 
@@ -86,6 +104,32 @@ class EmbeddingService:
             response.raise_for_status()
             data = response.json()
             return list(data["data"][0]["embedding"])
+
+    async def _api_batch_embed(self, texts: list[str]) -> list[list[float]]:
+        """批量调用 DashScope API 生成语义向量，一次网络往返
+
+        参数:
+            texts: 需要嵌入的文本列表
+
+        返回:
+            list[list[float]]: 与 texts 顺序对应的向量列表
+        """
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{self._DASHSCOPE_BASE_URL}/embeddings",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self._api_model,
+                    "input": texts,
+                    "dimensions": self.dimension,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return [list(item["embedding"]) for item in data["data"]]
 
     def _local_embed(self, text: str) -> list[float]:
         """本地字符 n-gram 哈希向量（fallback）
