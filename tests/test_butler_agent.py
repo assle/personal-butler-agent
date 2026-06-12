@@ -225,3 +225,53 @@ async def test_butler_agent_runs_search_web_tool_call_loop(db_session):
     assert result.reply == "查到了：一部新韩剧正在热播。"
     web_search_service.search.assert_awaited_once_with("最新韩剧")
     assert len(llm.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_private_butler_submits_explicit_deep_research(db_session):
+    """"深度研究："在私聊中创建异步任务并绕过 ReAct 图"""
+    submitter = AsyncMock()
+    submitter.submit.return_value = "已创建研究任务 R20260612-ABCDEF12。"
+    agent = PrivateButlerAgent(
+        llm_client=FakeToolCallingLLM([]),
+        summary_agent=FakeAgent(),
+        knowledge_service=AsyncMock(),
+        web_search_service=AsyncMock(),
+        research_submitter=submitter,
+    )
+    result = await agent.handle(
+        "private_butler",
+        "深度研究：比较 Taskiq 和 Celery",
+        "open-u1",
+        db_session,
+        extra_state={"chat_type": "single", "source_msgid": "msg-r1"},
+    )
+    assert result.data == {"intent": "research_submit"}
+    submitter.submit.assert_awaited_once_with(
+        db_session,
+        source_msgid="msg-r1",
+        requester_open_userid="open-u1",
+        question="比较 Taskiq 和 Celery",
+    )
+
+
+@pytest.mark.asyncio
+async def test_private_butler_returns_research_status(db_session):
+    """"查看研究任务 ID"只允许查询当前用户任务"""
+    submitter = AsyncMock()
+    submitter.status.return_value = "任务已完成。"
+    agent = PrivateButlerAgent(
+        llm_client=FakeToolCallingLLM([]),
+        summary_agent=FakeAgent(),
+        knowledge_service=AsyncMock(),
+        web_search_service=AsyncMock(),
+        research_submitter=submitter,
+    )
+    result = await agent.handle(
+        "private_butler",
+        "查看研究任务 R20260612-ABCDEF12",
+        "open-u1",
+        db_session,
+        extra_state={"chat_type": "single", "source_msgid": "msg-status"},
+    )
+    assert result.data == {"intent": "research_status"}

@@ -64,7 +64,21 @@ research_task_service = _ResearchTaskService(
     timeout_seconds=settings.research_timeout_seconds,
 )
 research_submitter = None
+_research_broker_module = None
 if settings.research_enabled:
+    # 启动时验证必填配置
+    missing = []
+    if not settings.wecom_app_corp_id:
+        missing.append("WECOM_APP_CORP_ID")
+    if not settings.wecom_app_secret:
+        missing.append("WECOM_APP_SECRET")
+    if settings.wecom_app_agent_id <= 0:
+        missing.append("WECOM_APP_AGENT_ID")
+    if missing:
+        raise RuntimeError(
+            f"RESEARCH_ENABLED=true requires: {', '.join(missing)}"
+        )
+
     from src.research.broker import broker as _research_broker
     from src.research.queue import TaskiqResearchDispatcher as _TaskiqResearchDispatcher
     from src.research.submission import ResearchSubmissionService as _ResearchSubmissionService
@@ -73,6 +87,7 @@ if settings.research_enabled:
         run_research_task as _run_task,
     )
 
+    _research_broker_module = _research_broker
     research_submitter = _ResearchSubmissionService(
         research_task_service,
         _TaskiqResearchDispatcher(_run_task, _deliver_task),
@@ -142,8 +157,14 @@ async def lifespan(app: FastAPI):
         poll_agent._scheduler_manager = scheduler_manager
         poll_agent._webhook_client = WebhookPushClient()
 
+    # 异步研究 broker（仅在启用时）
+    if _research_broker_module is not None:
+        await _research_broker_module.startup()
+
     yield
 
+    if _research_broker_module is not None:
+        await _research_broker_module.shutdown()
     if scheduler_manager is not None:
         scheduler_manager.shutdown()
     await engine.dispose()
