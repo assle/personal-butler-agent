@@ -17,7 +17,7 @@ Current implementation baseline:
 - Scheduler push: `SchedulerManager` reads `SCHEDULER_TARGETS_FILE`, sends `mode="raw"` content directly with optional `weather_query` appended, or calls `WebhookComposerAgent` for `mode="compose"` targets, then sends markdown with `WebhookPushClient`
 - Runtime agents: `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, `SummaryAgent`, `ReminderAgent`, `PollAgent`
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek through `LLMClient`
-- Persistence: `group_messages`, conversation memory, knowledge-base tables, reminders, reminder runs, `inbound_messages`, polls, poll_votes, group_webhooks
+- Persistence: `group_messages`, conversation memory, knowledge-base tables, reminders, reminder runs, `inbound_messages`, polls, poll_votes, group_webhooks, `memory_fragments`, `user_profile`
 - Multi-turn memory: SQLite conversation memory plus LangGraph `MemorySaver` checkpointing for graph execution
 - Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_TOKEN` + `WECOM_AIBOT_ENCODING_AES_KEY`; `SCHEDULER_TARGETS_FILE` enables APScheduler-driven Enterprise WeChat group webhook push
 
@@ -38,7 +38,7 @@ Current implementation baseline:
 - Weather lookup: Open-Meteo-backed weather data is available in private chat through `PrivateButlerAgent` tools, in group @ through a restricted `GroupMentionAgent` ToolNode loop, and in scheduler webhook raw composition through `weather_query`; no API key is required.
 - Group poll voting: `PollAgent` handles full lifecycle — create polls with natural-language end time, cast/change votes via @bot, view live results, and end polls manually. `SchedulerManager` registers one-shot APScheduler jobs for auto-ending; results are pushed to the group via webhook. `GroupWebhook` table maps `chat_id` to webhook URL, enabling dynamic push without static config.
 - LLM translation: `translate_text` function shared by `PrivateButlerAgent` (as a LangChain tool) and `GroupMentionAgent` (as a keyword-triggered node). Supports any language pair via LLM prompting, with target-language parsing from natural-language requests like "翻译成英文：你好世界".
-- Personalized memory: `MemoryService` stores user facts in `user_memories` table with vector embeddings. `PrivateButlerAgent` exposes 5 memory tools (add/list/update/delete/search_memory) and injects top-3 semantically relevant memories into the system prompt. Supports both explicit ("记住：xxx") and auto-extracted fact creation.
+- Deep personalized memory (Stage 1): 双层存储——`memory_fragments` 碎片池 + `user_profile` 确认画像。`MemoryService` 支持碎片管理、聚合升级（occurrences ≥ 3）、重要性计算（来源×0.4 + 置信度×0.4 + 信号强度×0.2）、衰减和矛盾检测。`extractor.py` 隐式从每条私聊消息中提取画像碎片（preference/fact/habit/relationship），旁路异步执行不阻塞回复。prompt 注入升级为分类结构化画像 + 行为指导。`EmbeddingService` 新增 `batch_embed()` 批量 API 支持，碎片创建时缓存向量。
 - Semantic embedding: `EmbeddingService` uses DashScope Qwen3-Embedding API (`text-embedding-v4`, 1024-dim) for semantic vector matching. Falls back to local character n-gram hashing when API key is not configured or the API call fails, ensuring zero-downtime degradation.
 
 ## Deferred Work
