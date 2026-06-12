@@ -1,4 +1,6 @@
 .env
+chroma_data/
+
 .idea/
 .ipynb_checkpoints/
 config/scheduler_targets.local.json
