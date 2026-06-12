@@ -76,7 +76,13 @@ async def extract_fragments(
         list[dict]: [{"type": "preference", "content": "...", "signal_strength": 0.9}, ...]
     """
     if not _should_extract(message):
+        logger.debug(
+            "Memory extractor: skipped (no personal signal) msg=%.60s", message
+        )
         return []
+
+    logger.info("Memory extractor: extracting from msg=%.100s, existing_profiles=%s",
+                message, profile_summary or "(empty)")
 
     prompt = EXTRACT_FRAGMENTS_PROMPT.format(
         message=message,
@@ -91,6 +97,7 @@ async def extract_fragments(
             ],
             temperature=0.2,
         )
+        logger.debug("Memory extractor: raw LLM response=%.200s", raw)
         # 清理可能的 markdown 代码块包裹
         raw = raw.strip()
         if raw.startswith("```"):
@@ -100,9 +107,10 @@ async def extract_fragments(
             raw = raw.strip()
         fragments = json.loads(raw)
         if not isinstance(fragments, list):
+            logger.warning("Memory extractor: LLM returned non-list: %.100s", raw)
             return []
         valid_types = {"preference", "fact", "habit", "relationship"}
-        return [
+        result = [
             {
                 "type": f["type"],
                 "content": str(f["content"]),
@@ -111,11 +119,17 @@ async def extract_fragments(
             for f in fragments
             if isinstance(f, dict) and f.get("type") in valid_types and f.get("content")
         ]
+        if result:
+            types_str = ", ".join(f"{f['type']}:{f['content'][:30]}" for f in result)
+            logger.info("Memory extractor: extracted %d fragments: %s", len(result), types_str)
+        else:
+            logger.info("Memory extractor: no fragments extracted (empty or invalid)")
+        return result
     except (json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.debug("Memory: fragment extraction parse error: %s", e)
+        logger.warning("Memory extractor: parse error type=%s msg=%.200s", type(e).__name__, str(e))
         return []
     except Exception as e:
-        logger.warning("Memory: fragment extraction failed: %s", e)
+        logger.warning("Memory extractor: LLM call failed type=%s msg=%s", type(e).__name__, str(e))
         return []
 
 

@@ -192,6 +192,15 @@ class PrivateButlerAgent:
             except Exception:
                 pass
 
+        if profile_context:
+            _logger.info(
+                "[trace:inject] user_id=%s profile_count=%d context_preview=%.200s",
+                user_id, sum(1 for v in grouped.values() for _ in v),
+                profile_context.replace("\n", " | "),
+            )
+        else:
+            _logger.info("[trace:inject] user_id=%s profile_count=0 (no profiles)", user_id)
+
         initial_state: dict = {
             "messages": build_initial_messages(message),
             "user_id": user_id,
@@ -276,17 +285,32 @@ async def _extract_fragments_side_path(
         memory_service: MemoryService 实例
         llm: LLMClient 实例
     """
+    import time as _time
+    t0 = _time.monotonic()
+
+    # Stage 1: 加载已有画像
+    t1 = t0
     try:
         async with db_session_factory() as db:
             grouped = await memory_service.get_profiles_grouped(db, user_id)
             profile_summary = _build_profile_summary(grouped)
+        t1 = _time.monotonic()
     except Exception:
+        _logger.info("[trace:sidepath] user_id=%s stage=load_profiles FAILED", user_id)
         return
 
+    # Stage 2: LLM 提取
     fragments = await _extract_fragments(message, profile_summary, llm)
+    t2 = _time.monotonic()
     if not fragments:
+        _logger.info("[trace:sidepath] user_id=%s stage=extract elapsed=%.2fs result=empty",
+                     user_id, t2 - t1)
         return
 
+    _logger.info("[trace:sidepath] user_id=%s stage=extract elapsed=%.2fs result=%d_fragments",
+                 user_id, t2 - t1, len(fragments))
+
+    # Stage 3: 写入碎片 + 聚合 + 矛盾检测
     contradiction_flags: list[str] = []
     try:
         async with db_session_factory() as db:
@@ -298,7 +322,6 @@ async def _extract_fragments_side_path(
                     content=f["content"],
                     signal_strength=f["signal_strength"],
                 )
-                # 检测矛盾
                 contradicted = await memory_service.detect_contradiction(
                     db, user_id, f["content"],
                 )
@@ -309,15 +332,25 @@ async def _extract_fragments_side_path(
 
             new_profiles = await memory_service.aggregate_fragments(db, user_id)
             await db.commit()
+            t3 = _time.monotonic()
+
+            total_elapsed = t3 - t0
             if new_profiles:
                 _logger.info(
-                    "Memory side-path: %s new profiles for user_id=%s",
-                    len(new_profiles), user_id,
+                    "[trace:sidepath] user_id=%s stage=write elapsed=%.2fs new_profiles=%d total=%.2fs profiles_detail=[%s]",
+                    user_id, t3 - t2, len(new_profiles), total_elapsed,
+                    ", ".join(f"{p.type}:{p.content[:30]}" for p in new_profiles),
+                )
+            else:
+                _logger.info(
+                    "[trace:sidepath] user_id=%s stage=write elapsed=%.2fs new_profiles=0 total=%.2fs",
+                    user_id, t3 - t2, total_elapsed,
                 )
             if contradiction_flags:
                 _logger.info(
-                    "Memory side-path: contradictions for user_id=%s: %s",
-                    user_id, contradiction_flags,
+                    "[trace:sidepath] user_id=%s contradictions=%s",
+                    user_id, " | ".join(contradiction_flags),
                 )
     except Exception:
-        pass
+        _logger.info("[trace:sidepath] user_id=%s stage=write FAILED elapsed=%.2fs",
+                     user_id, _time.monotonic() - t2)
