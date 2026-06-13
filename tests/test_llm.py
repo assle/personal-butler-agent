@@ -9,6 +9,7 @@ import os
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage
+from pydantic import BaseModel
 
 
 @pytest.mark.asyncio
@@ -84,3 +85,28 @@ def test_llm_client_bind_tools_delegates_to_chat_model():
 
             assert result is bound_model
             mock_model.bind_tools.assert_called_once_with(tools)
+
+
+class _FakePlanDraft(BaseModel):
+    objective: str = ""
+    steps: list = []
+
+
+@pytest.mark.asyncio
+async def test_ainvoke_structured_returns_validated_model():
+    """验证结构化调用返回 Pydantic 模型"""
+    from src.llm.client import LLMClient
+
+    client = LLMClient()
+    fake_model = AsyncMock()
+    fake_model.with_structured_output.return_value.ainvoke.return_value = (
+        _FakePlanDraft(objective="compare", steps=[])
+    )
+    client._model = fake_model
+    result = await client.ainvoke_structured(
+        messages=[{"role": "user", "content": "compare"}],
+        schema=_FakePlanDraft,
+        temperature=0.1,
+    )
+    assert isinstance(result, _FakePlanDraft)
+    assert result.objective == "compare"

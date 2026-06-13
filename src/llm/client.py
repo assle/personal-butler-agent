@@ -16,6 +16,7 @@ from typing import Any
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import Runnable
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
 
 from src.config import settings
 
@@ -65,6 +66,26 @@ class LLMClient:
         """
         model = self.bind_tools(tools) if tools is not None else self._model
         return await model.ainvoke(messages, temperature=temperature)
+
+    async def ainvoke_structured(
+        self,
+        messages: list[dict[str, str]] | list[BaseMessage],
+        *,
+        schema: type[BaseModel],
+        temperature: float = 0.1,
+    ) -> BaseModel:
+        """调用模型并按 Pydantic Schema 校验输出
+
+        参数:
+            messages: 模型消息
+            schema: 目标 Pydantic 模型类型
+            temperature: 生成温度
+
+        返回:
+            BaseModel: 已通过 Schema 校验的结构化结果
+        """
+        runnable = self._model.with_structured_output(schema)
+        return await runnable.ainvoke(messages, temperature=temperature)
 
     async def chat(
         self,

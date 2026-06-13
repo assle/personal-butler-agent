@@ -6,7 +6,7 @@
 ## Project Overview
 
 - Name: Personal Butler Agent
-- Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, SQLite, ChromaDB, Taskiq, Redis, Pydantic v2, uv, pytest
+- Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, PostgreSQL (production) / SQLite (dev), asyncpg, Alembic, ChromaDB, Taskiq, Redis, Pydantic v2, uv, pytest
 - Purpose: AI personal butler for WeChat Work natural-language workflows: private Q&A, group-chat interactions, weather lookup, reminders, polls, translation, personalized memory, async long-form research, RAG knowledge retrieval, and scheduled group pushes.
 - Runtime entry: `src.main:app` (FastAPI producer); optional `taskiq worker src.research.broker:broker src.research.tasks` for async research
 - Current interfaces: `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing (inbound); scheduler jobs push to Enterprise WeChat group webhooks (outbound group); WeChat custom-application API for proactive private delivery (outbound private, research complete notifications)
@@ -30,7 +30,8 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/messaging/`: normalized inbound messages, group message policy, and private/group scene dispatch.
 - `src/wechat/`: WeChat Work intelligent robot integration (URL callback crypto, callback router, inbox, response_url reply) and custom-application client (access token cache, ID conversion, proactive private messaging).
 - `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate).
-- `src/research/`: async research subsystem — task lifecycle service, Redis Stream broker (Taskiq), queue dispatcher, foundation executor, delivery service, worker tasks, and private-chat submission facade.
+- `src/governance/`: workspace membership resolution, permission engine, and research lifecycle hooks.
+- `src/research/`: async research subsystem — task lifecycle service, Redis Stream broker (Taskiq), queue dispatcher, foundation executor, delivery service, worker tasks, private-chat submission facade, approval policy, budgeting, structured supervisor planner, retrieval specialists, governed tool registry, evidence persistence, and step execution.
 - `src/research/supervisor/`: LLM structured-output planner with validation
 - `src/research/specialists/`: knowledge and web retrieval specialists
 - `src/research/tools/`: governed tool registry with permission checks
@@ -42,7 +43,7 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/scheduler/`: APScheduler lifecycle, config loading, and webhook HTTP client for outbound group pushes.
 - `src/graph/`: shared graph utilities, MemorySaver checkpoint instance.
 - `src/db/`: async SQLAlchemy engine, session factory, declarative base.
-- `src/models/`: SQLite ORM models for messaging, conversation memory, knowledge, reminders, polls, group webhooks, research tasks, and user memories.
+- `src/models/`: PostgreSQL/SQLite ORM models for messaging, conversation memory, knowledge, reminders, polls, group webhooks, workspace governance, research tasks, execution DAG, evidence, and user memories.
 - `src/llm/`: LangChain ChatOpenAI wrapper pointed at DeepSeek.
 - `src/knowledge/`: Knowledge base RAG, `EmbeddingService` (DashScope Qwen3-Embedding API with local hashing fallback), `ChromaStore` embedded vector DB, parsers (PDF/web).
 - `src/search/`: web search service (DuckDuckGo), configurable and disabled by default.
