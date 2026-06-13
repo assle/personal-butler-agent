@@ -68,6 +68,20 @@ class ResearchDeliveryService:
         else:
             userid = binding.userid
 
+        # 使用 FOR UPDATE 行锁重新检查投递状态（并发安全）
+        locked = (
+            await db.execute(
+                select(ResearchDelivery).where(
+                    ResearchDelivery.task_id == task_id,
+                ).with_for_update()
+            )
+        ).scalar_one_or_none()
+        if locked is None:
+            # 若 delivery 在新会话中丢失，重新获取
+            pass
+        elif locked.status == ResearchDeliveryStatus.DELIVERED.value:
+            return locked
+
         delivery.status = ResearchDeliveryStatus.DELIVERING.value
         delivery.recipient_userid = userid
         delivery.attempts += 1

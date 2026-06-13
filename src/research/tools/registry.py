@@ -25,17 +25,19 @@ class ResearchToolDeniedError(RuntimeError):
 class ResearchToolRegistry:
     """按名称注册、校验和路由研究工具"""
 
-    def __init__(self, permission_engine: Any = None, hook_bus: Any = None):
+    def __init__(self, permission_engine: Any = None, hook_bus: Any = None, circuit_breaker: Any = None):
         """初始化工具注册表
 
         参数:
             permission_engine: 可选权限引擎
             hook_bus: 可选 Hook 总线
+            circuit_breaker: 可选提供者熔断器
         """
         self._tools: dict[str, ResearchToolDefinition] = {}
         self._providers: dict[str, Any] = {}
         self._permission = permission_engine
         self._hooks = hook_bus
+        self._circuit = circuit_breaker
 
     def register(
         self,
@@ -136,6 +138,15 @@ class ResearchToolRegistry:
                     error=f"工具 {tool_name} 权限不足: {decision.reason}",
                 )
 
+        # 提供者熔断检查
+        provider_name = definition.provider_name or tool_name
+        if self._circuit is not None and not await self._circuit.allow(provider_name):
+            return ToolExecutionResult(
+                success=False,
+                error=f"provider_circuit_open: {provider_name}",
+                data={"failure_category": "provider_5xx", "retryable": True},
+            )
+
         # 执行提供者
         provider = self._providers.get(tool_name)
         if provider is None:
@@ -153,6 +164,8 @@ class ResearchToolRegistry:
                 error=f"工具 {tool_name} 执行超时 ({definition.timeout_seconds}s)",
             )
         except Exception as exc:
+            if self._circuit is not None:
+                await self._circuit.record_failure(provider_name)
             from src.research.reliability.errors import classify_error, FailureCategory
             decision = classify_error(exc)
             if decision.degrade_provider:
@@ -163,7 +176,9 @@ class ResearchToolRegistry:
                 data={"failure_category": decision.category.value, "retryable": decision.retryable},
             )
 
-        # 发射 AFTER_TOOL Hook
+        # 记录成功并发射 AFTER_TOOL Hook
+        if self._circuit is not None and result.success:
+            await self._circuit.record_success(provider_name)
         if self._hooks is not None:
             from src.governance.hooks import HookEvent
             try:

@@ -198,6 +198,58 @@ class ResearchStepService:
             logger.info("Step: recovered %d expired leases", len(recovered_ids))
         return recovered_ids
 
+    async def schedule_retry(
+        self, db: AsyncSession, step: ResearchStep, *, delay_seconds: int, error: str
+    ) -> ResearchStep | None:
+        """调度步骤重试
+
+        如果步骤已达最大尝试次数，则标记为失败而非重试。
+
+        参数:
+            db: 异步数据库会话
+            step: 步骤实例
+            delay_seconds: 重试延迟秒数
+            error: 错误信息
+
+        返回:
+            ResearchStep | None: 已调度的步骤，或 None（已达最大尝试次数）
+        """
+        if step.attempt_count >= step.max_attempts:
+            return await self.complete_step(db, step.id, error=error)
+        step.status = ResearchStepStatus.RETRY_WAIT.value
+        step.available_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        step.owner = None
+        step.lease_expires_at = None
+        step.error = error[:1000]
+        await db.flush()
+        return step
+
+    async def promote_due_retries(self, db: AsyncSession, *, limit: int = 100) -> int:
+        """将所有已到期的 RETRY_WAIT 步骤提升为 READY
+
+        参数:
+            db: 异步数据库会话
+            limit: 最大提升数
+
+        返回:
+            int: 提升的步骤数
+        """
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            select(ResearchStep).where(
+                ResearchStep.status == ResearchStepStatus.RETRY_WAIT.value,
+                ResearchStep.available_at <= now,
+            ).limit(limit)
+        )
+        steps = result.scalars().all()
+        for step in steps:
+            step.status = ResearchStepStatus.READY.value
+            step.available_at = now
+            step.updated_at = now
+        if steps:
+            await db.flush()
+        return len(steps)
+
     async def mark_root_steps_ready(
         self, db: AsyncSession, task_id: str
     ) -> int:

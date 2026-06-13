@@ -36,10 +36,12 @@ class ResearchStepExecutor:
         registry,
         evidence_service: ResearchEvidenceService,
         step_service,
+        retry_policy=None,
     ):
         self._registry = registry
         self._evidence = evidence_service
         self._steps = step_service
+        self._retry_policy = retry_policy
 
     async def execute(
         self,
@@ -80,12 +82,21 @@ class ResearchStepExecutor:
         if not tool_result.success:
             retryable = tool_result.data.get("retryable", False)
             if retryable:
-                step.status = ResearchStepStatus.RETRY_WAIT.value
-                step.owner = None
-                step.lease_expires_at = None
-                step.error = tool_result.error
-                step.updated_at = datetime.now(timezone.utc)
-                await db.flush()
+                if self._retry_policy is not None:
+                    delay = self._retry_policy.delay(
+                        attempt=step.attempt_count,
+                        retry_after=tool_result.data.get("retry_after"),
+                    )
+                    await self._steps.schedule_retry(
+                        db, step, delay_seconds=delay, error=tool_result.error,
+                    )
+                else:
+                    step.status = ResearchStepStatus.RETRY_WAIT.value
+                    step.owner = None
+                    step.lease_expires_at = None
+                    step.error = tool_result.error
+                    step.updated_at = datetime.now(timezone.utc)
+                    await db.flush()
                 logger.warning("Step %s: retryable failure — %s", step_id, tool_result.error)
                 return StepExecutionResult(
                     step_id=step_id, success=False, error=tool_result.error,

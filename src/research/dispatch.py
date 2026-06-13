@@ -28,20 +28,22 @@ class ResearchStepDispatcher:
         self._session_factory = session_factory
         self._max = max_concurrent
 
-    async def dispatch_ready(self, task_id: str) -> int:
-        """认领任务的就绪步骤并派发到队列
+    async def dispatch_ready(self, task_id: str | None = None) -> int:
+        """认领就绪步骤并派发到队列
 
-        先原子认领步骤（持久化 running 状态），再逐个派发到队列。
+        先将已到期的 RETRY_WAIT 步骤提升为 READY，
+        再原子认领步骤（持久化 running 状态），逐个派发到队列。
         任意步骤入队失败时释放其租约，最后传播首个异常。
 
         参数:
-            task_id: 研究任务 ID
+            task_id: 可选研究任务 ID，不指定时认领所有任务的就绪步骤
 
         返回:
             int: 成功派发的步骤数
         """
         owner = f"dispatch:{uuid.uuid4().hex[:8]}"
         async with self._session_factory() as db:
+            await self._steps.promote_due_retries(db, limit=100)
             steps = await self._steps.claim_next(db, owner=owner, limit=self._max, task_id=task_id)
             await db.commit()
 

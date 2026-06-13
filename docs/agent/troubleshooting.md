@@ -189,3 +189,93 @@ Check:
 Fix pattern:
 - Do not treat generic public 404s as scheduler failures.
 - Add a dedicated health route only if deployment monitoring requires it.
+
+## Research Step Stuck in RETRY_WAIT
+
+Symptom:
+- Step remains in `retry_wait` status longer than expected. Worker never picks it up.
+
+Check:
+- Confirm `promote_due_retries()` is called before `claim_next()` in the dispatch path.
+- `dispatch_ready()` in `ResearchStepDispatcher` calls `promote_due_retries()` before claiming.
+- Watchdog `run_once()` also calls `promote_due_retries()` alongside `recover_expired_leases()`.
+
+Fix pattern:
+- Ensure every dispatch entry point promotes due retries before claiming.
+
+## Research Step Undispatch After Recovery
+
+Symptom:
+- Watchdog recovers expired leases but steps are not re-dispatched.
+
+Check:
+- Watchdog no longer calls `enqueue_step()` directly on recovered steps.
+- It calls `dispatcher.dispatch_ready()` which claims-before-enqueue.
+- `dispatch_ready()` requires a database session — verify the watchdog commits the recovery before calling dispatch.
+
+Fix pattern:
+- Watchdog commits recovered/promoted steps first, then calls `dispatcher.dispatch_ready()`.
+
+## Definition-Only Provider Registered with No Executor
+
+Symptom:
+- Tool returns "工具 {tool_name} 无可用提供者" at runtime.
+
+Check:
+- Verify `register()` was called with a `provider=` argument for the tool name.
+- Some tools (e.g., `human_review`) are definition-only and cannot be executed — check the tool name against supported executor tools.
+
+Fix pattern:
+- Register executable tools with a provider instance. For definition-only tools, the registry handles the "no provider" case gracefully.
+
+## Concurrent Research Step Claim Collision
+
+Symptom:
+- Two workers claim the same step concurrently, or a step is claimed by multiple workers.
+
+Check:
+- PostgreSQL uses `SELECT ... FOR UPDATE SKIP LOCKED` to prevent concurrent claims.
+- Verify the `claim_next()` method uses `with_for_update(skip_locked=True)`.
+- The integration test `test_concurrent_workers_claim_different_steps` verifies two workers get different steps.
+
+Fix pattern:
+- Ensure the database dialect supports row locking (PostgreSQL). SQLite does not support FOR UPDATE.
+
+## Research Stage Transition Before Enqueue
+
+Symptom:
+- `queue_synthesis_if_complete()` detects all steps complete, transitions task to `SYNTHESIZING`, but the synthesis enqueue happens after commit — if the process crashes between commit and enqueue, the task is stuck.
+
+Check:
+- The pipeline commits the transition first, then calls the dispatch enqueue.
+- If the dispatch enqueue fails, the transition is already committed. The task will be in `SYNTHESIZING` but not actually synthesizing.
+
+Fix pattern:
+- `queue_synthesis_if_complete()` returns False on `InvalidResearchTransitionError` — this handles the case where two concurrent calls both pass the completion check.
+- The idempotency test `test_concurrent_synthesis_is_idempotent` verifies only one call succeeds.
+
+## Research Delivery Not Idempotent Under Concurrency
+
+Symptom:
+- Two workers both attempt to deliver the same research report, sending duplicate messages.
+
+Check:
+- `deliver()` in `ResearchDeliveryService` re-reads delivery status under `FOR UPDATE` lock before sending.
+- The initial check without lock is a fast path; the locked re-check ensures only one worker proceeds.
+
+Fix pattern:
+- Always re-check terminal states under row lock before writing.
+
+## Circuit Breaker Blocks Provider Prematurely
+
+Symptom:
+- `web.search` returns "provider_circuit_open" even though the provider is healthy.
+
+Check:
+- The circuit breaker tracks consecutive failures in Redis: `research:circuit:{provider}:failures`.
+- Check Redis key expiry — it is set to `open_seconds * 2` for the failure counter.
+- The circuit auto-resets after `open_seconds`.
+
+Fix pattern:
+- Verify the circuit breaker configuration (`failure_threshold`, `open_seconds`) matches provider reliability expectations.
+

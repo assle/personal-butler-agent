@@ -29,7 +29,17 @@ async def postgres_engine():
 
 
 @pytest_asyncio.fixture
-async def postgres_session(postgres_engine):
+async def postgres_schema(postgres_engine):
+    """创建并清空 PostgreSQL 表结构"""
+    from src.db.base import Base
+    async with postgres_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        for table in reversed(Base.metadata.sorted_tables):
+            await conn.execute(table.delete())
+
+
+@pytest_asyncio.fixture
+async def postgres_session(postgres_engine, postgres_schema):
     """提供每个测试自动回滚的 PostgreSQL 会话
 
     产出:
@@ -50,7 +60,22 @@ async def postgres_session(postgres_engine):
 
 
 @pytest_asyncio.fixture
-async def postgres_session_factory(postgres_engine):
+async def redis_client():
+    import os
+    from redis.asyncio import Redis
+    url = os.getenv("REDIS_URL", "")
+    if not url.startswith("redis://"):
+        pytest.skip("REDIS_URL is required for Redis integration tests")
+    client = Redis.from_url(url, decode_responses=True)
+    await client.ping()
+    await client.flushdb()
+    yield client
+    await client.flushdb()
+    await client.aclose()
+
+
+@pytest_asyncio.fixture
+async def postgres_session_factory(postgres_engine, postgres_schema):
     """提供并发 PostgreSQL 会话工厂
 
     产出:

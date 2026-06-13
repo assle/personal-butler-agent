@@ -81,3 +81,18 @@ async def test_registry_passes_database_session_to_provider():
     result = await registry.execute(db, _ctx(), "knowledge.search", {"query": "test"})
     assert result.success is True
     provider.execute.assert_awaited_once_with(db, _ctx(), {"query": "test"})
+
+
+@pytest.mark.asyncio
+async def test_open_circuit_blocks_provider():
+    """验证熔断器打开时阻止提供者执行"""
+    from unittest.mock import AsyncMock
+    breaker = AsyncMock()
+    breaker.allow.return_value = False
+    provider = AsyncMock()
+    registry = ResearchToolRegistry(circuit_breaker=breaker)
+    registry.register(ResearchToolDefinition(name="web.search"), provider=provider)
+    result = await registry.execute(AsyncMock(), _ctx(), "web.search", {"query": "x"})
+    assert result.success is False
+    assert "circuit_open" in result.error
+    provider.execute.assert_not_awaited()
