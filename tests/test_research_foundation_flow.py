@@ -23,16 +23,21 @@ class RecordingDispatcher:
 
     def __init__(self):
         """初始化记录列表"""
-        self.research_ids: list[str] = []
+        self.planning_ids: list[str] = []
         self.delivery_ids: list[str] = []
+        self.research_ids: list[str] = []
 
-    async def enqueue_research(self, task_id: str) -> None:
-        """记录研究任务 ID"""
-        self.research_ids.append(task_id)
+    async def enqueue_planning(self, task_id: str) -> None:
+        """记录规划任务 ID"""
+        self.planning_ids.append(task_id)
 
     async def enqueue_delivery(self, task_id: str) -> None:
         """记录投递任务 ID"""
         self.delivery_ids.append(task_id)
+
+    async def enqueue_research(self, task_id: str) -> None:
+        """记录研究任务 ID（legacy）"""
+        self.research_ids.append(task_id)
 
 
 @pytest.mark.asyncio
@@ -85,7 +90,7 @@ async def test_private_research_foundation_flow_is_durable_and_idempotent(
     rows = (await db_session.execute(select(ResearchTask))).scalars().all()
     assert duplicate.reply == first.reply
     assert len(rows) == 1
-    assert dispatcher.research_ids == [task_id]
+    assert dispatcher.planning_ids == [task_id]
 
     llm = AsyncMock()
     llm.chat.return_value = "## 初步结论\nTaskiq 更贴近 async 项目。"

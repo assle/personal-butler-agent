@@ -143,6 +143,7 @@ _supervisor = ResearchSupervisor(
     llm=LLMClient(),
     validator=PlanValidator(allowed_tools={"knowledge.search", "web.search"}),
     plan_service=PlanService(),
+    registry=_registry,
     approval_policy=ApprovalPolicy(high_cost_microunits=settings.research_high_cost_approval_microunits),
     approval_service=ApprovalService(
         ApprovalPolicy(high_cost_microunits=settings.research_high_cost_approval_microunits),
@@ -286,6 +287,7 @@ async def execute_step_job(
     session_factory,
     step_service,
     executor=None,
+    dispatcher=None,
 ) -> None:
     """执行单个研究步骤
 
@@ -294,11 +296,14 @@ async def execute_step_job(
         session_factory: 数据库会话工厂
         step_service: 步骤服务
         executor: 可选步骤执行器（Phase 3），不为 None 时执行真实工具调用
+        dispatcher: 可选派发器，不为 None 时在所有步骤完成后派发综合任务
     """
     async with session_factory() as db:
         step = await db.get(ResearchStep, step_id)
         if step is None or step.status != ResearchStepStatus.RUNNING.value:
             return
+
+        task_id = step.task_id  # 在 commit 前保存，避免过期对象访问
 
         try:
             if executor is not None:
@@ -318,6 +323,18 @@ async def execute_step_job(
                     fail_db, step_id, error=str(exc),
                 )
                 await fail_db.commit()
+            return
+
+        # 检查任务的所有步骤是否都已完成，若全部完成则派发综合
+        if dispatcher is not None:
+            all_steps_result = await db.execute(
+                select(ResearchStep.id, ResearchStep.status).where(
+                    ResearchStep.task_id == task_id,
+                )
+            )
+            all_statuses = [row[1] for row in all_steps_result.all()]
+            if all_statuses and all(s == ResearchStepStatus.COMPLETED.value for s in all_statuses):
+                await dispatcher.enqueue_synthesis(task_id)
 
 
 async def execute_lease_recovery_job(
@@ -356,6 +373,7 @@ async def run_research_step(step_id: str) -> None:
         session_factory=async_session,
         step_service=_step_service,
         executor=_step_executor,
+        dispatcher=_dispatcher,
     )
 
 
@@ -402,6 +420,7 @@ async def validate_research_task(task_id: str) -> None:
                 )
                 await db.commit()
             elif decision.outcome == "repair":
+                task = await _task_service.get_task(db, task_id)
                 from src.research.quality import QualityRepairCoordinator
                 from src.research.planning.service import PlanService
                 coordinator = QualityRepairCoordinator(
@@ -409,7 +428,30 @@ async def validate_research_task(task_id: str) -> None:
                     plan_service=PlanService(),
                     max_repair_rounds=1,
                 )
-                await coordinator.handle(db, task_id, decision)
+                result = await coordinator.handle(db, task_id, decision)
+                if result.new_step_ids:
+                    # 修复步骤已创建，回退到 RUNNING 并派发修复步骤
+                    await _task_service.transition(
+                        db, task_id, task.workspace_id,
+                        expected={ResearchTaskStatus.VALIDATING},
+                        target=ResearchTaskStatus.RUNNING,
+                    )
+                    for step_id in result.new_step_ids:
+                        await _dispatcher.enqueue_step(step_id)
+                elif result.failed:
+                    await _task_service.mark_failed(db, task_id, "质量修复超出最大轮次")
+                else:
+                    # "weaken" — 弱化声明后直接完成验证
+                    await _task_service.transition(
+                        db, task_id, task.workspace_id,
+                        expected={ResearchTaskStatus.VALIDATING},
+                        target=ResearchTaskStatus.COMPLETED,
+                    )
+                    await db.execute(
+                        update(ResearchReport)
+                        .where(ResearchReport.task_id == task_id)
+                        .values(report_status="validated", validated_at=datetime.now(timezone.utc))
+                    )
                 await db.commit()
             else:  # fail
                 await _task_service.mark_failed(db, task_id, "Citation review failed")
@@ -418,3 +460,14 @@ async def validate_research_task(task_id: str) -> None:
             await db.rollback()
             logger.error("Validation failed for %s: %s", task_id, exc)
             raise
+
+
+# 在全部 broker task 定义之后创建模块级派发器，使 execute_step_job 可引用
+_dispatcher = TaskiqResearchDispatcher(
+    run_task=run_research_task,
+    deliver_task=deliver_research_task,
+    plan_task=plan_research_task,
+    step_task=run_research_step,
+    synthesis_task=synthesize_research_task,
+    validation_task=validate_research_task,
+)

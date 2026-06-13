@@ -281,8 +281,8 @@ class ResearchTaskService:
             await db.execute(
                 select(ResearchReport).where(
                     ResearchReport.task_id == task_id,
-                    ResearchReport.version == 1,
-                )
+                    ResearchReport.report_status == "validated",
+                ).order_by(ResearchReport.version.desc()).limit(1)
             )
         ).scalar_one()
         return ResearchReportSnapshot(

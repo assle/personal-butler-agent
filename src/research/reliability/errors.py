@@ -23,20 +23,38 @@ class FailureDecision:
 
 
 def classify_error(error: Exception) -> FailureDecision:
-    """将异常映射为失败分类和重试建议"""
+    """将异常映射为失败分类和重试建议
+
+    优先级：异常类型层级检查优先于字符串匹配，避免误分类。
+    字符串匹配作为自定义异常（如 FakePermission）的 fallback。
+    """
+    import asyncio
+
+    # 类型层级检查（优先于字符串匹配）
+    if isinstance(error, asyncio.TimeoutError):
+        return FailureDecision(FailureCategory.NETWORK, True)
+
     name = type(error).__name__
     msg = str(error).lower()
 
-    if "timeout" in name.lower() or "timeout" in msg:
-        return FailureDecision(FailureCategory.NETWORK, True)
+    # 异常类名匹配真实标准异常
+    if "PermissionError" in name or "Forbidden" in name or name == "PermissionError":
+        return FailureDecision(FailureCategory.PERMISSION, False)
+    if "ValueError" in name or "TypeError" in name or "AssertionError" in name:
+        return FailureDecision(FailureCategory.INVALID_INPUT, False)
+
+    # 字符串匹配（传输层和限流错误，以及自定义异常 fallback）
     if "429" in msg or "rate" in msg or "throttl" in msg:
         return FailureDecision(FailureCategory.RATE_LIMIT, True)
-    if "503" in msg or "502" in msg or "500" in msg or "server error" in msg:
+    if "503" in msg or "502" in msg:
         return FailureDecision(FailureCategory.PROVIDER_5XX, True, degrade_provider=True)
-    if "context" in msg and ("overflow" in msg or "too long" in msg or "exceed" in msg):
+    if "timeout" in msg:
+        return FailureDecision(FailureCategory.NETWORK, True)
+    if "context" in msg and ("overflow" in msg or "too long" in msg):
         return FailureDecision(FailureCategory.CONTEXT_OVERFLOW, True)
     if "permission" in msg or "denied" in msg or "forbidden" in msg:
         return FailureDecision(FailureCategory.PERMISSION, False)
-    if "invalid" in msg or "bad" in msg or "argument" in msg:
+    if "invalid" in msg or "bad argument" in msg:
         return FailureDecision(FailureCategory.INVALID_INPUT, False)
+
     return FailureDecision(FailureCategory.TERMINAL, False)

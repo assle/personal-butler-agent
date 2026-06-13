@@ -210,7 +210,7 @@ class ResearchStepService:
     async def _unblock_dependents(
         self, db: AsyncSession, completed_step_id: str
     ) -> None:
-        """解除依赖 completed_step_id 的阻塞步骤
+        """解除依赖 completed_step_id 的阻塞步骤（批量查询避免 N+1）
 
         参数:
             db: 异步数据库会话
@@ -228,17 +228,14 @@ class ResearchStepService:
 
         now = datetime.now(timezone.utc)
         for dep_step_id in dependent_step_ids:
-            # 检查该步骤的所有依赖是否都已完成
-            all_deps_result = await db.execute(
-                select(ResearchStepDependency.depends_on_step_id).where(
-                    ResearchStepDependency.step_id == dep_step_id,
-                )
-            )
-            all_dep_ids = {row[0] for row in all_deps_result.all()}
-
+            # 一次查询检查该步骤的所有依赖是否都已完成
             incomplete = await db.execute(
                 select(ResearchStep).where(
-                    ResearchStep.id.in_(all_dep_ids),
+                    ResearchStep.id.in_(
+                        select(ResearchStepDependency.depends_on_step_id).where(
+                            ResearchStepDependency.step_id == dep_step_id,
+                        )
+                    ),
                     ResearchStep.status.notin_([
                         ResearchStepStatus.COMPLETED.value,
                     ]),
@@ -259,7 +256,7 @@ class ResearchStepService:
     async def _cancel_dependents(
         self, db: AsyncSession, failed_step_id: str
     ) -> None:
-        """取消依赖失败步骤的所有后续步骤"""
+        """取消依赖失败步骤的所有后续步骤（递归传播）"""
         dep_result = await db.execute(
             select(ResearchStepDependency.step_id).where(
                 ResearchStepDependency.depends_on_step_id == failed_step_id,
@@ -275,3 +272,5 @@ class ResearchStepService:
                 step.status = ResearchStepStatus.CANCELLED.value
                 step.error = f"前置步骤 {failed_step_id} 执行失败"
                 step.updated_at = datetime.now(timezone.utc)
+                # 递归取消依赖此步骤的后续步骤
+                await self._cancel_dependents(db, step_id)

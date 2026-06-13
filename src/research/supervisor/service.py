@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.research.planning.schemas import PlanDraft
-from src.research.planning.validator import BudgetLimits, PlanValidator
+from src.research.budgets import BudgetLimits
+from src.research.planning.validator import PlanValidator
 from src.research.supervisor.planner import PlanningResult, TaskSnapshot
 from src.research.supervisor.prompts import SUPERVISOR_SYSTEM_PROMPT
 
@@ -28,6 +29,7 @@ class ResearchSupervisor:
         approval_policy,
         approval_service=None,
         hook_bus=None,
+        registry=None,
         max_steps: int = 12,
         max_tokens: int = 20_000,
         max_cost_microunits: int = 500_000,
@@ -41,6 +43,7 @@ class ResearchSupervisor:
             approval_policy: ApprovalPolicy 实例
             approval_service: ApprovalService 实例
             hook_bus: HookBus 实例
+            registry: 可选 ResearchToolRegistry，用于动态构建工具目录
             max_steps: 最大步骤数
             max_tokens: 最大 token 数
             max_cost_microunits: 最大成本微单位
@@ -51,6 +54,7 @@ class ResearchSupervisor:
         self._approval_policy = approval_policy
         self._approval_service = approval_service
         self._hooks = hook_bus
+        self._registry = registry
         self._budget_limits = BudgetLimits(
             max_steps=max_steps,
             max_tokens=max_tokens,
@@ -82,8 +86,12 @@ class ResearchSupervisor:
             target=ResearchTaskStatus.PLANNING,
         )
 
-        # 构建工具目录
-        tool_catalog = "knowledge.search, web.search"  # simplified for now
+        # 从注册表动态构建工具目录
+        if self._registry is not None:
+            tool_defs = self._registry.list_tools()
+            tool_catalog = ", ".join(t.name for t in tool_defs)
+        else:
+            tool_catalog = "knowledge.search, web.search"
 
         # LLM 结构化输出
         prompt = SUPERVISOR_SYSTEM_PROMPT.format(

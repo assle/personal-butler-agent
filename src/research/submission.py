@@ -98,7 +98,7 @@ class ResearchSubmissionService:
             # 必须先提交数据库，再发布 task_id，避免 Worker 抢先读取不到任务。
             await db.commit()
             try:
-                await self._dispatcher.enqueue_research(task.id)
+                await self._dispatcher.enqueue_planning(task.id)
                 await self._tasks.mark_enqueued(db, task.id)
                 await db.commit()
             except Exception as exc:

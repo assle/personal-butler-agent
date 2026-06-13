@@ -1,4 +1,5 @@
 """研究网页 URL 安全策略"""
+import asyncio
 import ipaddress
 import socket
 from urllib.parse import urlparse
@@ -34,7 +35,7 @@ class UrlPolicy:
             addr = ipaddress.ip_address(host)
         except ValueError:
             try:
-                addrs = socket.getaddrinfo(host, None)
+                addrs = await asyncio.to_thread(socket.getaddrinfo, host, None)
                 addr = ipaddress.ip_address(addrs[0][4][0])
             except Exception:
                 raise UnsafeUrlError(f"无法解析主机: {host}")

@@ -21,6 +21,7 @@ class BudgetLimits:
     max_concurrent_steps: int = 3
     max_replans: int = 2
     max_repair_rounds: int = 1
+    max_dependency_depth: int = 3
 
     @classmethod
     def default(cls) -> "BudgetLimits":

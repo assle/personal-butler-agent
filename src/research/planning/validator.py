@@ -1,26 +1,10 @@
 """研究计划 DAG 校验器"""
-from dataclasses import dataclass
-
+from src.research.budgets import BudgetLimits
 from src.research.planning.schemas import PlanDraft
 
 
 class PlanValidationError(ValueError):
     """研究计划校验失败"""
-
-
-@dataclass(frozen=True)
-class BudgetLimits:
-    """研究预算限制"""
-
-    max_steps: int = 12
-    max_tokens: int = 20_000
-    max_cost_microunits: int = 500_000
-    max_dependency_depth: int = 3
-
-    @classmethod
-    def default(cls) -> "BudgetLimits":
-        """返回默认预算限制"""
-        return cls()
 
 
 class PlanValidator:

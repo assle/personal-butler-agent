@@ -117,6 +117,7 @@ class ResearchToolRegistry:
                     role="member",
                     risk_level=definition.risk_level,
                     cost_class=definition.cost_class,
+                    # 工具执行仅在计划级审批通过后发生，首次使用检查在计划级完成
                     research_approved_once=True,
                     workspace_matches=True,
                 )
