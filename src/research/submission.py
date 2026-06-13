@@ -109,8 +109,9 @@ class ResearchSubmissionService:
                 await db.commit()
                 return "研究任务入队失败，请稍后重新提交。"
         return (
-            f"已创建研究任务 {task.id}。完成后会通过企微自建应用主动私聊通知。\n"
-            "当前 Phase 1 输出为未审核初稿，不含多来源检索和逐项引用。"
+            f"已创建研究任务 {task.id}。\n"
+            "系统将规划检索范围；首次使用或高成本计划可能需要你批准。\n"
+            f"查询状态: 查看研究任务 {task.id}"
         )
 
     async def status(

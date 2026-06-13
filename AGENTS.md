@@ -32,6 +32,10 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate).
 - `src/governance/`: workspace membership resolution, permission engine, and research lifecycle hooks.
 - `src/research/`: async research subsystem — task lifecycle, broker, queue, planning, approval, budgeting, supervisor, specialists, tool registry, evidence, synthesis, citation review, quality gate, repair, delivery, and step execution.
+- `src/research/skills/`: research skill manifest schema, catalog, and on-demand loader
+- `src/research/providers/`: built-in tool registrations and MCP provider boundary
+- `src/research/evaluation/`: offline research quality and cost evaluation runner
+- `src/research/observability.py`: trace context for end-to-end research execution observability
 - `src/research/reliability/`: failure classification, retry, circuit breaker, context builders, watchdog
 - `src/research/web/`: URL security policy and bounded full-page fetcher
 - `src/research/supervisor/`: LLM structured-output planner with validation
@@ -54,7 +58,7 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/search/`: web search service (DuckDuckGo), configurable and disabled by default.
 - `src/weather/`: weather lookup service (Open-Meteo geocoding and forecast APIs).
 - `src/schemas/`: shared Pydantic response schemas (`AgentResponse`).
-- `src/cli/`: CLI entry points for knowledge ingestion and Chroma migration.
+- `src/cli/`: CLI entry points for knowledge ingestion, Chroma migration, and research evaluation.
 - `tests/`: existing pytest coverage.
 
 ---

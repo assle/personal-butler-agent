@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     research_web_max_redirects: int = 5
     research_web_max_pages_per_task: int = 20
 
+    # MCP 研究工具适配器配置（默认关闭）
+    research_mcp_enabled: bool = False
+    research_mcp_config_file: str = ""
+
     # 企业微信自建应用主动私聊配置，与智能机器人回调配置相互独立
     wecom_app_corp_id: str = ""
     wecom_app_secret: str = ""

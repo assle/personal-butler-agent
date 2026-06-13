@@ -118,7 +118,8 @@
 - **Phase 2**: 持久化 DAG 与审批 — 12 状态任务生命周期、步骤依赖 DAG、PG 行锁并发认领、租约恢复、预算追踪、首次使用/高成本审批
 - **Phase 3**: Supervisor 与检索 Specialist — LLM 结构化规划器、知识库/网页检索 Specialist、受控工具注册表、证据去重持久化、步骤执行器
 - **Phase 4**: 引用质量门与证据综合 — 结构化报告综合 + 引用审查 + 确定性质量门 + 有限修复协调 + 仅已校验报告可投递
-- **下一步**: Phase 5 — 独立 Worker 池 + 安全页面采集 + 持久化 checkpoint + 仪表盘
+- **Phase 6**: 技能定义与加载 (ResearchSkillManifest, ResearchSkillCatalog/Loader)；内置 Provider 注册 + MCP Provider 预留边界；delivery 改进 (split_text_utf8)；离线质量评估框架 + CLI；全链路追踪上下文 (TraceContext)；CI workflow (test.yml)；运维手册 (research-runbook.md)
+- **下一步**: 技能驱动的规划；MCP 动态工具集成；在线 EVAL；分布式追踪集成
 
 ---
 
@@ -140,4 +141,4 @@
 | 中 | 预计 1-3 小时 |
 | 大 | 预计半天以上 |
 
-最后更新: 2026-06-13（Phase 4 完成：引用质量门 + 证据综合 + 独立引用审查 + 有限修复协调 + 已验证投递）
+最后更新: 2026-06-13（Phase 6 完成：技能定义、Provider 注册、Delivery 改进、评估框架、链路追踪、CI、运维手册）

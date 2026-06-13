@@ -174,3 +174,19 @@ class WeComAppMessageClient:
             raise WeComAppApiError(
                 f"WeCom API failed: {response.get('errcode')} {response.get('errmsg', '')}"
             )
+
+
+def split_text_utf8(content: str, *, max_bytes: int = 1900) -> list[str]:
+    """按 UTF-8 安全边界拆分文本"""
+    parts = []
+    current = ""
+    for char in content:
+        candidate = current + char
+        if len(candidate.encode("utf-8")) > max_bytes:
+            parts.append(current)
+            current = char
+        else:
+            current = candidate
+    if current:
+        parts.append(current)
+    return parts

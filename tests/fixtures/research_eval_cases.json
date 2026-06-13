@@ -1,0 +1,1 @@
+[{"id": "comparison-001", "question": "Compare Taskiq and Celery", "required_claim_topics": ["async", "delivery"], "required_source_types": ["knowledge", "web"], "forbidden_claims": ["exactly-once"], "max_cost_microunits": 500000}]

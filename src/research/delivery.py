@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.research import ResearchDelivery, ResearchReport, WeComUserBinding
 from src.research.schemas import ResearchDeliveryStatus
 from src.research.service import ResearchTaskService
+from src.wechat.app_client import split_text_utf8
 
 
 class ReportNotValidatedError(RuntimeError):
@@ -81,7 +82,10 @@ class ResearchDeliveryService:
             "当前为 Phase 1 单次 LLM 初稿，尚未进行多来源检索、逐项引用和独立审核。"
         )
         try:
-            delivery.wecom_msgid = await self._client.send_text(userid, content)
+            parts = split_text_utf8(content)
+            delivery.wecom_msgid = await self._client.send_text(userid, parts[0])
+            for part in parts[1:]:
+                await self._client.send_text(userid, part)
         except Exception as exc:
             delivery.status = ResearchDeliveryStatus.FAILED.value
             delivery.error = str(exc)[:1000]
