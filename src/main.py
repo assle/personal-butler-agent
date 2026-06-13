@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.config import settings
+from src.db.migrations import assert_database_at_head
 from src.db.session import async_session
 from src.llm.client import LLMClient
 from src.agents.summary import SummaryAgent
@@ -79,18 +80,39 @@ if settings.research_enabled:
             f"RESEARCH_ENABLED=true requires: {', '.join(missing)}"
         )
 
+    from src.governance.hooks import HookBus as _HookBus
+    from src.governance.workspaces import WorkspaceService as _WorkspaceService
     from src.research.broker import broker as _research_broker
     from src.research.queue import TaskiqResearchDispatcher as _TaskiqResearchDispatcher
     from src.research.submission import ResearchSubmissionService as _ResearchSubmissionService
+    from src.research.approvals import ApprovalPolicy as _ApprovalPolicy
+    from src.research.approvals import ApprovalService as _ApprovalService
+    from src.research.steps import ResearchStepService as _ResearchStepService
     from src.research.tasks import (
         deliver_research_task as _deliver_task,
+        plan_research_task as _plan_task,
+        recover_research_leases as _recover_task,
+        run_research_step as _step_task,
         run_research_task as _run_task,
     )
 
     _research_broker_module = _research_broker
+    _workspace_service = _WorkspaceService()
+    _hook_bus = _HookBus()
+    _approval_service = _ApprovalService(
+        _ApprovalPolicy(high_cost_microunits=settings.research_high_cost_approval_microunits),
+        _ResearchStepService(lease_seconds=settings.research_step_lease_seconds),
+    )
     research_submitter = _ResearchSubmissionService(
         research_task_service,
-        _TaskiqResearchDispatcher(_run_task, _deliver_task),
+        _TaskiqResearchDispatcher(
+            _run_task, _deliver_task,
+            plan_task=_plan_task,
+            step_task=_step_task,
+        ),
+        workspace_service=_workspace_service,
+        hook_bus=_hook_bus,
+        approval_service=_approval_service,
     )
 
 private_butler_agent = PrivateButlerAgent(
@@ -137,7 +159,10 @@ async def lifespan(app: FastAPI):
     from src.db.session import async_session, engine
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        if settings.database_require_migrations:
+            await assert_database_at_head(engine)
+        else:
+            await conn.run_sync(Base.metadata.create_all)
 
     global scheduler_manager
 

@@ -5,6 +5,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.governance.hooks import CriticalHookError, HookEvent
+from src.governance.workspaces import (
+    AmbiguousWorkspaceError,
+    WorkspaceAccessDeniedError,
+    WorkspaceContext,
+)
 from src.models.research import ResearchReport
 from src.research.service import ResearchTaskService, UserResearchBusyError
 
@@ -12,10 +18,21 @@ from src.research.service import ResearchTaskService, UserResearchBusyError
 class ResearchSubmissionService:
     """私聊研究提交和状态查询服务"""
 
-    def __init__(self, task_service: ResearchTaskService, dispatcher):
-        """注入任务服务和队列派发器"""
+    def __init__(
+        self,
+        task_service: ResearchTaskService,
+        dispatcher,
+        *,
+        workspace_service=None,
+        hook_bus=None,
+        approval_service=None,
+    ):
+        """注入任务服务、队列派发器、工作空间服务、Hook 总线和审批服务"""
         self._tasks = task_service
         self._dispatcher = dispatcher
+        self._workspace_service = workspace_service
+        self._hook_bus = hook_bus
+        self._approval_service = approval_service
 
     async def submit(
         self,
@@ -25,14 +42,54 @@ class ResearchSubmissionService:
         requester_open_userid: str,
         question: str,
     ) -> str:
-        """创建并派发任务；重复回调返回同一任务 ID"""
+        """创建并派发任务；重复回调返回同一任务 ID；
+        通过 WorkspaceService 解析成员身份，发射 BEFORE_RESEARCH Hook。
+        """
         if not source_msgid:
             return "研究任务缺少消息标识，暂时无法可靠创建。"
+
+        # 解析工作空间上下文
+        if self._workspace_service is not None:
+            try:
+                ws_ctx = await self._workspace_service.resolve_member(
+                    db, requester_open_userid
+                )
+            except WorkspaceAccessDeniedError:
+                return "你没有访问任何工作空间的权限，无法创建研究任务。"
+            except AmbiguousWorkspaceError:
+                return "你属于多个工作空间，请指定工作空间 ID 后再试。"
+
+            # 发射 BEFORE_RESEARCH Hook
+            if self._hook_bus is not None:
+                try:
+                    await self._hook_bus.emit(
+                        HookEvent.BEFORE_RESEARCH,
+                        {
+                            "open_userid": requester_open_userid,
+                            "question": question,
+                        },
+                    )
+                except CriticalHookError:
+                    return "研究任务未通过审批检查，无法创建。"
+        else:
+            # 向后兼容：无工作空间服务时使用配置默认值
+            from src.config import settings
+
+            # 向后兼容路径：member_id=0 为占位值，
+            # 表示未通过 WorkspaceService 解析，不作为真实 member 引用
+            ws_ctx = WorkspaceContext(
+                workspace_id=settings.default_workspace_id,
+                member_id=0,
+                open_userid=requester_open_userid,
+                role="member",
+                research_approved_once=True,
+            )
+
         try:
             task, created = await self._tasks.create_task(
                 db,
+                workspace=ws_ctx,
                 source_msgid=source_msgid,
-                requester_open_userid=requester_open_userid,
                 question=question,
             )
         except UserResearchBusyError as exc:
@@ -84,3 +141,55 @@ class ResearchSubmissionService:
             f"研究任务 {task.id} 已完成。\n"
             f"质量状态：{report.quality_status}\n\n{report.body}"
         )
+
+    async def approve(
+        self,
+        db: AsyncSession,
+        *,
+        task_id: str,
+        requester_open_userid: str,
+    ) -> str:
+        """批准研究任务"""
+        if self._workspace_service is None:
+            return "审批功能需要工作空间服务支持。"
+        try:
+            ws_ctx = await self._workspace_service.resolve_member(db, requester_open_userid)
+        except Exception:
+            return "无法解析工作空间身份，审批失败。"
+        try:
+            await self._approval_service.approve(db, workspace=ws_ctx, task_id=task_id)
+            await db.commit()
+            return f"已批准研究任务 {task_id}，任务开始执行。"
+        except ValueError as e:
+            return str(e)
+        except Exception as e:
+            return f"审批失败：{e}"
+
+    async def reject(
+        self,
+        db: AsyncSession,
+        *,
+        task_id: str,
+        requester_open_userid: str,
+        reason: str = "",
+    ) -> str:
+        """拒绝研究任务"""
+        if self._workspace_service is None:
+            return "审批功能需要工作空间服务支持。"
+        try:
+            ws_ctx = await self._workspace_service.resolve_member(db, requester_open_userid)
+        except Exception:
+            return "无法解析工作空间身份，审批失败。"
+        try:
+            await self._approval_service.reject(
+                db, workspace=ws_ctx, task_id=task_id, reason=reason,
+            )
+            await db.commit()
+            msg = f"已拒绝研究任务 {task_id}"
+            if reason:
+                msg += f"，原因：{reason}"
+            return msg
+        except ValueError as e:
+            return str(e)
+        except Exception as e:
+            return f"拒绝操作失败：{e}"

@@ -81,7 +81,7 @@ async def test_execute_research_job_marks_failure_and_does_not_enqueue_delivery(
 
 @pytest.mark.asyncio
 async def test_execute_research_job_marks_timeout(db_session):
-    """超过硬预算时记录 timed_out 而不是普通 failed"""
+    """超过硬预算时通过 mark_timed_out 记录为 failed 状态"""
     async def never_finishes(db, task_id):
         """模拟超时任务"""
         await asyncio.sleep(1)

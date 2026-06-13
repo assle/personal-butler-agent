@@ -29,6 +29,14 @@ _RESEARCH_SUBMIT_PATTERN = re.compile(r"^(?:深度研究|研究任务)[：:]\s*(
 _RESEARCH_STATUS_PATTERN = re.compile(
     r"^查看研究任务\s+(R\d{8}-[A-F0-9]{8})$", re.IGNORECASE
 )
+_RESEARCH_APPROVE_PATTERN = re.compile(
+    r"^批准研究任务\s+(R\d{8}-[A-F0-9]{8})$",
+    re.IGNORECASE,
+)
+_RESEARCH_REJECT_PATTERN = re.compile(
+    r"^拒绝研究任务\s+(R\d{8}-[A-F0-9]{8})(?:[：:]\s*(.+))?$",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _direct_reminder_intent(message: str) -> str | None:
@@ -181,6 +189,26 @@ class PrivateButlerAgent:
                     question=submit_match.group(1).strip(),
                 )
                 return AgentResponse(reply=reply, data={"intent": "research_submit"})
+
+            # ── 研究审批命令 ──
+            approve_match = _RESEARCH_APPROVE_PATTERN.match(message.strip())
+            if approve_match and self._research_submitter is not None:
+                reply = await self._research_submitter.approve(
+                    db,
+                    task_id=approve_match.group(1).upper(),
+                    requester_open_userid=user_id,
+                )
+                return AgentResponse(reply=reply, data={"intent": "research_approve"})
+
+            reject_match = _RESEARCH_REJECT_PATTERN.match(message.strip())
+            if reject_match and self._research_submitter is not None:
+                reply = await self._research_submitter.reject(
+                    db,
+                    task_id=reject_match.group(1).upper(),
+                    requester_open_userid=user_id,
+                    reason=(reject_match.group(2) or "").strip(),
+                )
+                return AgentResponse(reply=reply, data={"intent": "research_reject"})
 
         direct_reminder_intent = _direct_reminder_intent(message)
         if chat_type == "single" and direct_reminder_intent:

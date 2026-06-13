@@ -94,6 +94,20 @@
 - **目标**: 增加有限数量的端到端测试（真实 SQLite + 真实 DeepSeek 调用），在 CI 中手动触发
 - **工作量**: 中
 
+### 5.5 PostgreSQL 迁移与工作空间治理（已完成）
+
+- **当前**: PostgreSQL 已作为生产数据库默认配置；SQLite 仍支持单用户开发。
+- **已完成**:
+  - Alembic 数据库迁移框架搭建，所有 DDL 由迁移脚本管理
+  - Workspace、WorkspaceMember ORM 模型与迁移脚本
+  - WorkspaceService — 成员身份解析与工作空间上下文提供
+  - PermissionEngine — 5 规则优先级链实现
+  - HookBus — 研究任务生命周期钩子
+  - 研究任务按 `workspace_id` 隔离，跨工作空间访问被服务层阻断
+  - 知识关键字搜索多方言适配（SQLite FTS5 + PostgreSQL tsvector）
+  - SQLite → PostgreSQL 一次性迁移 CLI（`butler-migrate-to-pg`）
+  - 启动时 `DATABASE_REQUIRE_MIGRATIONS=true` 验证 Alembic 版本是否 HEAD
+
 ---
 
 ## 七、异步研究
@@ -102,7 +116,7 @@
 
 - **当前**: 私聊提交"深度研究：<问题>" → Redis Stream (Taskiq) 入队 → Worker 生成 unreviewed_foundation 初稿 → 企微自建应用主动私聊投递。回调 msgid 提供幂等，每用户单任务限制，研究和投递独立任务队列，token 缓存 + 重试。
 - **已完成**: ORM 模型、Taskiq broker/queue、执行器、投递服务、Worker 任务、私聊入口、127 测试。
-- **下一步**: Phase 2 — 确定性规划、授权检索、综合、引用验证；Phase 3 — Supervisor + 多 agent 协同；Phase 4 — 持久化 checkpoint + 仪表盘；Phase 5 — PostgreSQL 迁移 + 独立 Worker 池。
+- **下一步**: Phase 2 — 确定性规划、授权检索、综合、引用验证；Phase 3 — Supervisor + 多 agent 协同；Phase 4 — 持久化 checkpoint + 仪表盘；Phase 5 — 独立 Worker 池。（Phase 1 PostgreSQL 迁移已完成，见 5.5）
 
 ---
 

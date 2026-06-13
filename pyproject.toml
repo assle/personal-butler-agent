@@ -22,11 +22,14 @@ dependencies = [
     "taskiq>=0.11.0",
     "taskiq-redis>=1.0.0",
     "redis>=5.0.0",
+    "alembic>=1.14.0",
+    "asyncpg>=0.30.0",
 ]
 
 [project.scripts]
 butler-ingest-knowledge = "src.cli.ingest_knowledge:run"
 butler-migrate-to-chroma = "src.cli.migrate_to_chroma:run"
+butler-migrate-sqlite-to-postgres = "src.cli.migrate_sqlite_to_postgres:run"
 
 [project.optional-dependencies]
 dev = [

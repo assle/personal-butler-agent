@@ -9,11 +9,14 @@ from redis.asyncio import Redis
 from src.config import settings
 from src.db.session import async_session
 from src.llm.client import LLMClient
+from src.models.research_execution import ResearchStep
 from src.research.broker import broker
 from src.research.delivery import ResearchDeliveryService
 from src.research.executor import FoundationResearchExecutor
 from src.research.queue import TaskiqResearchDispatcher
+from src.research.schemas import ResearchStepStatus, ResearchTaskStatus
 from src.research.service import ResearchTaskService
+from src.research.steps import ResearchStepService
 from src.wechat.app_client import (
     RedisAccessTokenCache,
     WeComAppMessageClient,
@@ -91,6 +94,7 @@ _app_client = WeComAppMessageClient(
 )
 _executor = FoundationResearchExecutor(_task_service, LLMClient())
 _delivery_service = ResearchDeliveryService(_task_service, _app_client)
+_step_service = ResearchStepService(lease_seconds=settings.research_step_lease_seconds)
 
 
 @broker.task(task_name="research.deliver")
@@ -116,4 +120,150 @@ async def run_research_task(task_id: str) -> None:
         dispatcher=dispatcher,
         task_service=_task_service,
         timeout_seconds=settings.research_timeout_seconds,
+    )
+
+
+async def execute_planning_job(
+    task_id: str,
+    *,
+    session_factory,
+    task_service,
+) -> None:
+    """执行研究规划：生成确定性 fixture 计划并持久化"""
+    from src.research.planning.schemas import PlanDraft, StepDraft
+    from src.research.planning.service import PlanService
+
+    async with session_factory() as db:
+        task = await task_service.get_task(db, task_id)
+        await task_service.transition(
+            db, task_id, task.workspace_id,
+            expected={ResearchTaskStatus.SUBMITTED},
+            target=ResearchTaskStatus.PLANNING,
+        )
+
+        # Phase 2: 确定性 fixture planner
+        draft = PlanDraft(
+            objective=task.question,
+            completion_criteria=["回答用户问题"],
+            estimated_tokens=500,
+            estimated_cost_microunits=1000,
+            steps=[
+                StepDraft(
+                    key="search",
+                    kind="knowledge_retrieval",
+                    tool_name="knowledge.search",
+                    input_payload={"query": task.question},
+                ),
+            ],
+        )
+
+        service = PlanService()
+        plan = await service.persist(
+            db, workspace_id=task.workspace_id,
+            task_id=task_id, draft=draft,
+        )
+
+        # 检查是否需要审批
+        from src.research.approvals import ApprovalPolicy, ApprovalService
+        from src.research.steps import ResearchStepService
+        from src.governance.workspaces import WorkspaceContext
+
+        policy = ApprovalPolicy(high_cost_microunits=250_000)
+        step_service = ResearchStepService(lease_seconds=120)
+        approval_service = ApprovalService(policy, step_service)
+
+        ws_ctx = WorkspaceContext(
+            workspace_id=task.workspace_id,
+            member_id=0,  # planning不需要完整member上下文
+            open_userid=task.requester_open_userid,
+            role="member",
+            research_approved_once=True,  # Phase 2 fixture默认已审批
+        )
+
+        approval = await approval_service.request_approval(
+            db, task=task, plan=plan, workspace=ws_ctx,
+        )
+        if approval is None:
+            # 无需审批，直接激活步骤
+            await task_service.transition(
+                db, task_id, task.workspace_id,
+                expected={ResearchTaskStatus.PLANNING},
+                target=ResearchTaskStatus.RUNNING,
+            )
+            await step_service.mark_root_steps_ready(db, task_id)
+
+        await db.commit()
+
+
+async def execute_step_job(
+    step_id: str,
+    *,
+    session_factory,
+    step_service,
+) -> None:
+    """执行单个研究步骤"""
+    async with session_factory() as db:
+        # 认领步骤并更新租约
+        step = await db.get(ResearchStep, step_id)
+        if step is None or step.status != ResearchStepStatus.RUNNING.value:
+            return
+
+        try:
+            # Phase 2 fixture: 步骤直接成功
+            await step_service.complete_step(
+                db, step_id,
+                result_ref=f"fixture_result:{step_id}",
+            )
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            async with session_factory() as fail_db:
+                await step_service.complete_step(
+                    fail_db, step_id, error=str(exc),
+                )
+                await fail_db.commit()
+
+
+async def execute_lease_recovery_job(
+    *,
+    session_factory,
+    step_service,
+) -> None:
+    """恢复过期租约的步骤"""
+    async with session_factory() as db:
+        recovered = await step_service.recover_expired_leases(db)
+        if recovered:
+            await db.commit()
+
+
+@broker.task(task_name="research.plan")
+async def plan_research_task(task_id: str) -> None:
+    """Taskiq 研究规划入口
+
+    Phase 2: 使用确定性 fixture planner 生成计划。
+    Phase 3 将替换为 LLM Supervisor 调用。
+    """
+    await execute_planning_job(
+        task_id,
+        session_factory=async_session,
+        task_service=_task_service,
+    )
+
+
+@broker.task(task_name="research.step")
+async def run_research_step(step_id: str) -> None:
+    """Taskiq 研究步骤入口"""
+    await execute_step_job(
+        step_id,
+        session_factory=async_session,
+        step_service=_step_service,
+    )
+
+
+@broker.task(task_name="research.recover_leases")
+async def recover_research_leases() -> None:
+    """Taskiq 过期步骤租约恢复入口"""
+    await execute_lease_recovery_job(
+        session_factory=async_session,
+        step_service=_step_service,
     )

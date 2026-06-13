@@ -8,6 +8,7 @@ from src.models.knowledge import (
 )
 from src.models.inbound_message import InboundMessage
 from src.models.poll import Poll, PollVote
+from src.models.workspace import Workspace, WorkspaceMember
 from src.models.group_webhook import GroupWebhook
 from src.models.reminder import Reminder, ReminderRun
 from src.agents.memory.models import MemoryFragment, UserMemory, UserProfile
@@ -17,6 +18,14 @@ from src.models.research import (
     ResearchTask,
     UserGroupAccess,
     WeComUserBinding,
+)
+from src.models.research_execution import (
+    ResearchApproval,
+    ResearchEvent,
+    ResearchPlan,
+    ResearchStep,
+    ResearchStepDependency,
+    ResearchUsage,
 )
 
 __all__ = [
@@ -40,4 +49,12 @@ __all__ = [
     "ResearchDelivery",
     "UserGroupAccess",
     "WeComUserBinding",
+    "Workspace",
+    "WorkspaceMember",
+    "ResearchApproval",
+    "ResearchEvent",
+    "ResearchPlan",
+    "ResearchStep",
+    "ResearchStepDependency",
+    "ResearchUsage",
 ]

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.knowledge.chroma_store import ChromaStore
 from src.knowledge.chunking import chunk_text
 from src.knowledge.embedding import EmbeddingService
+from src.knowledge.keyword_search import KeywordSearchBackend
 from src.knowledge.reranker import rerank_chunks, rewrite_query
 from src.knowledge.schemas import (
     VALID_DOMAINS,
@@ -38,18 +39,21 @@ class KnowledgeService:
         self,
         embedding_service: EmbeddingService | None = None,
         chroma_store: ChromaStore | None = None,
+        keyword_search: KeywordSearchBackend | None = None,
     ):
         """初始化知识库服务
 
         参数:
             embedding_service: 嵌入服务
             chroma_store: Chroma 向量存储；不传则不启用 Chroma（向后兼容）
+            keyword_search: 关键词检索后端；不传则默认创建 KeywordSearchBackend
 
         返回:
             None
         """
         self._embedding = embedding_service or EmbeddingService()
         self._chroma = chroma_store
+        self._keyword_backend = keyword_search or KeywordSearchBackend()
 
     # ── 导入 ──────────────────────────────────────────
 
@@ -90,7 +94,7 @@ class KnowledgeService:
         db.add(document)
         await db.flush()
 
-        await self._ensure_fts_table(db)
+        await self._ensure_keyword_index(db)
 
         chunks_input = chunk_text(request.content)
         chroma_payloads: list[dict] = []
@@ -111,7 +115,9 @@ class KnowledgeService:
             db.add(chunk)
             await db.flush()
 
-            await self._index_fts_chunk(db, chunk, document.title)
+            await self._keyword_backend.index_chunk(
+                db, self._dialect_name(db), chunk, document.title
+            )
 
             chroma_payloads.append({
                 "chunk_id": chunk.id,
@@ -168,7 +174,7 @@ class KnowledgeService:
             if domain not in VALID_DOMAINS:
                 raise ValueError(f"Invalid knowledge domain: {domain}")
 
-        await self._ensure_fts_table(db)
+        await self._ensure_keyword_index(db)
         scope_filter = self._build_scope_filter(user_id, chat_type, chat_id)
 
         # Step 1: Query Rewriting
@@ -259,8 +265,10 @@ class KnowledgeService:
             except Exception:
                 logger.debug("Knowledge: Chroma query failed", exc_info=True)
 
-        # 路 2: SQLite FTS
-        fts_scores = await self._search_fts(db, query)
+        # 路 2: 关键词全文检索（SQLite FTS5 或 PostgreSQL tsvector）
+        fts_scores = await self._keyword_backend.search(
+            db, self._dialect_name(db), query, limit=20
+        )
         if fts_scores:
             result = await db.execute(
                 select(KnowledgeChunk, KnowledgeDocument.title)
@@ -276,7 +284,7 @@ class KnowledgeService:
                         "title": title,
                         "source": chunk.source,
                         "content": chunk.content,
-                        "score": 1.0 / (1.0 + abs(float(fts_scores[chunk.id]))),
+                        "score": float(fts_scores[chunk.id]),
                         "scope_type": chunk.scope_type,
                         "domain": chunk.domain,
                     })
@@ -359,95 +367,10 @@ class KnowledgeService:
         if request.scope_type in {"user", "group"} and not request.scope_id:
             raise ValueError("Private knowledge must have scope_id")
 
-    # ── FTS ───────────────────────────────────────────
-
-    async def _ensure_fts_table(self, db: AsyncSession) -> None:
-        """确保 SQLite FTS5 索引表存在
-
-        参数:
-            db: 异步数据库会话
-
-        返回:
-            None
-        """
-        await db.execute(
-            text(
-                """
-                CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts
-                USING fts5(title, source, content, tokenize='unicode61')
-                """
-            )
-        )
-
-    async def _index_fts_chunk(
-        self,
-        db: AsyncSession,
-        chunk: KnowledgeChunk,
-        title: str,
-    ) -> None:
-        """将 chunk 写入 SQLite FTS 索引
-
-        参数:
-            db: 异步数据库会话
-            chunk: 已 flush 且拥有 id 的知识库 chunk
-            title: chunk 所属文档标题
-
-        返回:
-            None
-        """
-        await db.execute(
-            text(
-                """
-                INSERT OR REPLACE INTO knowledge_chunks_fts(rowid, title, source, content)
-                VALUES (:rowid, :title, :source, :content)
-                """
-            ),
-            {
-                "rowid": chunk.id,
-                "title": title,
-                "source": chunk.source,
-                "content": chunk.content,
-            },
-        )
-
-    async def _search_fts(self, db: AsyncSession, query: str) -> dict[int, float]:
-        """使用 SQLite FTS 查询候选 chunk 分数
-
-        参数:
-            db: 异步数据库会话
-            query: 用户查询文本
-
-        返回:
-            dict[int, float]: chunk_id 到 FTS 分数的映射
-        """
-        fts_query = self._fts_query(query)
-        if not fts_query:
-            return {}
-        try:
-            result = await db.execute(
-                text(
-                    """
-                    SELECT rowid, bm25(knowledge_chunks_fts) AS rank
-                    FROM knowledge_chunks_fts
-                    WHERE knowledge_chunks_fts MATCH :query
-                    ORDER BY rank
-                    LIMIT 50
-                    """
-                ),
-                {"query": fts_query},
-            )
-        except Exception:
-            return {}
-
-        scores: dict[int, float] = {}
-        for rowid, rank in result.all():
-            scores[int(rowid)] = 1.0 / (1.0 + abs(float(rank)))
-        return scores
-
     # ── 权限过滤 ──────────────────────────────────────
 
     def _build_scope_filter(self, user_id: str, chat_type: str, chat_id: str | None):
-        """构造知识可见范围过滤条件（FTS 用）
+        """构造知识可见范围过滤条件
 
         参数:
             user_id: 当前用户 ID
@@ -473,27 +396,53 @@ class KnowledgeService:
             and_(KnowledgeChunk.scope_type == "user", KnowledgeChunk.scope_id == user_id),
         )
 
-    def _fts_query(self, query: str) -> str:
-        """生成安全的 FTS MATCH 查询
+    # ── 关键词索引 ─────────────────────────────────────
+
+    @staticmethod
+    def _dialect_name(db: AsyncSession) -> str:
+        """获取当前数据库方言名称
 
         参数:
-            query: 用户查询文本
+            db: 异步数据库会话
 
         返回:
-            str: 用 OR 连接的 FTS token 查询；无可用 token 时返回空字符串
+            str: 数据库方言名称（如 sqlite、postgresql）
         """
-        normalized = query.strip().lower()
-        if not normalized:
-            return ""
-        terms = [
-            term
-            for term in normalized.replace("，", " ").replace("。", " ").split()
-            if term and all(char.isalnum() or "一" <= char <= "鿿" for char in term)
-        ]
-        if terms:
-            return " OR ".join(terms[:8])
+        return db.get_bind().dialect.name
 
-        compact = "".join(
-            char for char in normalized if char.isalnum() or "一" <= char <= "鿿"
-        )
-        return compact[:64]
+    async def _ensure_keyword_index(self, db: AsyncSession) -> None:
+        """确保关键词索引结构存在
+
+        SQLite 创建 FTS5 虚拟表；PostgreSQL 创建 GIN 表达式索引。
+
+        参数:
+            db: 异步数据库会话
+
+        返回:
+            None
+        """
+        dialect = self._dialect_name(db)
+        if dialect == "sqlite":
+            await db.execute(
+                text(
+                    """
+                    CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts
+                    USING fts5(title, source, content, tokenize='unicode61')
+                    """
+                )
+            )
+        elif dialect == "postgresql":
+            await db.execute(
+                text(
+                    """
+                    CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_fts_gin
+                    ON knowledge_chunks
+                    USING gin (
+                      to_tsvector(
+                        'simple',
+                        coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(source, '')
+                      )
+                    )
+                    """
+                )
+            )

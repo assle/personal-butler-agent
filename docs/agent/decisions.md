@@ -278,3 +278,23 @@ Reasoning:
 - Custom-application messages can be sent to any user at any time, enabling true async push.
 - The old `WECOM_CORP_ID`/`WECOM_CORP_SECRET` fields (retired in ADR-012) were removed because the intelligent robot callback does not need them. The new `WECOM_APP_*` fields are deliberately named differently to avoid confusion.
 - `open_userid` (from robot callback) and `userid` (for app messages) are different ID spaces. `WeComUserBinding` table caches the conversion.
+
+## ADR-026: PostgreSQL as Authoritative Team Database
+
+Status: Accepted. Replaces SQLite for production. Reasoning: multi-user concurrency, proper schema migrations via Alembic, tsvector FTS support. SQLite remains supported for single-user development.
+
+## ADR-027: Alembic Owning Production Schema
+
+Status: Accepted. Alembic manages all DDL; `Base.metadata.create_all` is dev-only fallback. Startup verifies revision at head when `database_require_migrations=True`.
+
+## ADR-028: Immutable Workspace Scope
+
+Status: Accepted. Research tasks are created with a `workspace_id` that never changes. Cross-workspace access is prevented by service-layer queries, not just database constraints.
+
+## ADR-029: Application-Owned Permission and Hook Interfaces
+
+Status: Accepted. `PermissionEngine` and `HookBus` provide structured governance without external policy engines. Simple priority-ordered rules cover the current single-team use case.
+
+## ADR-030: Durable Research DAG with Leases
+
+Status: Accepted. Steps are first-class DB rows with leases, not in-memory ephemeral state. Workers claim via row locks. Expired leases auto-recover. Plans are versioned and side-effect free until approved.

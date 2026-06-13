@@ -17,7 +17,7 @@ Current implementation baseline:
 - Scheduler push: `SchedulerManager` reads `SCHEDULER_TARGETS_FILE`, sends `mode="raw"` content directly with optional `weather_query` appended, or calls `WebhookComposerAgent` for `mode="compose"` targets, then sends markdown with `WebhookPushClient`
 - Runtime agents: `PrivateButlerAgent`, `GroupMentionAgent`, `WebhookComposerAgent`, `SummaryAgent`, `ReminderAgent`, `PollAgent`
 - LLM: `langchain_openai.ChatOpenAI` pointed at DeepSeek through `LLMClient`
-- Persistence: SQLite (`group_messages`, conversation memory, knowledge-base tables, reminders, reminder runs, `inbound_messages`, polls, poll_votes, group_webhooks, `memory_fragments`, `user_profile`) + ChromaDB (`chroma_data/` for knowledge chunks vector index)
+- Persistence: PostgreSQL as production database (`DATABASE_URL` + `DATABASE_REQUIRE_MIGRATIONS=true` with Alembic) or SQLite for dev (`DATABASE_URL=sqlite+aiosqlite:///butler.db DATABASE_REQUIRE_MIGRATIONS=false`) + ChromaDB (`chroma_data/` for knowledge chunks vector index)
 - Multi-turn memory: SQLite conversation memory plus LangGraph `MemorySaver` checkpointing for graph execution
 - Config: `WECOM_AIBOT_BOT_ID` + `WECOM_AIBOT_TOKEN` + `WECOM_AIBOT_ENCODING_AES_KEY`; `SCHEDULER_TARGETS_FILE` enables APScheduler-driven Enterprise WeChat group webhook push
 
@@ -43,13 +43,29 @@ Current implementation baseline:
 - Observability: Full-chain trace logging (`[trace:inject]` / `[trace:sidepath]` for memory extraction pipeline, `[trace:search]` for RAG retrieval). Logs include elapsed timings per stage, candidate counts, and source attribution.
 - Async research foundation (Phase 1): Private chat submits "深度研究：<问题>" → durable SQLite task with callback msgid idempotency → Redis Stream (Taskiq) enqueue → independent worker generates unreviewed_foundation LLM draft → separate delivery task converts open_userid via WeCom custom-app API and pushes result to user. Feature gate: `RESEARCH_ENABLED` defaults to false. Worker command: `taskiq worker src.research.broker:broker src.research.tasks`.
 - Enterprise WeChat custom-application messaging: `WeComAppMessageClient` with `RedisAccessTokenCache`, open_userid-to-userid conversion, errcode validation, and token refresh (40014/42001).
+- PostgreSQL as production database with Alembic schema management: `DATABASE_URL` defaults to `postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler`; `DATABASE_REQUIRE_MIGRATIONS=true` verifies Alembic revision at head on startup; `alembic upgrade head` required before first start. SQLite supported for dev via `DATABASE_URL=sqlite+aiosqlite:///butler.db DATABASE_REQUIRE_MIGRATIONS=false`.
+- Workspace and WorkspaceMember models for multi-tenant governance: each workspace scopes users, research tasks, and knowledge scopes independently.
+- WorkspaceService for membership resolution: `resolve_member()` identifies the caller's workspace identity before business logic execution.
+- PermissionEngine with 5-rule priority chain: structured governance for workspace-aware operations, rules evaluated in priority order.
+- HookBus for research lifecycle events: emits lifecycle hooks (critical hooks block on failure), owned by `src/governance/`.
+- Workspace-scoped research tasks: `workspace_id` assigned at creation and never changes; cross-workspace access prevented by service-layer queries.
+- Dialect-aware knowledge keyword search: SQLite FTS5 for local dev, PostgreSQL `tsvector`/`tsquery` for production — selected automatically via `db.dialect.name`.
+- SQLite-to-PostgreSQL one-time migration CLI: `butler-migrate-to-pg` exports SQLite data and imports to PostgreSQL for migration from dev environment.
+- Phase 2 研究执行 DAG：计划 → 步骤 → 审批 → 执行 → 重试，Taskiq Worker 认领步骤
+- 12 状态研究任务生命周期（submitted → planning → awaiting_approval → running → ...）
+- DAG 步骤依赖与租约恢复（PG SKIP LOCKED 并发认领，过期租约回收）
+- 确定性审批策略（首次使用 + 高成本审批），私聊批准/拒绝命令
+- 预算追踪（token 计数、成本微单位、软硬限制）
+- 计划校验器（DAG 无环检测、工具白名单、预算限制）
+- 审计事件日志（自动脱敏密钥和令牌）
+- 私聊命令 `批准研究任务 R20260613-XXXXXXXX` 批准待审批计划
+- 私聊命令 `拒绝研究任务 R20260613-XXXXXXXX：预算过高` 拒绝待审批计划
 
 ## Deferred Work
 
 - Reminder Stage 2: 日报/周报提醒内容生成，优先复用 Summary/WebhookComposer 等当前运行 agent 生成周期报告。
 - 图片 OCR 识别。
 - Docker 化部署、CI/CD、E2E 测试。
-- Research Phase 2: Deterministic planning, authorized retrieval, synthesis, citation validation.
 
 ## Working Guidance
 

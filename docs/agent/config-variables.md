@@ -11,7 +11,12 @@ Configuration is loaded by `src/config.py` with Pydantic Settings. The app reads
 | `DEEPSEEK_API_KEY` | Yes | None | API key for DeepSeek/OpenAI-compatible chat calls |
 | `DEEPSEEK_BASE_URL` | No | `https://api.deepseek.com` | Base URL for the OpenAI-compatible provider |
 | `DEEPSEEK_MODEL` | No | `deepseek-chat` | Chat model used by `LLMClient` |
-| `DATABASE_URL` | No | `sqlite+aiosqlite:///butler.db` | SQLAlchemy async database URL |
+| `DATABASE_URL` | No | `postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler` | SQLAlchemy async database URL |
+| `DATABASE_POOL_SIZE` | No | `10` | PostgreSQL 常驻连接数 |
+| `DATABASE_MAX_OVERFLOW` | No | `20` | PostgreSQL 临时溢出连接数 |
+| `DATABASE_REQUIRE_MIGRATIONS` | No | `true` | 启动时要求数据库 Alembic 版本已达到 HEAD |
+| `DEFAULT_WORKSPACE_ID` | No | `default` | 首次迁移时创建的默认工作空间 ID |
+| `DEFAULT_WORKSPACE_NAME` | No | `Default Workspace` | 默认工作空间名称 |
 | `WEATHER_TIMEOUT_SECONDS` | No | `8` | Open-Meteo geocoding/forecast HTTP timeout in seconds |
 | `DASHSCOPE_API_KEY` | No | `""` | 阿里云百炼 DashScope API key，用于 Qwen3-Embedding 语义向量模型。不配则使用本地字符 n-gram 哈希嵌入 |
 
@@ -25,11 +30,60 @@ Example shape:
 DEEPSEEK_API_KEY=sk-your-actual-key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
-DATABASE_URL=sqlite+aiosqlite:///butler.db
+DATABASE_URL=postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler
+DATABASE_POOL_SIZE=10
+DATABASE_MAX_OVERFLOW=20
+DATABASE_REQUIRE_MIGRATIONS=true
 WEATHER_TIMEOUT_SECONDS=8
 ```
 
+If you need to use SQLite for local development (e.g., no PostgreSQL installed), override `DATABASE_URL`:
+
+```env
+DATABASE_URL=sqlite+aiosqlite:///butler.db
+DATABASE_REQUIRE_MIGRATIONS=false
+```
+
 Do not commit `.env` or real API keys.
+
+## PostgreSQL Local Setup
+
+On macOS with Homebrew:
+
+```bash
+# 安装 PostgreSQL 16
+brew install postgresql@16
+
+# 启动并设为开机自启
+brew services start postgresql@16
+
+# 创建应用数据库和用户
+/opt/homebrew/opt/postgresql@16/bin/psql -h localhost -p 5432 postgres -c \
+  "CREATE ROLE butler WITH LOGIN PASSWORD 'butler' CREATEDB;"
+
+# 创建应用数据库和测试数据库
+for db in butler butler_test; do
+  PGPASSWORD=butler /opt/homebrew/opt/postgresql@16/bin/createdb \
+    -h localhost -p 5432 -U butler "$db"
+done
+```
+
+PostgreSQL 16 on Homebrew is keg-only — binaries are at `/opt/homebrew/opt/postgresql@16/bin/`. Add to PATH if needed:
+
+```bash
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+```
+
+Key connection details after setup:
+
+| Item | Value |
+|------|-------|
+| Host | `127.0.0.1:5432` |
+| User / Password | `butler` / `butler` |
+| App database | `butler` |
+| Test database | `butler_test` |
+| SQLAlchemy URL | `postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler` |
+| Test DB URL | `postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler_test` |
 
 ## Tests
 
@@ -132,6 +186,16 @@ Phase 1 异步研究：私聊提交问题，Worker 在独立进程中生成 LLM 
 | `RESEARCH_QUEUE_NAME` | If enabled | `butler-research` | Redis Stream 队列名称 |
 | `RESEARCH_MAX_ROUNDS` | If enabled | `4` | 研究最大迭代轮次 |
 | `RESEARCH_TIMEOUT_SECONDS` | If enabled | `300` | 单次研究硬超时（秒） |
+| `RESEARCH_MAX_STEPS` | No | `12` | 单个研究任务最大步骤数 |
+| `RESEARCH_MAX_CONCURRENT_STEPS` | No | `3` | 最大并发研究步骤数 |
+| `RESEARCH_SOFT_TOKEN_BUDGET` | No | `15000` | 软 token 预算阈值 |
+| `RESEARCH_HARD_TOKEN_BUDGET` | No | `20000` | 硬 token 预算上限 |
+| `RESEARCH_SOFT_COST_MICROUNITS` | No | `350000` | 软成本预算阈值 |
+| `RESEARCH_HARD_COST_MICROUNITS` | No | `500000` | 硬成本预算上限 |
+| `RESEARCH_MAX_REPLANS` | No | `2` | 最大重新规划次数 |
+| `RESEARCH_MAX_REPAIR_ROUNDS` | No | `1` | 最大修复轮次 |
+| `RESEARCH_STEP_LEASE_SECONDS` | No | `120` | 步骤租约秒数 |
+| `RESEARCH_HIGH_COST_APPROVAL_MICROUNITS` | No | `250000` | 高成本审批阈值 |
 
 ## 企业微信自建应用主动私聊
 
