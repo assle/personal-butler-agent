@@ -16,7 +16,6 @@ from src.models.research_quality import (
 )
 from src.research.review.prompts import CITATION_REVIEW_PROMPT
 from src.research.review.schemas import CitationReview
-from src.research.schemas import ResearchTaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +38,8 @@ class CitationReviewService:
     ) -> QualityDecision:
         task = await self._tasks.get_task(db, task_id)
 
-        # 1. transition
-        await self._tasks.transition(
-            db, task.id, task.workspace_id,
-            expected={ResearchTaskStatus.SYNTHESIZING},
-            target=ResearchTaskStatus.VALIDATING,
-        )
-
-        # 2. load claims + evidence
+        # 任务必须已处于 VALIDATING 状态（由协调器负责转换）
+        # 1. load claims + evidence
         claims_result = await db.execute(
             select(ResearchClaim).where(
                 ResearchClaim.workspace_id == task.workspace_id,

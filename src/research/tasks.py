@@ -16,9 +16,11 @@ from src.models.research import ResearchReport
 from src.models.research_execution import ResearchStep
 from src.research.broker import broker
 from src.research.delivery import ResearchDeliveryService
+from src.research.dispatch import ResearchStepDispatcher
 from src.research.evidence import ResearchEvidenceService
 from src.research.execution import ResearchStepExecutor
 from src.research.executor import FoundationResearchExecutor
+from src.research.pipeline import ResearchPipelineCoordinator
 from src.research.queue import TaskiqResearchDispatcher
 from src.research.schemas import ResearchStepStatus, ResearchTaskStatus
 from src.research.service import ResearchTaskService
@@ -109,28 +111,29 @@ _step_service = ResearchStepService(lease_seconds=settings.research_step_lease_s
 
 # Phase 3: 工具注册表与步骤执行器
 _registry = ResearchToolRegistry()
-_registry.register(
-    ResearchToolDefinition(
-        name="knowledge.search",
-        description="从内部知识库检索信息",
-        risk_level="read",
-        data_scope="workspace",
-        cost_class="low",
-    ),
-)
-_registry.register(
-    ResearchToolDefinition(
-        name="web.search",
-        description="从互联网检索公开信息",
-        risk_level="read",
-        data_scope="public_web",
-        cost_class="low",
-    ),
-)
 _step_executor = ResearchStepExecutor(
     registry=_registry,
     evidence_service=ResearchEvidenceService(),
     step_service=_step_service,
+)
+
+# 注册内置研究工具使用真实依赖
+from src.knowledge import KnowledgeService
+from src.research.providers.builtin import register_builtin_research_tools, BuiltinResearchDependencies
+from src.research.sources import ResearchSourceGateway
+from src.search import WebSearchService
+from src.research.web.fetcher import SecuredFetcher
+
+register_builtin_research_tools(
+    _registry,
+    BuiltinResearchDependencies(
+        source_gateway=ResearchSourceGateway(
+            knowledge=KnowledgeService(),
+            web=WebSearchService(),
+        ),
+        web_search_service=WebSearchService(),
+        web_fetcher=SecuredFetcher(),
+    ),
 )
 
 # Phase 3: Structured LLM Supervisor
@@ -190,8 +193,11 @@ async def execute_planning_job(
     task_service,
     supervisor=None,
     step_service=None,
+    step_dispatcher=None,
 ) -> None:
     """执行研究规划：LLM Supervisor 生成计划或 fixture 回退
+
+    规划完成后使用 step_dispatcher 派发就绪步骤到队列。
 
     参数:
         task_id: 研究任务 ID
@@ -199,6 +205,7 @@ async def execute_planning_job(
         task_service: 任务服务
         supervisor: 可选 LLM Supervisor（Phase 3）
         step_service: 步骤服务（用于激活无依赖步骤）
+        step_dispatcher: 可选步骤派发器（用于派发就绪步骤到队列）
     """
     from src.research.planning.schemas import PlanDraft, StepDraft
     from src.research.planning.service import PlanService
@@ -280,6 +287,10 @@ async def execute_planning_job(
 
         await db.commit()
 
+    # 规划完成后派发就绪步骤到队列
+    if step_dispatcher is not None:
+        await step_dispatcher.dispatch_ready(task_id)
+
 
 async def execute_step_job(
     step_id: str,
@@ -288,15 +299,19 @@ async def execute_step_job(
     step_service,
     executor=None,
     dispatcher=None,
+    pipeline=None,
 ) -> None:
     """执行单个研究步骤
+
+    步骤执行完毕后使用 pipeline 协调器检查是否需要进入综合阶段。
 
     参数:
         step_id: 步骤 ID
         session_factory: 数据库会话工厂
         step_service: 步骤服务
         executor: 可选步骤执行器（Phase 3），不为 None 时执行真实工具调用
-        dispatcher: 可选派发器，不为 None 时在所有步骤完成后派发综合任务
+        dispatcher: 保留参数，当前通过 pipeline 协调器派发综合任务
+        pipeline: 可选 ResearchPipelineCoordinator，用于步骤完成后检查并派发综合
     """
     async with session_factory() as db:
         step = await db.get(ResearchStep, step_id)
@@ -325,16 +340,9 @@ async def execute_step_job(
                 await fail_db.commit()
             return
 
-        # 检查任务的所有步骤是否都已完成，若全部完成则派发综合
-        if dispatcher is not None:
-            all_steps_result = await db.execute(
-                select(ResearchStep.id, ResearchStep.status).where(
-                    ResearchStep.task_id == task_id,
-                )
-            )
-            all_statuses = [row[1] for row in all_steps_result.all()]
-            if all_statuses and all(s == ResearchStepStatus.COMPLETED.value for s in all_statuses):
-                await dispatcher.enqueue_synthesis(task_id)
+        # 使用 pipeline 协调器检查是否全部步骤完成并派发综合
+        if pipeline is not None:
+            await pipeline.queue_synthesis_if_complete(db, task_id)
 
 
 async def execute_lease_recovery_job(
@@ -355,6 +363,7 @@ async def plan_research_task(task_id: str) -> None:
 
     Phase 3: 使用 LLM Supervisor 生成计划并处理审批。
     Phase 2 回退: 使用确定性 fixture planner。
+    规划完成后通过 step_dispatcher 派发就绪步骤。
     """
     await execute_planning_job(
         task_id,
@@ -362,6 +371,7 @@ async def plan_research_task(task_id: str) -> None:
         task_service=_task_service,
         supervisor=_supervisor,
         step_service=_step_service,
+        step_dispatcher=_step_dispatcher,
     )
 
 
@@ -374,6 +384,7 @@ async def run_research_step(step_id: str) -> None:
         step_service=_step_service,
         executor=_step_executor,
         dispatcher=_dispatcher,
+        pipeline=_pipeline,
     )
 
 
@@ -397,6 +408,9 @@ async def synthesize_research_task(task_id: str) -> None:
             await db.rollback()
             logger.error("Synthesis failed for %s: %s", task_id, exc)
             raise
+    # 综合完成后由协调器进入验证阶段
+    async with async_session() as db:
+        await _pipeline.queue_validation(db, task_id)
 
 
 @broker.task(task_name="research.validate")
@@ -407,18 +421,7 @@ async def validate_research_task(task_id: str) -> None:
             decision = await _review_service.review(db, task_id)
             await db.commit()
             if decision.outcome == "pass":
-                task = await _task_service.get_task(db, task_id)
-                await _task_service.transition(
-                    db, task_id, task.workspace_id,
-                    expected={ResearchTaskStatus.VALIDATING},
-                    target=ResearchTaskStatus.COMPLETED,
-                )
-                await db.execute(
-                    update(ResearchReport)
-                    .where(ResearchReport.task_id == task_id)
-                    .values(report_status="validated", validated_at=datetime.now(timezone.utc))
-                )
-                await db.commit()
+                await _pipeline.complete_and_queue_delivery(db, task_id)
             elif decision.outcome == "repair":
                 task = await _task_service.get_task(db, task_id)
                 from src.research.quality import QualityRepairCoordinator
@@ -430,29 +433,13 @@ async def validate_research_task(task_id: str) -> None:
                 )
                 result = await coordinator.handle(db, task_id, decision)
                 if result.new_step_ids:
-                    # 修复步骤已创建，回退到 RUNNING 并派发修复步骤
-                    await _task_service.transition(
-                        db, task_id, task.workspace_id,
-                        expected={ResearchTaskStatus.VALIDATING},
-                        target=ResearchTaskStatus.RUNNING,
-                    )
-                    for step_id in result.new_step_ids:
-                        await _dispatcher.enqueue_step(step_id)
+                    await _pipeline.repair_and_retry(db, task_id, result.new_step_ids)
                 elif result.failed:
                     await _task_service.mark_failed(db, task_id, "质量修复超出最大轮次")
+                    await db.commit()
                 else:
                     # "weaken" — 弱化声明后直接完成验证
-                    await _task_service.transition(
-                        db, task_id, task.workspace_id,
-                        expected={ResearchTaskStatus.VALIDATING},
-                        target=ResearchTaskStatus.COMPLETED,
-                    )
-                    await db.execute(
-                        update(ResearchReport)
-                        .where(ResearchReport.task_id == task_id)
-                        .values(report_status="validated", validated_at=datetime.now(timezone.utc))
-                    )
-                await db.commit()
+                    await _pipeline.complete_and_queue_delivery(db, task_id)
             else:  # fail
                 await _task_service.mark_failed(db, task_id, "Citation review failed")
                 await db.commit()
@@ -470,4 +457,21 @@ _dispatcher = TaskiqResearchDispatcher(
     step_task=run_research_step,
     synthesis_task=synthesize_research_task,
     validation_task=validate_research_task,
+)
+
+# 步骤派发器与管线协调器（需在 _dispatcher 之后创建）
+_step_dispatcher = ResearchStepDispatcher(
+    step_service=_step_service,
+    dispatcher=_dispatcher,
+    session_factory=async_session,
+    max_concurrent=settings.research_max_concurrent_steps,
+)
+
+_pipeline = ResearchPipelineCoordinator(
+    task_service=_task_service,
+    dispatcher=_dispatcher,
+    synthesis_dispatcher=_dispatcher,
+    validation_dispatcher=_dispatcher,
+    delivery_dispatcher=_dispatcher,
+    step_dispatcher=_dispatcher,
 )

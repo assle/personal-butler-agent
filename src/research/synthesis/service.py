@@ -22,7 +22,6 @@ from src.models.research_evidence import ResearchEvidence
 from src.models.research_quality import ResearchClaim, ResearchClaimEvidence
 from src.research.synthesis.prompts import SYNTHESIS_SYSTEM_PROMPT
 from src.research.synthesis.schemas import ReportDraft, validate_report_draft
-from src.research.schemas import ResearchTaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +93,8 @@ class ReportSynthesisService:
         """
         task = await self._tasks.get_task(db, task_id)
 
-        # 1. 状态转换
-        await self._tasks.transition(
-            db, task.id, task.workspace_id,
-            expected={ResearchTaskStatus.RUNNING},
-            target=ResearchTaskStatus.SYNTHESIZING,
-        )
-
-        # 2. 加载证据
+        # 任务必须已处于 SYNTHESIZING 状态（由协调器负责转换）
+        # 1. 加载证据
         evidence_result = await db.execute(
             select(ResearchEvidence).where(
                 ResearchEvidence.workspace_id == task.workspace_id,

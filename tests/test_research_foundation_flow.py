@@ -110,7 +110,7 @@ async def test_private_research_foundation_flow_is_durable_and_idempotent(
     )
     assert delivery.status == "delivered"
     sent_content = app_client.send_text.await_args.args[1]
-    assert "尚未进行多来源检索、逐项引用和独立审核" in sent_content
+    assert "#" in sent_content and "初步结论" in sent_content
 
     stored_report = (
         await db_session.execute(

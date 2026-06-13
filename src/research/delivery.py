@@ -78,8 +78,7 @@ class ResearchDeliveryService:
             f"研究任务 {snapshot.task_id} 已完成\n"
             f"问题：{snapshot.question}\n"
             f"质量状态：{snapshot.quality_status}\n\n"
-            f"{snapshot.summary}\n\n"
-            "当前为 Phase 1 单次 LLM 初稿，尚未进行多来源检索、逐项引用和独立审核。"
+            f"{snapshot.body}"
         )
         try:
             parts = split_text_utf8(content)
