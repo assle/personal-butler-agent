@@ -311,3 +311,10 @@ Reasoning:
 - **Worker-process ownership**: The supervisor, registry, step executor, and specialist providers are instantiated in Taskiq worker processes (src/research/tasks.py), not the FastAPI main process. This keeps the producer thin and worker self-contained.
 
 Trade-off: The supervisor always evaluates `first_use=True` when calling ApprovalPolicy, because it lacks access to the WorkspaceContext (resolved in the main process). This means every plan requires first-use approval by default, even if the user was already approved in the past. The approval flow in the callback router resolves this by checking the actual WorkspaceMember.research_approved_once.
+
+## ADR-032: Evidence-Grounded Citation Quality Gate
+
+Status: Accepted.
+
+Synthesis and citation validation are separate LLM calls with independent context. The Synthesizer receives evidence; the Reviewer receives claims and their bound evidence only. A deterministic local gate can override an LLM "pass" when material claims lack evidence bindings or have unresolved error findings. Repair is bounded (max rounds + budget); failure escalation is explicit.
+
