@@ -42,27 +42,32 @@ class ResearchStepService:
         self._lease_seconds = lease_seconds
 
     async def claim_next(
-        self, db: AsyncSession, *, owner: str, limit: int = 1
+        self, db: AsyncSession, *, owner: str, limit: int = 1, task_id: str | None = None,
     ) -> list[ResearchStep]:
         """认领最多 limit 个就绪步骤
 
         使用 SELECT ... FOR UPDATE SKIP LOCKED 实现并发安全认领。
+        可选按 task_id 过滤，用于定向派发某任务的就绪步骤。
 
         参数:
             db: 异步数据库会话
             owner: Worker 标识
             limit: 最多认领数
+            task_id: 可选任务 ID 过滤
 
         返回:
             list[ResearchStep]: 已认领并为 running 的步骤
         """
         now = datetime.now(timezone.utc)
+        conditions = [
+            ResearchStep.status == ResearchStepStatus.READY.value,
+            ResearchStep.available_at <= now,
+        ]
+        if task_id is not None:
+            conditions.append(ResearchStep.task_id == task_id)
         query = (
             select(ResearchStep)
-            .where(
-                ResearchStep.status == ResearchStepStatus.READY.value,
-                ResearchStep.available_at <= now,
-            )
+            .where(*conditions)
             .order_by(ResearchStep.available_at, ResearchStep.id)
             .limit(limit)
         )
@@ -86,6 +91,36 @@ class ResearchStepService:
                 len(claimed), owner,
             )
         return claimed
+
+    async def release_claim(self, db: AsyncSession, step_id: str, *, owner: str) -> bool:
+        """队列发送失败时释放指定所有者的步骤租约
+
+        将 running 状态的步骤恢复为 ready，仅当 owner 匹配时生效。
+
+        参数:
+            db: 异步数据库会话
+            step_id: 步骤 ID
+            owner: 租约所有者
+
+        返回:
+            bool: 是否成功释放
+        """
+        from sqlalchemy import update as _update
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            _update(ResearchStep).where(
+                ResearchStep.id == step_id,
+                ResearchStep.status == ResearchStepStatus.RUNNING.value,
+                ResearchStep.owner == owner,
+            ).values(
+                status=ResearchStepStatus.READY.value,
+                owner=None,
+                lease_expires_at=None,
+                updated_at=now,
+            )
+        )
+        await db.flush()
+        return result.rowcount == 1
 
     async def complete_step(
         self,
