@@ -63,6 +63,10 @@ class ResearchToolRegistry:
         """获取工具定义"""
         return self._tools.get(name)
 
+    def has_provider(self, name: str) -> bool:
+        """返回指定工具是否绑定可执行提供者"""
+        return name in self._providers
+
     def list_tools(self) -> list[ResearchToolDefinition]:
         """列出所有已注册工具"""
         return list(self._tools.values())
