@@ -98,10 +98,13 @@ async def test_ainvoke_structured_returns_validated_model():
     from src.llm.client import LLMClient
 
     client = LLMClient()
-    fake_model = AsyncMock()
-    fake_model.with_structured_output.return_value.ainvoke.return_value = (
-        _FakePlanDraft(objective="compare", steps=[])
+    fake_model = MagicMock()
+    structured_runnable = AsyncMock()
+    structured_runnable.ainvoke.return_value = _FakePlanDraft(
+        objective="compare",
+        steps=[],
     )
+    fake_model.with_structured_output.return_value = structured_runnable
     client._model = fake_model
     result = await client.ainvoke_structured(
         messages=[{"role": "user", "content": "compare"}],
