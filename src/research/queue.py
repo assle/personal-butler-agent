@@ -24,11 +24,20 @@ class ResearchDispatcher(Protocol):
         """派发独立报告投递任务"""
         raise NotImplementedError
 
+    async def enqueue_synthesis(self, task_id: str) -> None:
+        """派发报告综合任务"""
+        raise NotImplementedError
+
+    async def enqueue_validation(self, task_id: str) -> None:
+        """派发引用验证任务"""
+        raise NotImplementedError
+
 
 class TaskiqResearchDispatcher:
     """通过 Taskiq 派发研究和投递任务"""
 
-    def __init__(self, run_task, deliver_task, *, plan_task=None, step_task=None):
+    def __init__(self, run_task, deliver_task, *, plan_task=None, step_task=None,
+                 synthesis_task=None, validation_task=None):
         """注入 Taskiq task 函数
 
         参数:
@@ -36,11 +45,15 @@ class TaskiqResearchDispatcher:
             deliver_task: 报告投递 task
             plan_task: 研究规划 task
             step_task: 研究步骤 task
+            synthesis_task: 报告综合 task
+            validation_task: 引用验证 task
         """
         self._run = run_task
         self._deliver = deliver_task
         self._plan = plan_task
         self._step = step_task
+        self._synthesis = synthesis_task
+        self._validation = validation_task
 
     async def enqueue_planning(self, task_id: str) -> None:
         """派发计划生成任务"""
@@ -59,3 +72,13 @@ class TaskiqResearchDispatcher:
     async def enqueue_research(self, task_id: str) -> None:
         """Phase 1 兼容：派发 legacy 研究任务"""
         await self._run.kiq(task_id)
+
+    async def enqueue_synthesis(self, task_id: str) -> None:
+        """派发报告综合任务"""
+        if self._synthesis is not None:
+            await self._synthesis.kiq(task_id)
+
+    async def enqueue_validation(self, task_id: str) -> None:
+        """派发引用验证任务"""
+        if self._validation is not None:
+            await self._validation.kiq(task_id)

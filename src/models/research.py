@@ -106,6 +106,12 @@ class ResearchReport(Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     quality_status: Mapped[str] = mapped_column(String(64), nullable=False)
+    report_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft"
+    )
+    validated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

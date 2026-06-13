@@ -20,6 +20,11 @@ from src.models.research import (
     WeComUserBinding,
 )
 from src.models.research_evidence import ResearchEvidence
+from src.models.research_quality import (
+    ResearchClaim,
+    ResearchClaimEvidence,
+    ResearchReviewFinding,
+)
 from src.models.research_execution import (
     ResearchApproval,
     ResearchEvent,
@@ -59,4 +64,7 @@ __all__ = [
     "ResearchStep",
     "ResearchStepDependency",
     "ResearchUsage",
+    "ResearchClaim",
+    "ResearchClaimEvidence",
+    "ResearchReviewFinding",
 ]

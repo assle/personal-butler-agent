@@ -93,6 +93,9 @@ async def test_private_research_foundation_flow_is_durable_and_idempotent(
         db_session, task_id
     )
     assert report.quality_status == "unreviewed_foundation"
+    # 标记报告为已验证，使投递通过质量门
+    report.report_status = "validated"
+    await db_session.flush()
 
     app_client = AsyncMock()
     app_client.convert_open_userid.return_value = "plain-u1"

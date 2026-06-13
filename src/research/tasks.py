@@ -3,12 +3,16 @@ Taskiq 研究与投递任务
 Taskiq wrapper 只接收 task_id；数据库会话和服务在 Worker 进程内重新创建。
 """
 import asyncio
+import logging
+from datetime import datetime, timezone
 
 from redis.asyncio import Redis
+from sqlalchemy import select, update
 
 from src.config import settings
 from src.db.session import async_session
 from src.llm.client import LLMClient
+from src.models.research import ResearchReport
 from src.models.research_execution import ResearchStep
 from src.research.broker import broker
 from src.research.delivery import ResearchDeliveryService
@@ -20,10 +24,14 @@ from src.research.schemas import ResearchStepStatus, ResearchTaskStatus
 from src.research.service import ResearchTaskService
 from src.research.steps import ResearchStepService
 from src.research.tools import ResearchToolDefinition, ResearchToolRegistry
+from src.research.review.service import CitationReviewService
+from src.research.synthesis.service import ReportSynthesisService
 from src.wechat.app_client import (
     RedisAccessTokenCache,
     WeComAppMessageClient,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def execute_research_job(
@@ -141,6 +149,11 @@ _supervisor = ResearchSupervisor(
         _step_service,
     ),
 )
+
+# Phase 4: 报告综合与引用验证服务
+_llm = LLMClient()
+_synthesis_service = ReportSynthesisService(llm=_llm, task_service=_task_service)
+_review_service = CitationReviewService(llm=_llm, task_service=_task_service)
 
 
 @broker.task(task_name="research.deliver")
@@ -353,3 +366,55 @@ async def recover_research_leases() -> None:
         session_factory=async_session,
         step_service=_step_service,
     )
+
+
+@broker.task(task_name="research.synthesize")
+async def synthesize_research_task(task_id: str) -> None:
+    """Taskiq 报告综合入口"""
+    async with async_session() as db:
+        try:
+            report = await _synthesis_service.synthesize(db, task_id)
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            logger.error("Synthesis failed for %s: %s", task_id, exc)
+            raise
+
+
+@broker.task(task_name="research.validate")
+async def validate_research_task(task_id: str) -> None:
+    """Taskiq 引用验证入口"""
+    async with async_session() as db:
+        try:
+            decision = await _review_service.review(db, task_id)
+            await db.commit()
+            if decision.outcome == "pass":
+                task = await _task_service.get_task(db, task_id)
+                await _task_service.transition(
+                    db, task_id, task.workspace_id,
+                    expected={ResearchTaskStatus.VALIDATING},
+                    target=ResearchTaskStatus.COMPLETED,
+                )
+                await db.execute(
+                    update(ResearchReport)
+                    .where(ResearchReport.task_id == task_id)
+                    .values(report_status="validated", validated_at=datetime.now(timezone.utc))
+                )
+                await db.commit()
+            elif decision.outcome == "repair":
+                from src.research.quality import QualityRepairCoordinator
+                from src.research.planning.service import PlanService
+                coordinator = QualityRepairCoordinator(
+                    task_service=_task_service,
+                    plan_service=PlanService(),
+                    max_repair_rounds=1,
+                )
+                await coordinator.handle(db, task_id, decision)
+                await db.commit()
+            else:  # fail
+                await _task_service.mark_failed(db, task_id, "Citation review failed")
+                await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            logger.error("Validation failed for %s: %s", task_id, exc)
+            raise

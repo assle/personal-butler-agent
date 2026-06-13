@@ -4,11 +4,16 @@
 """
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.research import ResearchDelivery, WeComUserBinding
+from src.models.research import ResearchDelivery, ResearchReport, WeComUserBinding
 from src.research.schemas import ResearchDeliveryStatus
 from src.research.service import ResearchTaskService
+
+
+class ReportNotValidatedError(RuntimeError):
+    """报告未通过引用质量门"""
 
 
 class ResearchDeliveryService:
@@ -33,6 +38,18 @@ class ResearchDeliveryService:
             await db.flush()
         if delivery.status == ResearchDeliveryStatus.DELIVERED.value:
             return delivery
+
+        # 要求报告已通过引用验证
+        report = (
+            await db.execute(
+                select(ResearchReport).where(
+                    ResearchReport.task_id == task_id,
+                    ResearchReport.report_status == "validated",
+                ).order_by(ResearchReport.version.desc())
+            )
+        ).scalar_one_or_none()
+        if report is None:
+            raise ReportNotValidatedError(task_id)
 
         snapshot = await self._tasks.get_report_snapshot(db, task_id)
         binding = await db.get(WeComUserBinding, snapshot.requester_open_userid)

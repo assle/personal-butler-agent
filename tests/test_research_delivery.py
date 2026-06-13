@@ -5,9 +5,10 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy import select
 
 from src.governance.workspaces import WorkspaceContext
-from src.models.research import ResearchDelivery, ResearchTask, WeComUserBinding
+from src.models.research import ResearchDelivery, ResearchReport, ResearchTask, WeComUserBinding
 from src.models.workspace import Workspace
 from src.research.delivery import ResearchDeliveryService
 from src.research.service import ResearchTaskService
@@ -35,7 +36,7 @@ async def _ensure_workspace(db_session, workspace_id="ws-test"):
 
 
 async def _completed_task(db_session):
-    """创建带首版报告的已完成任务"""
+    """创建带已验证报告（report_status=validated）的已完成任务"""
     await _ensure_workspace(db_session)
     tasks = ResearchTaskService(max_rounds=4, timeout_seconds=300)
     task, _ = await tasks.create_task(
@@ -51,6 +52,14 @@ async def _completed_task(db_session):
         body="完整初稿",
         quality_status="unreviewed_foundation",
     )
+    # 标识报告为已验证，使投递通过质量门
+    report = (
+        await db_session.execute(
+            select(ResearchReport).where(ResearchReport.task_id == task.id)
+        )
+    ).scalar_one()
+    report.report_status = "validated"
+    await db_session.flush()
     return tasks, task
 
 
