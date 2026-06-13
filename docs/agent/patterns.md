@@ -186,7 +186,7 @@ Key principles:
   - `research/submission.py` — private-chat facade
 - **Delivery isolation**: `execute_research_job` commits report then calls `dispatcher.enqueue_delivery(task_id)` — delivery is a separate task. Delivery failure does not roll back research.
 - **Worker startup**: `taskiq worker --ack-type when_executed --workers 1 --max-async-tasks 1 src.research.broker:broker src.research.tasks`
-- **Migration path**: `taskiq.akiq()` (deprecated) → `task.kiq()` (current) → eventually supervisor pattern (Phase 3).
+- **Pipeline**: `submission → enqueue_planning → Supervisor.plan() → plan persisted → approval check → mark_root_steps_ready → enqueue_step per ready step → step executor → evidence persisted → enqueue_synthesis when all steps done → Synthesizer → enqueue_validation → Reviewer → quality gate → pass/deliver or repair or fail`
 
 ## Governance Pattern
 
@@ -203,4 +203,48 @@ When persisting and executing research steps:
 1. `PlanService.persist()` creates versioned plans with deterministic step IDs: `{task_id}:{version}:{key}`
 2. `ResearchStepService.claim_next()` uses `SELECT ... FOR UPDATE SKIP LOCKED` for concurrent-safe claiming
 3. Lease recovery (`recover_expired_leases()`) resets timed-out steps back to ready
-4. Completion unblocks dependent steps; failure cascades cancellation
+4. Completion unblocks dependent steps; failure cascades cancellation through full dependency chain
+
+## Multi-Agent Pipeline Pattern
+
+The research pipeline separates concerns across 5 independent LLM roles, each with isolated context:
+
+1. **Supervisor** (`supervisor/service.py`): structured planning via `ainvoke_structured(PlanDraft)` — never executes tools
+2. **Specialist** (`specialists/knowledge.py`, `specialists/web.py`): single-purpose retrieval — maps results to `EvidenceInput`
+3. **Synthesizer** (`synthesis/service.py`): evidence-to-report — every claim binds evidence IDs
+4. **Reviewer** (`review/service.py`): independent citation check — receives claims+evidence only, not Synthesizer's conversation
+5. **Quality Gate** (`review/service.py:_apply_quality_gate`): deterministic rules override LLM "pass" when material claims lack evidence
+
+Rules:
+- Each agent's system prompt is wrapped in `<system_rules>` / `<task>` / `<untrusted_source>` sections
+- No agent receives another agent's full context
+- State transitions enforce linear progression: `submitted → planning → [awaiting_approval] → running → synthesizing → validating → completed`
+
+## Deterministic Guard Pattern
+
+LLM decisions are verified or overridden by deterministic code:
+
+1. Group message triggers → keyword matching, not LLM classification
+2. Research commands (`深度研究：`, `批准研究任务`, `查看研究任务`) → regex interception before agent
+3. Quality gate → material claims with no evidence bindings fail regardless of Reviewer LLM output
+4. Tool registry → unknown tool names rejected before provider execution
+5. URL policy → scheme/address validation before any HTTP request
+
+## Provider and Tool Registration Pattern
+
+Tools are registered once via `register_builtin_research_tools()` and shared between FastAPI and Worker processes:
+
+1. `ResearchToolDefinition` declares risk_level, data_scope, cost_class, timeout
+2. `ResearchToolRegistry` enforces duplicate detection and permission checks before execution
+3. Provider implementation is decoupled — `ResearchToolProvider` protocol
+4. MCP adapter (`mcp.py`) is disabled by default via `RESEARCH_MCP_ENABLED=false`
+
+## Reliability Pattern
+
+Provider failures and worker crashes are handled deterministically:
+
+1. `classify_error()` categorizes exceptions by type first, message second
+2. `RetryPolicy.delay()` respects Retry-After header, falls back to exponential + jitter
+3. `ProviderCircuitBreaker` uses Redis atomic INCR/SETEX — opens after threshold, auto-resets
+4. `ResearchWatchdog.run_once()` recovers expired leases and requeues steps
+5. Retryable failures set step to `RETRY_WAIT`; terminal failures cascade cancellation

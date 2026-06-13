@@ -198,6 +198,13 @@ Phase 1 异步研究：私聊提交问题，Worker 在独立进程中生成 LLM 
 | `RESEARCH_HIGH_COST_APPROVAL_MICROUNITS` | No | `250000` | 高成本审批阈值 |
 | `RESEARCH_CIRCUIT_FAILURE_THRESHOLD` | No | `3` | 提供者熔断器连续失败阈值 |
 | `RESEARCH_CIRCUIT_OPEN_SECONDS` | No | `60` | 熔断器开启持续时间（秒） |
+| `RESEARCH_RETRY_BASE_SECONDS` | No | `1.0` | 指数退避重试基础间隔（秒） |
+| `RESEARCH_RETRY_MAX_SECONDS` | No | `30.0` | 指数退避重试最大间隔（秒） |
+| `RESEARCH_WEB_FETCH_TIMEOUT_SECONDS` | No | `15` | 安全网页抓取超时（秒） |
+| `RESEARCH_WEB_MAX_RESPONSE_BYTES` | No | `2000000` | 网页抓取最大响应字节数 |
+| `RESEARCH_WEB_MAX_REDIRECTS` | No | `5` | 网页抓取最大重定向次数 |
+| `RESEARCH_WEB_MAX_PAGES_PER_TASK` | No | `20` | 单任务最大网页抓取数 |
+| `RESEARCH_MCP_ENABLED` | No | `false` | MCP 动态工具提供者开关（默认关闭） |
 | `RESEARCH_RETRY_BASE_SECONDS` | No | `1.0` | 重试指数退避初始秒数 |
 | `RESEARCH_RETRY_MAX_SECONDS` | No | `30.0` | 重试最大延迟秒数 |
 | `RESEARCH_WEB_FETCH_TIMEOUT_SECONDS` | No | `15` | 网页抓取超时（秒） |
