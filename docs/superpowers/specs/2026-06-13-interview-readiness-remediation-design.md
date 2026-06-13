@@ -42,12 +42,10 @@ actions.
 
 ### 3.2 Verification is not green
 
-The local suite currently reports two failures:
+The local suite currently reports one failure:
 
 - the structured LLM test uses an asynchronous mock for a synchronous
   `with_structured_output()` factory;
-- a Settings test passes an environment-style uppercase name as a constructor
-  field.
 
 CI starts PostgreSQL and Redis but excludes the integration test directory.
 There is no single command proving that the complete supported test matrix is
@@ -77,7 +75,7 @@ The repository does not yet contain reproducible evidence for:
 
 ### 4.1 Included
 
-- Repair the current unit-test failures.
+- Repair the current unit-test failure.
 - Complete the asynchronous research runtime wiring.
 - Bind real built-in knowledge and web providers to the governed registry.
 - Add a dispatcher loop for ready-step claiming and Taskiq enqueueing.
@@ -210,7 +208,7 @@ full telemetry backend.
 
 ### Week 1: Correctness and executable pipeline
 
-- Fix the two existing test failures.
+- Fix the remaining test failure.
 - Replace definition-only tool registration with provider assembly.
 - Implement ready-step claim and dispatch.
 - Wire plan, step, synthesis, validation, and delivery transitions.
