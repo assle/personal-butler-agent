@@ -1,0 +1,69 @@
+"""研究工具注册表测试"""
+from unittest.mock import AsyncMock, Mock
+import pytest
+from src.research.tools.schemas import (
+    ResearchToolDefinition,
+    ToolExecutionContext,
+    ToolExecutionResult,
+)
+from src.research.tools.registry import (
+    DuplicateResearchToolError,
+    ResearchToolDeniedError,
+    ResearchToolRegistry,
+)
+
+
+def _ctx() -> ToolExecutionContext:
+    return ToolExecutionContext(
+        workspace_id="ws-a", user_id="u1", task_id="R1", step_id="R1:1:a",
+    )
+
+
+def test_registry_rejects_duplicate_tool_names():
+    """验证工具名称不可重复注册"""
+    registry = ResearchToolRegistry()
+    registry.register(ResearchToolDefinition(name="knowledge.search"))
+    with pytest.raises(DuplicateResearchToolError):
+        registry.register(ResearchToolDefinition(name="knowledge.search"))
+
+
+@pytest.mark.asyncio
+async def test_registry_checks_permission_before_provider_call():
+    """验证工具执行前先经过权限引擎"""
+    from src.governance.permissions import PermissionDecision, PermissionEffect
+    permission = Mock()
+    permission.evaluate.return_value = PermissionDecision(
+        effect=PermissionEffect.DENY, policy_id="test", reason="blocked",
+    )
+    provider = AsyncMock()
+    registry = ResearchToolRegistry(permission_engine=permission)
+    registry.register(ResearchToolDefinition(name="web.search"), provider=provider)
+    result = await registry.execute(_ctx(), "web.search", {"query": "x"})
+    assert result.success is False
+    provider.execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_registry_executes_provider_and_returns_result():
+    """验证正常路径：权限通过后执行提供者"""
+    from src.governance.permissions import PermissionDecision, PermissionEffect
+    permission = Mock()
+    permission.evaluate.return_value = PermissionDecision(
+        effect=PermissionEffect.ALLOW, policy_id="test", reason="ok",
+    )
+    provider = AsyncMock()
+    provider.execute.return_value = ToolExecutionResult(success=True, data={"result": "ok"})
+    registry = ResearchToolRegistry(permission_engine=permission)
+    registry.register(ResearchToolDefinition(name="knowledge.search"), provider=provider)
+    result = await registry.execute(_ctx(), "knowledge.search", {"query": "test"})
+    assert result.success is True
+    provider.execute.assert_awaited_once()
+
+
+def test_registry_lists_registered_tools():
+    """验证 list_tools 返回所有已注册工具"""
+    registry = ResearchToolRegistry()
+    registry.register(ResearchToolDefinition(name="knowledge.search"))
+    registry.register(ResearchToolDefinition(name="web.search"))
+    tools = registry.list_tools()
+    assert {t.name for t in tools} == {"knowledge.search", "web.search"}

@@ -230,6 +230,38 @@ class KnowledgeService:
         )
         return results
 
+    async def search_research(
+        self,
+        query: str,
+        access_scope,
+        db: AsyncSession,
+        domains: list[str] | None = None,
+        limit: int = 5,
+        llm=None,
+    ) -> list[KnowledgeChunkResult]:
+        """按研究任务不可变权限范围检索
+
+        参数:
+            query: 检索查询
+            access_scope: ResearchAccessScope 实例
+            db: 异步数据库会话
+            domains: 领域标签
+            limit: 返回条数
+            llm: LLMClient
+
+        返回:
+            list[KnowledgeChunkResult]
+        """
+        return await self.search(
+            query=query,
+            user_id=access_scope.user_id,
+            db=db,
+            chat_type="single",
+            domains=domains or ["global", "qa"],
+            limit=limit,
+            llm=llm,
+        )
+
     async def _coarse_retrieval(
         self,
         query: str,

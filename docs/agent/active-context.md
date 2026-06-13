@@ -60,6 +60,11 @@ Current implementation baseline:
 - 审计事件日志（自动脱敏密钥和令牌）
 - 私聊命令 `批准研究任务 R20260613-XXXXXXXX` 批准待审批计划
 - 私聊命令 `拒绝研究任务 R20260613-XXXXXXXX：预算过高` 拒绝待审批计划
+- Phase 3 结构化 LLM Supervisor：Supervisor 产生经过校验的 PlanDraft JSON；检索与规划解耦，每步写入规范化证据
+- Phase 3 知识库 + 网页检索 Specialist：KnowledgeResearcher 和 WebResearcher 产生归一化 ToolExecutionResult
+- Phase 3 管辖工具注册表：ResearchToolRegistry 集成权限检查和 Hook 总线
+- Phase 3 工作空间隔离证据去重：ResearchEvidenceService 按 SHA-256 去重，同工作空间相同 hash 复用
+- Phase 3 步骤执行器：ResearchStepExecutor 执行已派发工具调用，持久化证据，更新步骤 DAG 状态
 
 ## Deferred Work
 

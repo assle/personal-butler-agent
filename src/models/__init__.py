@@ -19,6 +19,7 @@ from src.models.research import (
     UserGroupAccess,
     WeComUserBinding,
 )
+from src.models.research_evidence import ResearchEvidence
 from src.models.research_execution import (
     ResearchApproval,
     ResearchEvent,
@@ -47,6 +48,7 @@ __all__ = [
     "ResearchTask",
     "ResearchReport",
     "ResearchDelivery",
+    "ResearchEvidence",
     "UserGroupAccess",
     "WeComUserBinding",
     "Workspace",

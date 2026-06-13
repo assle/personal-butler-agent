@@ -115,6 +115,15 @@ if settings.research_enabled:
         approval_service=_approval_service,
     )
 
+    # 异步研究的 Worker 端单例（Taskiq 进程，非主进程）
+    # 以下组件在 src/research/tasks.py 的 Worker 进程中创建，而非此处：
+    #   - ResearchToolRegistry: 工具注册表（knowledge.search, web.search）
+    #   - ResearchStepExecutor: 步骤执行器，调用注册工具并持久化证据
+    #   - ResearchSupervisor: LLM 结构化输出规划器
+    #   - PlanValidator: DAG 无环和预算校验
+    # 主进程（FastAPI）负责调度、审批和投递；Worker 进程执行研究和检索。
+
+
 private_butler_agent = PrivateButlerAgent(
     llm_client=llm_client,
     summary_agent=summary_agent,

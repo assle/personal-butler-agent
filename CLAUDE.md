@@ -31,6 +31,12 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/wechat/`: WeChat Work intelligent robot integration (URL callback crypto, callback router, inbox, response_url reply) and custom-application client (access token cache, ID conversion, proactive private messaging).
 - `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate).
 - `src/research/`: async research subsystem — task lifecycle service, Redis Stream broker (Taskiq), queue dispatcher, foundation executor, delivery service, worker tasks, and private-chat submission facade.
+- `src/research/supervisor/`: LLM structured-output planner with validation
+- `src/research/specialists/`: knowledge and web retrieval specialists
+- `src/research/tools/`: governed tool registry with permission checks
+- `src/research/evidence.py`: normalized evidence dedup and persistence
+- `src/research/execution.py`: step executor with evidence writing
+- `src/research/sources.py`: workspace-authorized source gateway
 - `src/memory/`: conversation memory persistence and retrieval (sliding window + LLM-compressed summary).
 - `src/reminders/`: reminder lifecycle service — natural-language parsing, CRUD, and expiry.
 - `src/scheduler/`: APScheduler lifecycle, config loading, and webhook HTTP client for outbound group pushes.

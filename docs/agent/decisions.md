@@ -298,3 +298,16 @@ Status: Accepted. `PermissionEngine` and `HookBus` provide structured governance
 ## ADR-030: Durable Research DAG with Leases
 
 Status: Accepted. Steps are first-class DB rows with leases, not in-memory ephemeral state. Workers claim via row locks. Expired leases auto-recover. Plans are versioned and side-effect free until approved.
+
+## ADR-031: Structured Supervisor over Ad-Hoc Planning
+
+Status: Accepted. Phase 3 introduces an LLM-based ResearchSupervisor that produces a validated PlanDraft JSON, replacing the deterministic fixture planner from Phase 2.
+
+Reasoning:
+- **Structured output guarantees schema compliance**: The supervisor uses `ainvoke_structured()` with Pydantic schema, producing PlanDraft with typed steps, dependencies, and budgets. The planner from Phase 2 was hardcoded fixture data with no LLM reasoning.
+- **Retrieval is isolated from planning**: The supervisor never searches the web or knowledge base during planning. Each retrieval step is explicitly declared in PlanDraft with tool_name and input_payload, to be executed by ResearchStepExecutor.
+- **Each step writes normalized evidence**: Tool execution produces ToolExecutionResult with an `evidence` array. ResearchEvidenceService deduplicates by SHA-256(workspace_id + source_ref + excerpt). Evidence is workspace-scoped.
+- **Governed tool registry**: ResearchToolRegistry enforces permission policies (read/internal_write/external_action) and emits HookBus events before and after each tool call, ensuring auditability.
+- **Worker-process ownership**: The supervisor, registry, step executor, and specialist providers are instantiated in Taskiq worker processes (src/research/tasks.py), not the FastAPI main process. This keeps the producer thin and worker self-contained.
+
+Trade-off: The supervisor always evaluates `first_use=True` when calling ApprovalPolicy, because it lacks access to the WorkspaceContext (resolved in the main process). This means every plan requires first-use approval by default, even if the user was already approved in the past. The approval flow in the callback router resolves this by checking the actual WorkspaceMember.research_approved_once.
