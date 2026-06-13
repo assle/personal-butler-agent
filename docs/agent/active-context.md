@@ -44,6 +44,7 @@ Current implementation baseline:
 - Enterprise WeChat custom-application messaging: `WeComAppMessageClient` with `RedisAccessTokenCache`, open_userid-to-userid conversion, errcode validation, and token refresh (40014/42001).
 
 - Phase 4 citation quality: 证据引用综合 (ReportSynthesisService) → 独立引用审查 (CitationReviewService) → 确定性质量门 → 有限修复协调 (QualityRepairCoordinator)。结构化结论 (ResearchClaim) + 证据绑定 (ResearchClaimEvidence) + 审查发现 (ResearchReviewFinding)。仅已验证报告可投递。
+- Phase 5: 失败分类与指数退避重试、Redis 熔断器、阶段上下文构建器、SSRF 防护 URL 策略、安全网页抓取、prompt 注入边界、步骤看门狗
 - Phase 3: Structured Supervisor 规划 + Knowledge/Web Specialist 检索 + 受控工具注册表 + 证据持久化
 - Phase 2: DAG 步骤 + 审批 + 预算
 - Phase 1: PostgreSQL + workspace 治理 + Alembic

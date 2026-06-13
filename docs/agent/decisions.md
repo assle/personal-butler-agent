@@ -318,3 +318,7 @@ Status: Accepted.
 
 Synthesis and citation validation are separate LLM calls with independent context. The Synthesizer receives evidence; the Reviewer receives claims and their bound evidence only. A deterministic local gate can override an LLM "pass" when material claims lack evidence bindings or have unresolved error findings. Repair is bounded (max rounds + budget); failure escalation is explicit.
 
+## ADR-033: Bounded Retry and Circuit Breaking
+
+Status: Accepted. Typed failure categories determine retry policy. Provider circuit breaker opens after configurable consecutive failures. Deterministic tool-gate prevents prompt injection from bypassing the registry.
+

@@ -66,6 +66,16 @@ class Settings(BaseSettings):
     research_max_repair_rounds: int = 1
     research_step_lease_seconds: int = 120
     research_high_cost_approval_microunits: int = 250_000
+    # 研究可靠性配置
+    research_circuit_failure_threshold: int = 3
+    research_circuit_open_seconds: int = 60
+    research_retry_base_seconds: float = 1.0
+    research_retry_max_seconds: float = 30.0
+    # 研究网页抓取配置
+    research_web_fetch_timeout_seconds: int = 15
+    research_web_max_response_bytes: int = 2_000_000
+    research_web_max_redirects: int = 5
+    research_web_max_pages_per_task: int = 20
 
     # 企业微信自建应用主动私聊配置，与智能机器人回调配置相互独立
     wecom_app_corp_id: str = ""

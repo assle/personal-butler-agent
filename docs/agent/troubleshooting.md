@@ -163,6 +163,16 @@ Fix pattern:
 - Use `display_name` only for user-facing confirmation and reminder lists.
 - Treat the reminder content, such as “该健身了”, separately from the target group.
 
+## Research Circuit Open
+Symptom: web.search returns "provider degraded"
+Check: Redis keys research:circuit:tavily:open
+Fix: circuit auto-resets after configured open_seconds; check provider status
+
+## Research Lease Expired
+Symptom: step stuck in running with stale owner
+Check: watchdog recovery log
+Fix: watchdog recovers expired leases automatically every minute
+
 ## Public 404 Requests
 
 Symptom:

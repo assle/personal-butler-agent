@@ -32,6 +32,8 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 - `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate).
 - `src/governance/`: workspace membership resolution, permission engine, and research lifecycle hooks.
 - `src/research/`: async research subsystem — task lifecycle, broker, queue, planning, approval, budgeting, supervisor, specialists, tool registry, evidence, synthesis, citation review, quality gate, repair, delivery, and step execution.
+- `src/research/reliability/`: failure classification, retry, circuit breaker, context builders, watchdog
+- `src/research/web/`: URL security policy and bounded full-page fetcher
 - `src/research/supervisor/`: LLM structured-output planner with validation
 - `src/research/specialists/`: knowledge and web retrieval specialists
 - `src/research/tools/`: governed tool registry with permission checks

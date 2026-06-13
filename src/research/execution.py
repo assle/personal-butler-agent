@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.research_execution import ResearchStep
 from src.research.evidence import EvidenceInput, ResearchEvidenceService
+from src.research.schemas import ResearchStepStatus
 from src.research.tools.schemas import ToolExecutionContext, ToolExecutionResult
 
 logger = logging.getLogger(__name__)
@@ -77,8 +78,20 @@ class ResearchStepExecutor:
         )
 
         if not tool_result.success:
+            retryable = tool_result.data.get("retryable", False)
+            if retryable:
+                step.status = ResearchStepStatus.RETRY_WAIT.value
+                step.owner = None
+                step.lease_expires_at = None
+                step.error = tool_result.error
+                step.updated_at = datetime.now(timezone.utc)
+                await db.flush()
+                logger.warning("Step %s: retryable failure — %s", step_id, tool_result.error)
+                return StepExecutionResult(
+                    step_id=step_id, success=False, error=tool_result.error,
+                )
             await self._steps.complete_step(db, step_id, error=tool_result.error)
-            logger.warning("Step %s: tool failed — %s", step_id, tool_result.error)
+            logger.warning("Step %s: terminal failure — %s", step_id, tool_result.error)
             return StepExecutionResult(
                 step_id=step_id, success=False, error=tool_result.error,
             )

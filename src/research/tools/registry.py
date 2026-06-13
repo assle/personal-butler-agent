@@ -143,6 +143,16 @@ class ResearchToolRegistry:
                 success=False,
                 error=f"工具 {tool_name} 执行超时 ({definition.timeout_seconds}s)",
             )
+        except Exception as exc:
+            from src.research.reliability.errors import classify_error, FailureCategory
+            decision = classify_error(exc)
+            if decision.degrade_provider:
+                logger.warning("Registry: provider degraded for %s", tool_name)
+            return ToolExecutionResult(
+                success=False,
+                error=f"{decision.category.value}: {exc}",
+                data={"failure_category": decision.category.value, "retryable": decision.retryable},
+            )
 
         # 发射 AFTER_TOOL Hook
         if self._hooks is not None:
