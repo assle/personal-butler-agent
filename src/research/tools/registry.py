@@ -3,6 +3,8 @@ import asyncio
 import logging
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.research.tools.schemas import (
     ResearchToolDefinition,
     ToolExecutionContext,
@@ -67,6 +69,7 @@ class ResearchToolRegistry:
 
     async def execute(
         self,
+        db: AsyncSession,
         context: ToolExecutionContext,
         tool_name: str,
         arguments: dict,
@@ -74,6 +77,7 @@ class ResearchToolRegistry:
         """执行注册工具
 
         参数:
+            db: 异步数据库会话
             context: 执行上下文
             tool_name: 工具名
             arguments: 工具参数
@@ -138,7 +142,7 @@ class ResearchToolRegistry:
 
         try:
             async with asyncio.timeout(definition.timeout_seconds):
-                result = await provider.execute(context, arguments)
+                result = await provider.execute(db, context, arguments)
         except asyncio.TimeoutError:
             return ToolExecutionResult(
                 success=False,

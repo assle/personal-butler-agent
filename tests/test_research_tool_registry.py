@@ -38,7 +38,7 @@ async def test_registry_checks_permission_before_provider_call():
     provider = AsyncMock()
     registry = ResearchToolRegistry(permission_engine=permission)
     registry.register(ResearchToolDefinition(name="web.search"), provider=provider)
-    result = await registry.execute(_ctx(), "web.search", {"query": "x"})
+    result = await registry.execute(AsyncMock(), _ctx(), "web.search", {"query": "x"})
     assert result.success is False
     provider.execute.assert_not_awaited()
 
@@ -55,7 +55,7 @@ async def test_registry_executes_provider_and_returns_result():
     provider.execute.return_value = ToolExecutionResult(success=True, data={"result": "ok"})
     registry = ResearchToolRegistry(permission_engine=permission)
     registry.register(ResearchToolDefinition(name="knowledge.search"), provider=provider)
-    result = await registry.execute(_ctx(), "knowledge.search", {"query": "test"})
+    result = await registry.execute(AsyncMock(), _ctx(), "knowledge.search", {"query": "test"})
     assert result.success is True
     provider.execute.assert_awaited_once()
 
@@ -67,3 +67,17 @@ def test_registry_lists_registered_tools():
     registry.register(ResearchToolDefinition(name="web.search"))
     tools = registry.list_tools()
     assert {t.name for t in tools} == {"knowledge.search", "web.search"}
+
+
+@pytest.mark.asyncio
+async def test_registry_passes_database_session_to_provider():
+    """验证注册表把当前数据库会话传给工具提供者"""
+    db = AsyncMock()
+    provider = AsyncMock()
+    provider.execute.return_value = ToolExecutionResult(success=True, data={"result": "ok"})
+    registry = ResearchToolRegistry()
+    registry.register(ResearchToolDefinition(name="knowledge.search"), provider=provider)
+
+    result = await registry.execute(db, _ctx(), "knowledge.search", {"query": "test"})
+    assert result.success is True
+    provider.execute.assert_awaited_once_with(db, _ctx(), {"query": "test"})

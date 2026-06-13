@@ -74,7 +74,7 @@ class ResearchStepExecutor:
 
         # 执行工具
         tool_result = await self._registry.execute(
-            context, step.tool_name, step.input_payload,
+            db, context, step.tool_name, step.input_payload,
         )
 
         if not tool_result.success:
