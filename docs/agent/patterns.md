@@ -187,3 +187,20 @@ Key principles:
 - **Delivery isolation**: `execute_research_job` commits report then calls `dispatcher.enqueue_delivery(task_id)` — delivery is a separate task. Delivery failure does not roll back research.
 - **Worker startup**: `taskiq worker --ack-type when_executed --workers 1 --max-async-tasks 1 src.research.broker:broker src.research.tasks`
 - **Migration path**: `taskiq.akiq()` (deprecated) → `task.kiq()` (current) → eventually supervisor pattern (Phase 3).
+
+## Governance Pattern
+
+When a service needs workspace-aware access control:
+
+1. `WorkspaceService.resolve_member()` resolves the caller's identity before any business logic
+2. `PermissionEngine.evaluate()` checks structured permissions
+3. `HookBus.emit()` fires lifecycle events (critical hooks block on failure)
+4. All governance types live in `src/governance/`
+
+## Research Step Pattern
+
+When persisting and executing research steps:
+1. `PlanService.persist()` creates versioned plans with deterministic step IDs: `{task_id}:{version}:{key}`
+2. `ResearchStepService.claim_next()` uses `SELECT ... FOR UPDATE SKIP LOCKED` for concurrent-safe claiming
+3. Lease recovery (`recover_expired_leases()`) resets timed-out steps back to ready
+4. Completion unblocks dependent steps; failure cascades cancellation

@@ -47,12 +47,17 @@ class ResearchTask(Base):
     requester_open_userid: Mapped[str] = mapped_column(
         String(256), nullable=False, index=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     question: Mapped[str] = mapped_column(Text, nullable=False)
     research_type: Mapped[str] = mapped_column(
         String(32), nullable=False, default="foundation"
     )
     status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="queued", index=True
+        String(32), nullable=False, default="submitted", index=True
     )
     access_scope: Mapped[dict] = mapped_column(JSON, nullable=False)
     max_rounds: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
@@ -92,6 +97,11 @@ class ResearchReport(Base):
     task_id: Mapped[str] = mapped_column(
         ForeignKey("research_tasks.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
@@ -108,6 +118,11 @@ class ResearchDelivery(Base):
 
     task_id: Mapped[str] = mapped_column(
         ForeignKey("research_tasks.id", ondelete="CASCADE"), primary_key=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="pending", index=True

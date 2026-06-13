@@ -13,6 +13,52 @@ Check:
 Reason:
 - `Settings.deepseek_api_key` is required even when tests mock LLM behavior.
 
+## PostgreSQL Connection Refused
+
+Symptom:
+- App startup fails with "could not connect to server" or integration tests skip with "TEST_DATABASE_URL is required".
+- `brew services list` shows postgresql@16 as `none` (not running).
+
+Check:
+```bash
+# 检查 PostgreSQL 是否在运行
+/opt/homebrew/opt/postgresql@16/bin/pg_isready -h localhost -p 5432
+
+# 检查 brew service 状态
+brew services list | grep postgres
+```
+
+Fix:
+```bash
+# 启动 PostgreSQL
+brew services start postgresql@16
+
+# 如果启动失败，检查数据目录权限
+ls -la /opt/homebrew/var/postgresql@16
+
+# 验证连接
+PGPASSWORD=butler /opt/homebrew/opt/postgresql@16/bin/psql \
+  -h localhost -p 5432 -U butler -d butler -c "SELECT 1"
+```
+
+## PostgreSQL Role or Database Missing
+
+Symptom:
+- `FATAL: role "butler" does not exist` or `FATAL: database "butler" does not exist`.
+
+Fix:
+```bash
+# 创建角色
+/opt/homebrew/opt/postgresql@16/bin/psql -h localhost -p 5432 postgres -c \
+  "CREATE ROLE butler WITH LOGIN PASSWORD 'butler' CREATEDB;"
+
+# 创建数据库
+for db in butler butler_test; do
+  PGPASSWORD=butler /opt/homebrew/opt/postgresql@16/bin/createdb \
+    -h localhost -p 5432 -U butler "$db"
+done
+```
+
 ## Real LLM Calls Happen During Tests
 
 Symptom:

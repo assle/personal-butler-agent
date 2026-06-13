@@ -1,4 +1,5 @@
 """知识库模块包，提供文档切块、入库和检索服务"""
+from src.knowledge.keyword_search import KeywordSearchBackend
 from src.knowledge.schemas import (
     KnowledgeChunkInput,
     KnowledgeChunkResult,
@@ -12,6 +13,7 @@ from src.knowledge.service import KnowledgeService
 __all__ = [
     "ChromaStore",
     "EmbeddingService",
+    "KeywordSearchBackend",
     "KnowledgeChunkInput",
     "KnowledgeChunkResult",
     "KnowledgeIngestRequest",

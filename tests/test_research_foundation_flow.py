@@ -11,6 +11,7 @@ from sqlalchemy import select
 from src.agents.private_butler import PrivateButlerAgent
 from src.messaging import InboundMessage, dispatch_message
 from src.models.research import ResearchDelivery, ResearchReport, ResearchTask
+from src.models.workspace import Workspace
 from src.research.delivery import ResearchDeliveryService
 from src.research.executor import FoundationResearchExecutor
 from src.research.service import ResearchTaskService
@@ -39,6 +40,12 @@ async def test_private_research_foundation_flow_is_durable_and_idempotent(
     db_session,
 ):
     """私聊提交、生成初稿、主动投递和重复回调形成完整闭环"""
+    # 确保 backward-compat 路径的默认工作空间存在
+    db_session.add(
+        Workspace(id="default", name="Default Workspace", status="active")
+    )
+    await db_session.flush()
+
     tasks = ResearchTaskService(max_rounds=4, timeout_seconds=300)
     dispatcher = RecordingDispatcher()
     submitter = ResearchSubmissionService(tasks, dispatcher)

@@ -48,9 +48,56 @@ def enable_sqlite_foreign_keys(async_engine: AsyncEngine) -> None:
             cursor.close()
 
 
-engine = create_async_engine(settings.database_url, echo=False)
+def build_engine_options(
+    database_url: str,
+    *,
+    pool_size: int,
+    max_overflow: int,
+) -> dict:
+    """按数据库类型生成异步引擎参数
+
+    参数:
+        database_url: SQLAlchemy 异步数据库 URL
+        pool_size: PostgreSQL 常驻连接数
+        max_overflow: PostgreSQL 临时溢出连接数
+
+    返回:
+        dict: 可传给 create_async_engine 的参数
+    """
+    options: dict = {"echo": False}
+    if database_url.startswith("postgresql+"):
+        options.update(
+            pool_pre_ping=True,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+        )
+    return options
+
+
+def create_database_engine(database_url: str) -> AsyncEngine:
+    """创建并配置异步数据库引擎
+
+    参数:
+        database_url: SQLAlchemy 异步数据库 URL
+
+    返回:
+        AsyncEngine: 已配置的 SQLAlchemy 异步引擎
+    """
+    async_engine = create_async_engine(
+        database_url,
+        **build_engine_options(
+            database_url,
+            pool_size=settings.database_pool_size,
+            max_overflow=settings.database_max_overflow,
+        ),
+    )
+    enable_sqlite_foreign_keys(async_engine)
+    return async_engine
+
+
+engine = create_database_engine(settings.database_url)
 """异步 SQLAlchemy 引擎，基于配置中的 database_url 创建"""
-enable_sqlite_foreign_keys(engine)
+
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 """异步会话工厂，每个请求通过 get_db 获取独立会话"""

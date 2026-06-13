@@ -7,13 +7,31 @@ from enum import StrEnum
 
 
 class ResearchTaskStatus(StrEnum):
-    """研究任务状态"""
+    """研究主任务状态"""
 
-    QUEUED = "queued"
+    SUBMITTED = "submitted"
+    PLANNING = "planning"
+    AWAITING_APPROVAL = "awaiting_approval"
     RUNNING = "running"
+    SYNTHESIZING = "synthesizing"
+    VALIDATING = "validating"
+    COMPLETED = "completed"
+    DELIVERING = "delivering"
+    DELIVERED = "delivered"
+    RETRYING = "retrying"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ResearchStepStatus(StrEnum):
+    """研究步骤状态"""
+
+    PENDING = "pending"
+    READY = "ready"
+    RUNNING = "running"
+    RETRY_WAIT = "retry_wait"
     COMPLETED = "completed"
     FAILED = "failed"
-    TIMED_OUT = "timed_out"
     CANCELLED = "cancelled"
 
 
@@ -26,9 +44,14 @@ class ResearchDeliveryStatus(StrEnum):
     FAILED = "failed"
 
 
-ACTIVE_RESEARCH_STATUSES = {
-    ResearchTaskStatus.QUEUED.value,
+ACTIVE_RESEARCH_STATUSES: set[str] = {
+    ResearchTaskStatus.SUBMITTED.value,
+    ResearchTaskStatus.PLANNING.value,
+    ResearchTaskStatus.AWAITING_APPROVAL.value,
     ResearchTaskStatus.RUNNING.value,
+    ResearchTaskStatus.SYNTHESIZING.value,
+    ResearchTaskStatus.VALIDATING.value,
+    ResearchTaskStatus.RETRYING.value,
 }
 
 
@@ -42,3 +65,4 @@ class ResearchReportSnapshot:
     summary: str
     body: str
     quality_status: str
+    workspace_id: str

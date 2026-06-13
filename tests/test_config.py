@@ -49,7 +49,7 @@ def test_settings_use_defaults():
         settings = Settings(_env_file=None)
         assert settings.deepseek_base_url == "https://api.deepseek.com"
         assert settings.deepseek_model == "deepseek-chat"
-        assert settings.database_url == "sqlite+aiosqlite:///butler.db"
+        assert settings.database_url == "postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler"
         assert settings.wecom_aibot_bot_id == ""
         assert settings.wecom_aibot_token == ""
         assert settings.wecom_aibot_encoding_aes_key == ""
@@ -162,3 +162,36 @@ def test_legacy_self_built_app_env_is_ignored():
         assert not hasattr(settings, "wechat_encoding_aes_key")
         assert not hasattr(settings, "wecom_corp_id")
         assert not hasattr(settings, "wecom_corp_secret")
+
+
+def test_settings_default_database_url_is_postgresql():
+    """验证团队部署默认数据库切换为 PostgreSQL"""
+    with patch.dict(
+        os.environ,
+        {"DEEPSEEK_API_KEY": "test"},
+        clear=True,
+    ):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+    assert settings.database_url == (
+        "postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler"
+    )
+    assert settings.database_pool_size == 10
+    assert settings.database_max_overflow == 20
+    assert settings.database_require_migrations is True
+
+
+def test_settings_loads_workspace_bootstrap_config():
+    """验证默认工作空间迁移配置可从环境变量加载"""
+    env = {
+        "DEEPSEEK_API_KEY": "test",
+        "DEFAULT_WORKSPACE_ID": "ws-internal",
+        "DEFAULT_WORKSPACE_NAME": "Internal Research",
+    }
+    with patch.dict(os.environ, env, clear=True):
+        from src.config import Settings
+
+        settings = Settings(_env_file=None)
+    assert settings.default_workspace_id == "ws-internal"
+    assert settings.default_workspace_name == "Internal Research"

@@ -19,8 +19,17 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
-    # SQLite 数据库配置
-    database_url: str = "sqlite+aiosqlite:///butler.db"
+    # PostgreSQL 结构化数据库配置；生产 schema 由 Alembic 管理
+    database_url: str = (
+        "postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler"
+    )
+    database_pool_size: int = 10
+    database_max_overflow: int = 20
+    database_require_migrations: bool = True
+
+    # 首次迁移时用于承接现有单租户数据的默认工作空间
+    default_workspace_id: str = "default"
+    default_workspace_name: str = "Default Workspace"
 
     # 联网搜索配置；默认关闭，启用后由 search_web 工具查询实时信息
     web_search_enabled: bool = False
@@ -46,6 +55,17 @@ class Settings(BaseSettings):
     research_queue_name: str = "butler-research"
     research_max_rounds: int = 4
     research_timeout_seconds: int = 300
+    # 研究预算与步骤控制
+    research_max_steps: int = 12
+    research_max_concurrent_steps: int = 3
+    research_soft_token_budget: int = 15_000
+    research_hard_token_budget: int = 20_000
+    research_soft_cost_microunits: int = 350_000
+    research_hard_cost_microunits: int = 500_000
+    research_max_replans: int = 2
+    research_max_repair_rounds: int = 1
+    research_step_lease_seconds: int = 120
+    research_high_cost_approval_microunits: int = 250_000
 
     # 企业微信自建应用主动私聊配置，与智能机器人回调配置相互独立
     wecom_app_corp_id: str = ""

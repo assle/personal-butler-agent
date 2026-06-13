@@ -6,18 +6,42 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.governance.workspaces import WorkspaceContext
+from src.models.workspace import Workspace
 from src.research.executor import FoundationResearchExecutor
 from src.research.service import ResearchTaskService
+
+
+def _make_ws(workspace_id="ws-test"):
+    """创建测试用 WorkspaceContext"""
+    return WorkspaceContext(
+        workspace_id=workspace_id,
+        member_id=1,
+        open_userid="open-u1",
+        role="member",
+        research_approved_once=True,
+    )
+
+
+async def _ensure_workspace(db_session, workspace_id="ws-test"):
+    """确保测试用工作空间记录存在"""
+    existing = await db_session.get(Workspace, workspace_id)
+    if existing is None:
+        db_session.add(
+            Workspace(id=workspace_id, name=f"Test {workspace_id}", status="active")
+        )
+        await db_session.flush()
 
 
 @pytest.mark.asyncio
 async def test_executor_persists_unreviewed_foundation_report(db_session):
     """执行器生成初稿并完成任务"""
+    await _ensure_workspace(db_session)
     service = ResearchTaskService(max_rounds=4, timeout_seconds=300)
     task, _ = await service.create_task(
         db_session,
+        workspace=_make_ws(),
         source_msgid="msg-1",
-        requester_open_userid="open-u1",
         question="比较 Taskiq 与 Celery",
     )
     llm = AsyncMock()
@@ -34,11 +58,12 @@ async def test_executor_persists_unreviewed_foundation_report(db_session):
 @pytest.mark.asyncio
 async def test_executor_is_idempotent_after_report_exists(db_session):
     """重复投递同一任务不会重复调用 LLM 或创建第二份报告"""
+    await _ensure_workspace(db_session)
     service = ResearchTaskService(max_rounds=4, timeout_seconds=300)
     task, _ = await service.create_task(
         db_session,
+        workspace=_make_ws(),
         source_msgid="msg-1",
-        requester_open_userid="open-u1",
         question="研究问题",
     )
     llm = AsyncMock()

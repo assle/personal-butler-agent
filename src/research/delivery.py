@@ -23,7 +23,12 @@ class ResearchDeliveryService:
         """幂等投递报告；失败只更新 delivery 状态"""
         delivery = await db.get(ResearchDelivery, task_id)
         if delivery is None:
-            delivery = ResearchDelivery(task_id=task_id, status="pending")
+            task = await self._tasks.get_task(db, task_id)
+            delivery = ResearchDelivery(
+                task_id=task_id,
+                workspace_id=task.workspace_id,
+                status="pending",
+            )
             db.add(delivery)
             await db.flush()
         if delivery.status == ResearchDeliveryStatus.DELIVERED.value:

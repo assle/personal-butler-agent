@@ -6,18 +6,42 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from src.governance.workspaces import WorkspaceContext
 from src.models.research import ResearchDelivery, ResearchTask, WeComUserBinding
+from src.models.workspace import Workspace
 from src.research.delivery import ResearchDeliveryService
 from src.research.service import ResearchTaskService
 
 
+def _make_ws(workspace_id="ws-test"):
+    """创建测试用 WorkspaceContext"""
+    return WorkspaceContext(
+        workspace_id=workspace_id,
+        member_id=1,
+        open_userid="open-u1",
+        role="member",
+        research_approved_once=True,
+    )
+
+
+async def _ensure_workspace(db_session, workspace_id="ws-test"):
+    """确保测试用工作空间记录存在"""
+    existing = await db_session.get(Workspace, workspace_id)
+    if existing is None:
+        db_session.add(
+            Workspace(id=workspace_id, name=f"Test {workspace_id}", status="active")
+        )
+        await db_session.flush()
+
+
 async def _completed_task(db_session):
     """创建带首版报告的已完成任务"""
+    await _ensure_workspace(db_session)
     tasks = ResearchTaskService(max_rounds=4, timeout_seconds=300)
     task, _ = await tasks.create_task(
         db_session,
+        workspace=_make_ws(),
         source_msgid="msg-delivery",
-        requester_open_userid="open-u1",
         question="比较 Taskiq 和 Celery",
     )
     await tasks.complete_with_report(

@@ -42,3 +42,20 @@ async def test_base_metadata_has_tables():
     } <= table_names
     assert "training_records" not in table_names
     assert "user_preferences" not in table_names
+
+
+def test_create_engine_options_for_postgres():
+    """验证 PostgreSQL 引擎启用连接池健康检查"""
+    from src.db.session import build_engine_options
+
+    options = build_engine_options(
+        "postgresql+asyncpg://u:p@localhost/db",
+        pool_size=10,
+        max_overflow=20,
+    )
+    assert options == {
+        "echo": False,
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20,
+    }
