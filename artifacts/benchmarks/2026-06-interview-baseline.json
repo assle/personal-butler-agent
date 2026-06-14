@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-14T03:10:41.152649+00:00",
+  "generated_at": "2026-06-14T03:16:48.189915+00:00",
   "config": {
     "worker_counts": [
       1,
@@ -21,12 +21,12 @@
       "task_count": 12,
       "success_count": 12,
       "failure_count": 0,
-      "total_duration_s": 0.3904158748919144,
-      "p50_latency_s": 0.02612287492956966,
-      "p90_latency_s": 0.026190000004135072,
-      "p99_latency_s": 0.026197875034995377,
-      "mean_latency_s": 0.026037604159985978,
-      "throughput_tasks_per_sec": 30.73645507709482,
+      "total_duration_s": 0.38018687500152737,
+      "p50_latency_s": 0.02611433295533061,
+      "p90_latency_s": 0.02614941610954702,
+      "p99_latency_s": 0.026161290938034654,
+      "mean_latency_s": 0.026112826337339357,
+      "throughput_tasks_per_sec": 31.563425223324163,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -34,99 +34,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-d1e699f2a193:0000",
+          "task_id": "BENCH-3c51d74e0bd3:0000",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025701957987621427,
+          "latency_s": 0.026101374998688698,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0001",
+          "task_id": "BENCH-3c51d74e0bd3:0001",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02609612501692027,
+          "latency_s": 0.026108916965313256,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0002",
+          "task_id": "BENCH-3c51d74e0bd3:0002",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026075666886754334,
+          "latency_s": 0.02611433295533061,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0003",
+          "task_id": "BENCH-3c51d74e0bd3:0003",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026068790932185948,
+          "latency_s": 0.026110792066901922,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0004",
+          "task_id": "BENCH-3c51d74e0bd3:0004",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026131542050279677,
+          "latency_s": 0.026080874959006906,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0005",
+          "task_id": "BENCH-3c51d74e0bd3:0005",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026089708087965846,
+          "latency_s": 0.026039291988126934,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0006",
+          "task_id": "BENCH-3c51d74e0bd3:0006",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026142499991692603,
+          "latency_s": 0.026135792024433613,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0007",
+          "task_id": "BENCH-3c51d74e0bd3:0007",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02545566693879664,
+          "latency_s": 0.026141916983760893,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0008",
+          "task_id": "BENCH-3c51d74e0bd3:0008",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026197875034995377,
+          "latency_s": 0.0261224580463022,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0009",
+          "task_id": "BENCH-3c51d74e0bd3:0009",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.0261785420589149,
+          "latency_s": 0.026161290938034654,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0010",
+          "task_id": "BENCH-3c51d74e0bd3:0010",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026190000004135072,
+          "latency_s": 0.026087458012625575,
           "error": null
         },
         {
-          "task_id": "BENCH-d1e699f2a193:0011",
+          "task_id": "BENCH-3c51d74e0bd3:0011",
           "worker_count": 1,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02612287492956966,
+          "latency_s": 0.02614941610954702,
           "error": null
         }
       ]
@@ -137,12 +137,12 @@
       "task_count": 12,
       "success_count": 12,
       "failure_count": 0,
-      "total_duration_s": 0.14968983293510973,
-      "p50_latency_s": 0.025838000001385808,
-      "p90_latency_s": 0.02614674996584654,
-      "p99_latency_s": 0.026166082941927016,
-      "mean_latency_s": 0.02571680207620375,
-      "throughput_tasks_per_sec": 80.16576520064645,
+      "total_duration_s": 0.13294187502469867,
+      "p50_latency_s": 0.02527974999975413,
+      "p90_latency_s": 0.02611516695469618,
+      "p99_latency_s": 0.02618279098533094,
+      "mean_latency_s": 0.025450833326128002,
+      "throughput_tasks_per_sec": 90.26501241817579,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -150,99 +150,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-29fa7352019d:0000",
+          "task_id": "BENCH-732b0939abd6:0000",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026133415987715125,
+          "latency_s": 0.02618279098533094,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0001",
+          "task_id": "BENCH-732b0939abd6:0001",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025639125029556453,
+          "latency_s": 0.02514300006441772,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0002",
+          "task_id": "BENCH-732b0939abd6:0002",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025838000001385808,
+          "latency_s": 0.025286082993261516,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0003",
+          "task_id": "BENCH-732b0939abd6:0003",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026166082941927016,
+          "latency_s": 0.02611516695469618,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0004",
+          "task_id": "BENCH-732b0939abd6:0004",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02532554103527218,
+          "latency_s": 0.025140083977021277,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0005",
+          "task_id": "BENCH-732b0939abd6:0005",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025213334010913968,
+          "latency_s": 0.025275459047406912,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0006",
+          "task_id": "BENCH-732b0939abd6:0006",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02614674996584654,
+          "latency_s": 0.025597041938453913,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0007",
+          "task_id": "BENCH-732b0939abd6:0007",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025362416985444725,
+          "latency_s": 0.02506729098968208,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0008",
+          "task_id": "BENCH-732b0939abd6:0008",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025551125057972968,
+          "latency_s": 0.02527974999975413,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0009",
+          "task_id": "BENCH-732b0939abd6:0009",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02614004199858755,
+          "latency_s": 0.026071125059388578,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0010",
+          "task_id": "BENCH-732b0939abd6:0010",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02508125000167638,
+          "latency_s": 0.025061541935428977,
           "error": null
         },
         {
-          "task_id": "BENCH-29fa7352019d:0011",
+          "task_id": "BENCH-732b0939abd6:0011",
           "worker_count": 3,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02600454189814627,
+          "latency_s": 0.025190665968693793,
           "error": null
         }
       ]
@@ -253,12 +253,12 @@
       "task_count": 12,
       "success_count": 12,
       "failure_count": 0,
-      "total_duration_s": 0.10933883395045996,
-      "p50_latency_s": 0.02614974998869002,
-      "p90_latency_s": 0.0266343749826774,
-      "p99_latency_s": 0.026657709036953747,
-      "mean_latency_s": 0.02599562850082293,
-      "throughput_tasks_per_sec": 109.75057595215482,
+      "total_duration_s": 0.10248241701629013,
+      "p50_latency_s": 0.026050708955153823,
+      "p90_latency_s": 0.0262041250243783,
+      "p99_latency_s": 0.026271292008459568,
+      "mean_latency_s": 0.025736632000189275,
+      "throughput_tasks_per_sec": 117.09325706177027,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -266,99 +266,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-624844fde1c2:0000",
+          "task_id": "BENCH-03e464f2cc00:0000",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026194624952040613,
+          "latency_s": 0.02617612504400313,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0001",
+          "task_id": "BENCH-03e464f2cc00:0001",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.026657709036953747,
+          "latency_s": 0.026050708955153823,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0002",
+          "task_id": "BENCH-03e464f2cc00:0002",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02660579199437052,
+          "latency_s": 0.0262041250243783,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0003",
+          "task_id": "BENCH-03e464f2cc00:0003",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02522320905700326,
+          "latency_s": 0.0251160420011729,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0004",
+          "task_id": "BENCH-03e464f2cc00:0004",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025318540981970727,
+          "latency_s": 0.025237416033633053,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0005",
+          "task_id": "BENCH-03e464f2cc00:0005",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02614974998869002,
+          "latency_s": 0.025973208947107196,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0006",
+          "task_id": "BENCH-03e464f2cc00:0006",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.0266343749826774,
+          "latency_s": 0.026112625026144087,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0007",
+          "task_id": "BENCH-03e464f2cc00:0007",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02646895800717175,
+          "latency_s": 0.025100791943259537,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0008",
+          "task_id": "BENCH-03e464f2cc00:0008",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02549700008239597,
+          "latency_s": 0.02526208304334432,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0009",
+          "task_id": "BENCH-03e464f2cc00:0009",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02554225001949817,
+          "latency_s": 0.025234790984541178,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0010",
+          "task_id": "BENCH-03e464f2cc00:0010",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.025701000005938113,
+          "latency_s": 0.026100374991074204,
           "error": null
         },
         {
-          "task_id": "BENCH-624844fde1c2:0011",
+          "task_id": "BENCH-03e464f2cc00:0011",
           "worker_count": 5,
           "scenario": "normal",
           "success": true,
-          "latency_s": 0.02595433290116489,
+          "latency_s": 0.026271292008459568,
           "error": null
         }
       ]
@@ -369,12 +369,12 @@
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 1.3629165419843048,
-      "p50_latency_s": 0.10125420801341534,
-      "p90_latency_s": 0.10126875003334135,
-      "p99_latency_s": 0.10127770807594061,
-      "mean_latency_s": 0.1012161838686249,
-      "throughput_tasks_per_sec": 8.80464770244031,
+      "total_duration_s": 1.3271707500098273,
+      "p50_latency_s": 0.1005828749621287,
+      "p90_latency_s": 0.10121950006578118,
+      "p99_latency_s": 0.10123374999966472,
+      "mean_latency_s": 0.10077503134380095,
+      "throughput_tasks_per_sec": 9.041790590932736,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -382,99 +382,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-89e88b19b54d:0000",
+          "task_id": "BENCH-45c83d9a1779:0000",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10125420801341534,
+          "latency_s": 0.10120541707146913,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0001",
+          "task_id": "BENCH-45c83d9a1779:0001",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.1011785410810262,
+          "latency_s": 0.10123374999966472,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0002",
+          "task_id": "BENCH-45c83d9a1779:0002",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10108770790975541,
+          "latency_s": 0.1003734590485692,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0003",
+          "task_id": "BENCH-45c83d9a1779:0003",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10125854203943163,
+          "latency_s": 0.10108266700990498,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0004",
+          "task_id": "BENCH-45c83d9a1779:0004",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10126654210034758,
+          "latency_s": 0.10046941705513746,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0005",
+          "task_id": "BENCH-45c83d9a1779:0005",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10113220801576972,
+          "latency_s": 0.10057933290954679,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0006",
+          "task_id": "BENCH-45c83d9a1779:0006",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10127770807594061,
+          "latency_s": 0.10094887507148087,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0007",
+          "task_id": "BENCH-45c83d9a1779:0007",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10126641602255404,
+          "latency_s": 0.10057924990542233,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0008",
+          "task_id": "BENCH-45c83d9a1779:0008",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10122308309655637,
+          "latency_s": 0.10049791703931987,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0009",
+          "task_id": "BENCH-45c83d9a1779:0009",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10126875003334135,
+          "latency_s": 0.1005828749621287,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0010",
+          "task_id": "BENCH-45c83d9a1779:0010",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10121574997901917,
+          "latency_s": 0.10121950006578118,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-89e88b19b54d:0011",
+          "task_id": "BENCH-45c83d9a1779:0011",
           "worker_count": 1,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10116475005634129,
+          "latency_s": 0.10052791598718613,
           "error": "controlled provider timeout"
         }
       ]
@@ -485,12 +485,12 @@
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 0.46640033298172057,
-      "p50_latency_s": 0.10211950005032122,
-      "p90_latency_s": 0.10242920799646527,
-      "p99_latency_s": 0.102727708988823,
-      "mean_latency_s": 0.10190269117204782,
-      "throughput_tasks_per_sec": 25.728969624192594,
+      "total_duration_s": 0.45242837502155453,
+      "p50_latency_s": 0.10210937494412065,
+      "p90_latency_s": 0.10236150003038347,
+      "p99_latency_s": 0.10250604199245572,
+      "mean_latency_s": 0.10186930881657948,
+      "throughput_tasks_per_sec": 26.52353535391828,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -498,99 +498,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-cd4699dc5292:0000",
+          "task_id": "BENCH-6be6362d80b4:0000",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10126591706648469,
+          "latency_s": 0.10120591591112316,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0001",
+          "task_id": "BENCH-6be6362d80b4:0001",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10211950005032122,
+          "latency_s": 0.10194516705814749,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0002",
+          "task_id": "BENCH-6be6362d80b4:0002",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10242920799646527,
+          "latency_s": 0.10220820805989206,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0003",
+          "task_id": "BENCH-6be6362d80b4:0003",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.1012316249543801,
+          "latency_s": 0.10128245793748647,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0004",
+          "task_id": "BENCH-6be6362d80b4:0004",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10192458401434124,
+          "latency_s": 0.10210937494412065,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0005",
+          "task_id": "BENCH-6be6362d80b4:0005",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10215762502048165,
+          "latency_s": 0.10236150003038347,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0006",
+          "task_id": "BENCH-6be6362d80b4:0006",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10135312506463379,
+          "latency_s": 0.1012769159860909,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0007",
+          "task_id": "BENCH-6be6362d80b4:0007",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.1023791249608621,
+          "latency_s": 0.10219895793125033,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0008",
+          "task_id": "BENCH-6be6362d80b4:0008",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.102727708988823,
+          "latency_s": 0.10250604199245572,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0009",
+          "task_id": "BENCH-6be6362d80b4:0009",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10121791693381965,
+          "latency_s": 0.10124187497422099,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0010",
+          "task_id": "BENCH-6be6362d80b4:0010",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10187745897565037,
+          "latency_s": 0.10193858295679092,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-cd4699dc5292:0011",
+          "task_id": "BENCH-6be6362d80b4:0011",
           "worker_count": 3,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10214850003831089,
+          "latency_s": 0.10215670801699162,
           "error": "controlled provider timeout"
         }
       ]
@@ -601,12 +601,12 @@
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 0.35898537491448224,
-      "p50_latency_s": 0.10225716605782509,
-      "p90_latency_s": 0.10281970794312656,
-      "p99_latency_s": 0.10294554091524333,
-      "mean_latency_s": 0.10215684365054283,
-      "throughput_tasks_per_sec": 33.427545628728325,
+      "total_duration_s": 0.34304470801725984,
+      "p50_latency_s": 0.10205879202112556,
+      "p90_latency_s": 0.10255837498698384,
+      "p99_latency_s": 0.10276616702321917,
+      "mean_latency_s": 0.10193662500629823,
+      "throughput_tasks_per_sec": 34.98086319231672,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -614,99 +614,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-69dabf6fab5d:0000",
+          "task_id": "BENCH-5594ea5caccb:0000",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10118999995756894,
+          "latency_s": 0.10124787501990795,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0001",
+          "task_id": "BENCH-5594ea5caccb:0001",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.101937250001356,
+          "latency_s": 0.10199162503704429,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0002",
+          "task_id": "BENCH-5594ea5caccb:0002",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10225716605782509,
+          "latency_s": 0.10233866597991437,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0003",
+          "task_id": "BENCH-5594ea5caccb:0003",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10245383298024535,
+          "latency_s": 0.10255837498698384,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0004",
+          "task_id": "BENCH-5594ea5caccb:0004",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10265866701956838,
+          "latency_s": 0.10276616702321917,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0005",
+          "task_id": "BENCH-5594ea5caccb:0005",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.1012863339856267,
+          "latency_s": 0.10122966696508229,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0006",
+          "task_id": "BENCH-5594ea5caccb:0006",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10223800002131611,
+          "latency_s": 0.10190800006967038,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0007",
+          "task_id": "BENCH-5594ea5caccb:0007",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10259408294223249,
+          "latency_s": 0.10205879202112556,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0008",
+          "task_id": "BENCH-5594ea5caccb:0008",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10281970794312656,
+          "latency_s": 0.10218812501989305,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0009",
+          "task_id": "BENCH-5594ea5caccb:0009",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10294554091524333,
+          "latency_s": 0.10227575001772493,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0010",
+          "task_id": "BENCH-5594ea5caccb:0010",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10127445799298584,
+          "latency_s": 0.10115220793522894,
           "error": "controlled provider timeout"
         },
         {
-          "task_id": "BENCH-69dabf6fab5d:0011",
+          "task_id": "BENCH-5594ea5caccb:0011",
           "worker_count": 5,
           "scenario": "timeout",
           "success": false,
-          "latency_s": 0.10222708398941904,
+          "latency_s": 0.10152424999978393,
           "error": "controlled provider timeout"
         }
       ]
@@ -717,12 +717,12 @@
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 0.062087542028166354,
-      "p50_latency_s": 2.3875036276876926e-05,
-      "p90_latency_s": 5.079200491309166e-05,
-      "p99_latency_s": 5.091703496873379e-05,
-      "mean_latency_s": 2.6618169310192268e-05,
-      "throughput_tasks_per_sec": 193.27548825424807,
+      "total_duration_s": 0.05521020793821663,
+      "p50_latency_s": 1.3583921827375889e-05,
+      "p90_latency_s": 2.274999860674143e-05,
+      "p99_latency_s": 5.204195622354746e-05,
+      "mean_latency_s": 1.6569470365842182e-05,
+      "throughput_tasks_per_sec": 217.35111038575846,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -730,99 +730,99 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0000",
+          "task_id": "BENCH-58abbaad1c8f:0000",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 5.091703496873379e-05,
+          "latency_s": 5.204195622354746e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0001",
+          "task_id": "BENCH-58abbaad1c8f:0001",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.9542017728090286e-05,
+          "latency_s": 2.274999860674143e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0002",
+          "task_id": "BENCH-58abbaad1c8f:0002",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.3875036276876926e-05,
+          "latency_s": 1.5040975995361805e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0003",
+          "task_id": "BENCH-58abbaad1c8f:0003",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.0000035874545574e-05,
+          "latency_s": 1.1874944902956486e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0004",
+          "task_id": "BENCH-58abbaad1c8f:0004",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.01669754460454e-05,
+          "latency_s": 1.7666025087237358e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0005",
+          "task_id": "BENCH-58abbaad1c8f:0005",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 5.079200491309166e-05,
+          "latency_s": 1.3583921827375889e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0006",
+          "task_id": "BENCH-58abbaad1c8f:0006",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.5499961338937283e-05,
+          "latency_s": 1.1458992958068848e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0007",
+          "task_id": "BENCH-58abbaad1c8f:0007",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.5958986952900887e-05,
+          "latency_s": 1.0083080269396305e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0008",
+          "task_id": "BENCH-58abbaad1c8f:0008",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.220796886831522e-05,
+          "latency_s": 9.708921425044537e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0009",
+          "task_id": "BENCH-58abbaad1c8f:0009",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.0666979253292084e-05,
+          "latency_s": 1.5125027857720852e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0010",
+          "task_id": "BENCH-58abbaad1c8f:0010",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.6457983292639256e-05,
+          "latency_s": 1.0666903108358383e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-9b7d8f2dc9ae:0011",
+          "task_id": "BENCH-58abbaad1c8f:0011",
           "worker_count": 1,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.3333046808838844e-05,
+          "latency_s": 8.832896128296852e-06,
           "error": "controlled provider execution error"
         }
       ]
@@ -833,12 +833,12 @@
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 0.02233554096892476,
-      "p50_latency_s": 1.0665971785783768e-05,
-      "p90_latency_s": 1.604191493242979e-05,
-      "p99_latency_s": 2.4208915419876575e-05,
-      "mean_latency_s": 1.0708492482081056e-05,
-      "throughput_tasks_per_sec": 537.2603249993135,
+      "total_duration_s": 0.020359499962069094,
+      "p50_latency_s": 6.749993190169334e-06,
+      "p90_latency_s": 8.417060598731041e-06,
+      "p99_latency_s": 1.1750031262636185e-05,
+      "mean_latency_s": 7.364743699630101e-06,
+      "throughput_tasks_per_sec": 589.4054383632546,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -846,347 +846,115 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-cfdd4ea03808:0000",
+          "task_id": "BENCH-bababe87c7f8:0000",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 2.4208915419876575e-05,
+          "latency_s": 1.1750031262636185e-05,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0001",
+          "task_id": "BENCH-bababe87c7f8:0001",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.2833974324166775e-05,
+          "latency_s": 8.417060598731041e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0002",
+          "task_id": "BENCH-bababe87c7f8:0002",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.2125005014240742e-05,
+          "latency_s": 7.333001121878624e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0003",
+          "task_id": "BENCH-bababe87c7f8:0003",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.2917094863951206e-05,
+          "latency_s": 8.124974556267262e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0004",
+          "task_id": "BENCH-bababe87c7f8:0004",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.0665971785783768e-05,
+          "latency_s": 6.749993190169334e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0005",
+          "task_id": "BENCH-bababe87c7f8:0005",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 4.208995960652828e-06,
+          "latency_s": 6.66698906570673e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0006",
+          "task_id": "BENCH-bababe87c7f8:0006",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 1.604191493242979e-05,
+          "latency_s": 7.6669966802001e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0007",
+          "task_id": "BENCH-bababe87c7f8:0007",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 8.66700429469347e-06,
+          "latency_s": 6.66698906570673e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0008",
+          "task_id": "BENCH-bababe87c7f8:0008",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 7.917056791484356e-06,
+          "latency_s": 6.583984941244125e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0009",
+          "task_id": "BENCH-bababe87c7f8:0009",
           "worker_count": 3,
           "scenario": "execution_error",
           "success": false,
-          "latency_s": 4.707952030003071e-06,
+          "latency_s": 6.708898581564426e-06,
           "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-cfdd4ea03808:0010",
+          "task_id": "BENCH-bababe87c7f8:0010",
           "worker_count": 3,
           "scenario": "execution_error",
-          "success": false,
-          "latency_s": 6.832997314631939e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-cfdd4ea03808:0011",
-          "worker_count": 3,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 7.3750270530581474e-06,
-          "error": "controlled provider execution error"
-        }
-      ]
-    },
-    {
-      "scenario": "execution_error",
-      "worker_count": 5,
-      "task_count": 12,
-      "success_count": 0,
-      "failure_count": 12,
-      "total_duration_s": 0.017699250020086765,
-      "p50_latency_s": 7.00005330145359e-06,
-      "p90_latency_s": 8.750008419156075e-06,
-      "p99_latency_s": 9.124982170760632e-06,
-      "mean_latency_s": 7.232757828508814e-06,
-      "throughput_tasks_per_sec": 677.9948295199671,
-      "benchmark_kind": "postgresql_controlled_harness",
-      "database_dialect": "postgresql",
-      "external_dependencies": "fake",
-      "retry_count": 0,
-      "duplicate_claim_count": 0,
-      "results": [
-        {
-          "task_id": "BENCH-71379c1245c6:0000",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 8.750008419156075e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0001",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 8.207978680729866e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0002",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 7.1249669417738914e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0003",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 7.00005330145359e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0004",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 6.625079549849033e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0005",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 7.916940376162529e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0006",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 6.833928637206554e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0007",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 6.832997314631939e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0008",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 6.334041245281696e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0009",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 6.167101673781872e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0010",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 9.124982170760632e-06,
-          "error": "controlled provider execution error"
-        },
-        {
-          "task_id": "BENCH-71379c1245c6:0011",
-          "worker_count": 5,
-          "scenario": "execution_error",
-          "success": false,
-          "latency_s": 5.875015631318092e-06,
-          "error": "controlled provider execution error"
-        }
-      ]
-    },
-    {
-      "scenario": "rate_limited",
-      "worker_count": 1,
-      "task_count": 12,
-      "success_count": 0,
-      "failure_count": 12,
-      "total_duration_s": 0.030685125035233796,
-      "p50_latency_s": 7.582944817841053e-06,
-      "p90_latency_s": 1.0041054338216782e-05,
-      "p99_latency_s": 1.0208925232291222e-05,
-      "mean_latency_s": 7.583303765083353e-06,
-      "throughput_tasks_per_sec": 391.0689621183279,
-      "benchmark_kind": "postgresql_controlled_harness",
-      "database_dialect": "postgresql",
-      "external_dependencies": "fake",
-      "retry_count": 0,
-      "duplicate_claim_count": 0,
-      "results": [
-        {
-          "task_id": "BENCH-f20bd03aacf2:0000",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 1.0208925232291222e-05,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0001",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 8.29098280519247e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0002",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 6.709014996886253e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0003",
-          "worker_count": 1,
-          "scenario": "rate_limited",
           "success": false,
           "latency_s": 6.00004568696022e-06,
-          "error": "controlled provider rate limit"
+          "error": "controlled provider execution error"
         },
         {
-          "task_id": "BENCH-f20bd03aacf2:0004",
-          "worker_count": 1,
-          "scenario": "rate_limited",
+          "task_id": "BENCH-bababe87c7f8:0011",
+          "worker_count": 3,
+          "scenario": "execution_error",
           "success": false,
-          "latency_s": 6.207963451743126e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0005",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 8.291914127767086e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0006",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 6.041955202817917e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0007",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 1.0041054338216782e-05,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0008",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 7.582944817841053e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0009",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 6.791902706027031e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0010",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 5.875015631318092e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-f20bd03aacf2:0011",
-          "worker_count": 1,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 8.95792618393898e-06,
-          "error": "controlled provider rate limit"
+          "latency_s": 5.707959644496441e-06,
+          "error": "controlled provider execution error"
         }
       ]
     },
     {
-      "scenario": "rate_limited",
-      "worker_count": 3,
+      "scenario": "execution_error",
+      "worker_count": 5,
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 0.01488999999128282,
-      "p50_latency_s": 5.667097866535187e-06,
-      "p90_latency_s": 9.33394767343998e-06,
-      "p99_latency_s": 1.2167030945420265e-05,
-      "mean_latency_s": 6.309264184286197e-06,
-      "throughput_tasks_per_sec": 805.9100071877275,
+      "total_duration_s": 0.015490166959352791,
+      "p50_latency_s": 5.790963768959045e-06,
+      "p90_latency_s": 8.082948625087738e-06,
+      "p99_latency_s": 8.416012860834599e-06,
+      "mean_latency_s": 6.083127421637376e-06,
+      "throughput_tasks_per_sec": 774.6850005870681,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -1194,71 +962,239 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-79b3a8ba622a:0000",
-          "worker_count": 3,
+          "task_id": "BENCH-076c7a34601b:0000",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 8.416012860834599e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0001",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 6.3749030232429504e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0002",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.624955520033836e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0003",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.582929588854313e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0004",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.500041879713535e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0005",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 8.082948625087738e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0006",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 6.082933396100998e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0007",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.790963768959045e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0008",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.041947588324547e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0009",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.082925781607628e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0010",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 6.041955202817917e-06,
+          "error": "controlled provider execution error"
+        },
+        {
+          "task_id": "BENCH-076c7a34601b:0011",
+          "worker_count": 5,
+          "scenario": "execution_error",
+          "success": false,
+          "latency_s": 5.375011824071407e-06,
+          "error": "controlled provider execution error"
+        }
+      ]
+    },
+    {
+      "scenario": "rate_limited",
+      "worker_count": 1,
+      "task_count": 12,
+      "success_count": 0,
+      "failure_count": 12,
+      "total_duration_s": 0.02768879197537899,
+      "p50_latency_s": 5.458015948534012e-06,
+      "p90_latency_s": 6.666057743132114e-06,
+      "p99_latency_s": 7.6669966802001e-06,
+      "mean_latency_s": 5.763674077267448e-06,
+      "throughput_tasks_per_sec": 433.3883547780076,
+      "benchmark_kind": "postgresql_controlled_harness",
+      "database_dialect": "postgresql",
+      "external_dependencies": "fake",
+      "retry_count": 0,
+      "duplicate_claim_count": 0,
+      "results": [
+        {
+          "task_id": "BENCH-dcfbcff06b34:0000",
+          "worker_count": 1,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 1.2167030945420265e-05,
+          "latency_s": 6.458023563027382e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-79b3a8ba622a:0001",
-          "worker_count": 3,
+          "task_id": "BENCH-dcfbcff06b34:0001",
+          "worker_count": 1,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 5.334033630788326e-06,
+          "latency_s": 7.6669966802001e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-79b3a8ba622a:0002",
-          "worker_count": 3,
+          "task_id": "BENCH-dcfbcff06b34:0002",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 6.125075742602348e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0003",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.708076059818268e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0004",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.332985892891884e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0005",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.458015948534012e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0006",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.00003807246685e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0007",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.457899533212185e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0008",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.082925781607628e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0009",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 6.666057743132114e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0010",
+          "worker_count": 1,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.375011824071407e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-dcfbcff06b34:0011",
+          "worker_count": 1,
           "scenario": "rate_limited",
           "success": false,
           "latency_s": 4.832982085645199e-06,
           "error": "controlled provider rate limit"
-        },
+        }
+      ]
+    },
+    {
+      "scenario": "rate_limited",
+      "worker_count": 3,
+      "task_count": 12,
+      "success_count": 0,
+      "failure_count": 12,
+      "total_duration_s": 0.014292625011876225,
+      "p50_latency_s": 5.332985892891884e-06,
+      "p90_latency_s": 6.375019438564777e-06,
+      "p99_latency_s": 7.4589625000953674e-06,
+      "mean_latency_s": 5.454814527183771e-06,
+      "throughput_tasks_per_sec": 839.59384577912,
+      "benchmark_kind": "postgresql_controlled_harness",
+      "database_dialect": "postgresql",
+      "external_dependencies": "fake",
+      "retry_count": 0,
+      "duplicate_claim_count": 0,
+      "results": [
         {
-          "task_id": "BENCH-79b3a8ba622a:0003",
-          "worker_count": 3,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 6.375019438564777e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-79b3a8ba622a:0004",
-          "worker_count": 3,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 4.792003892362118e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-79b3a8ba622a:0005",
-          "worker_count": 3,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 4.66697383671999e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-79b3a8ba622a:0006",
-          "worker_count": 3,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 6.832997314631939e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-79b3a8ba622a:0007",
-          "worker_count": 3,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 5.667097866535187e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-79b3a8ba622a:0008",
+          "task_id": "BENCH-1cfbf3997595:0000",
           "worker_count": 3,
           "scenario": "rate_limited",
           "success": false,
@@ -1266,27 +1202,91 @@
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-79b3a8ba622a:0009",
+          "task_id": "BENCH-1cfbf3997595:0001",
           "worker_count": 3,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 9.33394767343998e-06,
+          "latency_s": 5.249981768429279e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-79b3a8ba622a:0010",
+          "task_id": "BENCH-1cfbf3997595:0002",
           "worker_count": 3,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 5.750101990997791e-06,
+          "latency_s": 4.541012458503246e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-79b3a8ba622a:0011",
+          "task_id": "BENCH-1cfbf3997595:0003",
           "worker_count": 3,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 4.292000085115433e-06,
+          "latency_s": 4.917033948004246e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0004",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 4.749977961182594e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0005",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 4.958012141287327e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0006",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 7.4589625000953674e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0007",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.499925464391708e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0008",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.207955837249756e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0009",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.332985892891884e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0010",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 6.375019438564777e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-1cfbf3997595:0011",
+          "worker_count": 3,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.499925464391708e-06,
           "error": "controlled provider rate limit"
         }
       ]
@@ -1297,12 +1297,12 @@
       "task_count": 12,
       "success_count": 0,
       "failure_count": 12,
-      "total_duration_s": 0.01165254192892462,
-      "p50_latency_s": 4.58303838968277e-06,
-      "p90_latency_s": 6.666057743132114e-06,
-      "p99_latency_s": 9.833020158112049e-06,
-      "mean_latency_s": 5.114503437653184e-06,
-      "throughput_tasks_per_sec": 1029.8182210538027,
+      "total_duration_s": 0.012772583053447306,
+      "p50_latency_s": 5.709007382392883e-06,
+      "p90_latency_s": 7.125083357095718e-06,
+      "p99_latency_s": 7.333001121878624e-06,
+      "mean_latency_s": 5.860987585037947e-06,
+      "throughput_tasks_per_sec": 939.5123875715345,
       "benchmark_kind": "postgresql_controlled_harness",
       "database_dialect": "postgresql",
       "external_dependencies": "fake",
@@ -1310,87 +1310,63 @@
       "duplicate_claim_count": 0,
       "results": [
         {
-          "task_id": "BENCH-3f9139396fe0:0000",
+          "task_id": "BENCH-a8748abcb6ec:0000",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 6.666057743132114e-06,
+          "latency_s": 6.457907147705555e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0001",
+          "task_id": "BENCH-a8748abcb6ec:0001",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 4.58303838968277e-06,
+          "latency_s": 5.500041879713535e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0002",
+          "task_id": "BENCH-a8748abcb6ec:0002",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 3.6669662222266197e-06,
+          "latency_s": 4.832982085645199e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0003",
+          "task_id": "BENCH-a8748abcb6ec:0003",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 4.333094693720341e-06,
+          "latency_s": 7.125083357095718e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0004",
+          "task_id": "BENCH-a8748abcb6ec:0004",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 3.4580007195472717e-06,
+          "latency_s": 7.333001121878624e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0005",
+          "task_id": "BENCH-a8748abcb6ec:0005",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 9.833020158112049e-06,
+          "latency_s": 6.707967258989811e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0006",
+          "task_id": "BENCH-a8748abcb6ec:0006",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 4.624947905540466e-06,
+          "latency_s": 5.458015948534012e-06,
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0007",
-          "worker_count": 5,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 4.292000085115433e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-3f9139396fe0:0008",
-          "worker_count": 5,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 4.542060196399689e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-3f9139396fe0:0009",
-          "worker_count": 5,
-          "scenario": "rate_limited",
-          "success": false,
-          "latency_s": 3.999914042651653e-06,
-          "error": "controlled provider rate limit"
-        },
-        {
-          "task_id": "BENCH-3f9139396fe0:0010",
+          "task_id": "BENCH-a8748abcb6ec:0007",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
@@ -1398,11 +1374,35 @@
           "error": "controlled provider rate limit"
         },
         {
-          "task_id": "BENCH-3f9139396fe0:0011",
+          "task_id": "BENCH-a8748abcb6ec:0008",
           "worker_count": 5,
           "scenario": "rate_limited",
           "success": false,
-          "latency_s": 6.124959327280521e-06,
+          "latency_s": 4.416913725435734e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-a8748abcb6ec:0009",
+          "worker_count": 5,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 4.832982085645199e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-a8748abcb6ec:0010",
+          "worker_count": 5,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 5.709007382392883e-06,
+          "error": "controlled provider rate limit"
+        },
+        {
+          "task_id": "BENCH-a8748abcb6ec:0011",
+          "worker_count": 5,
+          "scenario": "rate_limited",
+          "success": false,
+          "latency_s": 6.707967258989811e-06,
           "error": "controlled provider rate limit"
         }
       ]
