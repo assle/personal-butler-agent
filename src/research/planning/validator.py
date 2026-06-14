@@ -18,6 +18,17 @@ class PlanValidator:
         """
         self._allowed_tools = allowed_tools
 
+    @classmethod
+    def from_registry(cls, registry) -> "PlanValidator":
+        """从工具注册表创建校验器；参数为注册表；返回使用注册工具名的校验器。"""
+        return cls(
+            allowed_tools={
+                definition.name
+                for definition in registry.list_tools()
+                if registry.has_provider(definition.name)
+            }
+        )
+
     def validate(self, draft: PlanDraft, *, limits: BudgetLimits) -> None:
         """校验计划草案；不合法时抛出 PlanValidationError
 

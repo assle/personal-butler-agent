@@ -48,6 +48,7 @@ async def call_model(state: dict) -> dict:
                 state.get("conversation_summary"),
                 state.get("recent_messages", []),
                 profile_context=state.get("profile_context", ""),
+                research_available=state.get("research_available", False),
             )
         )
     ]

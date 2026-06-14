@@ -144,7 +144,7 @@ from src.research.supervisor import ResearchSupervisor
 
 _supervisor = ResearchSupervisor(
     llm=LLMClient(),
-    validator=PlanValidator(allowed_tools={"knowledge.search", "web.search"}),
+    validator=PlanValidator.from_registry(_registry),
     plan_service=PlanService(),
     registry=_registry,
     approval_policy=ApprovalPolicy(high_cost_microunits=settings.research_high_cost_approval_microunits),
@@ -216,11 +216,21 @@ async def execute_planning_job(
             from src.research.supervisor.planner import TaskSnapshot as _TaskSnapshot
 
             task = await task_service.get_task(db, task_id)
+            from src.governance.workspaces import WorkspaceService
+
+            workspace = await WorkspaceService().resolve_member(
+                db,
+                task.requester_open_userid,
+                workspace_id=task.workspace_id,
+            )
             snapshot = _TaskSnapshot(
                 task_id=task_id,
                 workspace_id=task.workspace_id,
                 question=task.question,
                 user_id=task.requester_open_userid,
+                member_id=workspace.member_id,
+                role=workspace.role,
+                research_approved_once=workspace.research_approved_once,
             )
             result = await supervisor.plan(db, snapshot, task_service)
 
@@ -299,6 +309,7 @@ async def execute_step_job(
     step_service,
     executor=None,
     dispatcher=None,
+    step_dispatcher=None,
     pipeline=None,
 ) -> None:
     """执行单个研究步骤
@@ -311,6 +322,7 @@ async def execute_step_job(
         step_service: 步骤服务
         executor: 可选步骤执行器（Phase 3），不为 None 时执行真实工具调用
         dispatcher: 保留参数，当前通过 pipeline 协调器派发综合任务
+        step_dispatcher: 可选步骤派发器，用于派发本步骤解锁的后续步骤
         pipeline: 可选 ResearchPipelineCoordinator，用于步骤完成后检查并派发综合
     """
     async with session_factory() as db:
@@ -319,10 +331,11 @@ async def execute_step_job(
             return
 
         task_id = step.task_id  # 在 commit 前保存，避免过期对象访问
+        lease_owner = step.owner
 
         try:
             if executor is not None:
-                result = await executor.execute(db, step_id, f"worker:{step_id}")
+                result = await executor.execute(db, step_id, lease_owner or "")
                 if not result.success:
                     logger.error("Step %s failed: %s", step_id, result.error)
             else:
@@ -339,6 +352,10 @@ async def execute_step_job(
                 )
                 await fail_db.commit()
             return
+
+        # 当前步骤可能解锁新的 DAG 节点，提交状态后继续认领并派发。
+        if step_dispatcher is not None:
+            await step_dispatcher.dispatch_ready(task_id)
 
         # 使用 pipeline 协调器检查是否全部步骤完成并派发综合
         if pipeline is not None:
@@ -384,6 +401,7 @@ async def run_research_step(step_id: str) -> None:
         step_service=_step_service,
         executor=_step_executor,
         dispatcher=_dispatcher,
+        step_dispatcher=_step_dispatcher,
         pipeline=_pipeline,
     )
 

@@ -44,8 +44,12 @@ class InboundMessage(Base):
     error = Column(Text, nullable=True)
     """最后一次处理失败的错误信息"""
 
-    received_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    received_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
     """收到回调并落库的时间"""
 
-    processed_at = Column(DateTime, nullable=True)
+    processed_at = Column(DateTime(timezone=True), nullable=True)
     """处理成功或最终失败的时间"""

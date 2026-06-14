@@ -472,7 +472,7 @@ class KnowledgeService:
                     USING gin (
                       to_tsvector(
                         'simple',
-                        coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(source, '')
+                        coalesce(content, '') || ' ' || coalesce(source, '')
                       )
                     )
                     """

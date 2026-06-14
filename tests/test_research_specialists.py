@@ -1,6 +1,7 @@
 """研究 Specialist 测试"""
 from unittest.mock import AsyncMock
 import pytest
+from src.research.specialists.fetch import WebFetchResearcher
 from src.research.specialists.knowledge import KnowledgeResearcher
 from src.research.specialists.web import WebResearcher
 from src.research.tools.schemas import ToolExecutionContext
@@ -57,3 +58,20 @@ async def test_web_specialist_marks_failure():
     result = await specialist.execute(AsyncMock(), _ctx(), {"query": "test"})
     assert result.success is False
     assert "联网检索失败" in result.error
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_specialist_uses_url_as_query_fallback():
+    """验证仅提供 URL 时抓取证据仍有非空查询；无参数；无返回值。"""
+    fetcher = AsyncMock()
+    fetcher.fetch.return_value = "page content"
+    specialist = WebFetchResearcher(fetcher)
+
+    result = await specialist.execute(
+        AsyncMock(),
+        _ctx(),
+        {"url": "https://example.com/paper"},
+    )
+
+    assert result.success is True
+    assert result.data["evidence"][0]["query"] == "https://example.com/paper"

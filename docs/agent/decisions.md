@@ -322,3 +322,31 @@ Synthesis and citation validation are separate LLM calls with independent contex
 
 Status: Accepted. Typed failure categories determine retry policy. Provider circuit breaker opens after configurable consecutive failures. Deterministic tool-gate prevents prompt injection from bypassing the registry.
 
+## ADR-034: Idempotent Default Workspace Bootstrap
+
+Status: Accepted. FastAPI startup idempotently creates the default workspace (from `DEFAULT_WORKSPACE_ID`/`DEFAULT_WORKSPACE_NAME`) and grants owner membership to the explicitly configured `DEFAULT_WORKSPACE_OWNER_OPEN_USERID`.
+
+Decision: `ensure_default_workspace()` runs in the FastAPI lifespan before any research submission or agent dispatch. It uses `db.get()` + `db.scalar(select(...))` to check existence, then `db.add()` + `db.flush()` only when absent. The function commits via the lifespan's outer `db.commit()`.
+
+Reasoning:
+- Single-tenant setups should not require manual INSERTs into `workspaces` and `workspace_members` before the first research request.
+- Idempotency means repeated restarts are safe — no duplicate rows, no unique-constraint violations.
+- Membership is opt-in: leaving `DEFAULT_WORKSPACE_OWNER_OPEN_USERID` empty skips member creation, producing a valid empty workspace.
+- Separating bootstrap from Alembic migrations keeps schema (DDL) and data (initial workspace) concerns distinct.
+
+Trade-off: Bootstrap creates exactly one workspace and at most one owner member. Multi-workspace setups must still use manual admin operations; this is deferred until multi-tenant requirements justify a workspace-management API.
+
+## ADR-035: Separate App Callback Verification Endpoint
+
+Status: Accepted. The WeChat Work custom-application receive-server URL callback (`GET/POST /api/wechat/app/callback`) is a standalone FastAPI router that performs cryptographic verification only — it never persists messages, invokes agents, or alters research delivery.
+
+Decision: `app_callback_router.py` exports a `create_app_callback_router()` factory and a `register_app_callback_router()` convenience function. Registration is conditional on all three config fields (`WECOM_APP_CORP_ID`, `WECOM_APP_CALLBACK_TOKEN`, `WECOM_APP_CALLBACK_ENCODING_AES_KEY`) being present. The POST handler decrypts and validates the payload format, logs acceptance, and returns the plain text `success`.
+
+Reasoning:
+- The self-built app callback exists for one purpose: pass the WeChat admin "receive server URL" verification to unlock the trusted-IP configuration. Processing business messages through this endpoint would create a second, ungoverned message path that bypasses the intelligent robot's inbound dedup, group policy, and scene dispatch.
+- Keeping the app callback fully stateless (no DB writes, no agent calls) means it can be toggled on and off purely via config without affecting any state.
+- The intelligent robot callback remains the sole business message path, preserving the single-writer guarantee for `inbound_messages`.
+- Reusing `WeComCallbackCrypto` (same crypto as the intelligent robot path) avoids maintaining two AES and signature implementations.
+
+Trade-off: The app callback endpoint produces no observable side effects — it cannot be used for debugging message delivery. If future requirements demand business processing from the self-built app, a separate dedicated router (not this verification endpoint) should be created to avoid conflating verification and processing concerns.
+

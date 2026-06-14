@@ -37,6 +37,51 @@ The app no longer exposes a local debug/dev message API. Configure the WeChat Wo
 
 > **Note**: PostgreSQL must be running with the database and user created before starting. See "PostgreSQL Local Setup" below.
 
+### Enable Async Research
+
+Research requires two independent processes: FastAPI receives WeChat callbacks and
+creates tasks, while a Taskiq worker consumes those tasks from Redis. An HTTPS
+tunnel such as ZeroNews should expose only FastAPI at `127.0.0.1:8000`; the worker
+does not expose an HTTP port.
+
+Configure `.env` with `RESEARCH_ENABLED=true`, `REDIS_URL`,
+`DEFAULT_WORKSPACE_OWNER_OPEN_USERID` set to the callback user ID, and the
+`WECOM_APP_CORP_ID`, `WECOM_APP_SECRET`, and `WECOM_APP_AGENT_ID` values.
+For receive-server URL verification, also configure
+`WECOM_APP_CALLBACK_TOKEN` and `WECOM_APP_CALLBACK_ENCODING_AES_KEY`. Then run:
+
+```bash
+uv run uvicorn src.main:app --host 127.0.0.1 --port 8000
+uv run taskiq worker --ack-type when_executed \
+  --workers 1 --max-async-tasks 4 \
+  src.research.broker:broker src.research.tasks
+```
+
+The local PyCharm project contains `local-butler`, `research-worker`, and the
+combined `local-full-stack` run configuration. Use `local-full-stack` for local
+end-to-end research testing.
+
+Proactive private delivery also requires the Taskiq worker's public egress IP
+to be listed as a trusted IP for the WeChat Work custom application. The HTTPS
+tunnel only exposes FastAPI callbacks and does not satisfy this outbound API
+requirement. Error `60020 not allow to access from your ip` means the trusted
+IP configuration is missing or stale.
+
+Without a domain, configure the custom application's receive-server URL with
+the public HTTPS address provided by ZeroNews:
+
+```text
+https://<your-zeronews-public-host>/api/wechat/app/callback
+```
+
+The Token and EncodingAESKey entered in the WeChat Work admin page must exactly
+match `WECOM_APP_CALLBACK_TOKEN` and
+`WECOM_APP_CALLBACK_ENCODING_AES_KEY`. Restart FastAPI before saving the admin
+configuration. After URL verification succeeds, obtain the worker egress IP
+with `curl https://api.ipify.org` and add it to the custom application's trusted
+IP list. This callback validates configuration only; research reports are still
+proactively sent by the custom application to the private task requester.
+
 ## PostgreSQL Local Setup
 
 On macOS with Homebrew:

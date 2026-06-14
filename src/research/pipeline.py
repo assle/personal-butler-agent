@@ -54,10 +54,17 @@ class ResearchPipelineCoordinator:
         result = await db.execute(select(ResearchStep).where(ResearchStep.task_id == task_id))
         steps = result.scalars().all()
         all_done = all(
-            s.status in (ResearchStepStatus.COMPLETED.value, ResearchStepStatus.CANCELLED.value)
+            s.status in (
+                ResearchStepStatus.COMPLETED.value,
+                ResearchStepStatus.FAILED.value,
+                ResearchStepStatus.CANCELLED.value,
+            )
             for s in steps
         )
-        if not all_done:
+        has_success = any(
+            s.status == ResearchStepStatus.COMPLETED.value for s in steps
+        )
+        if not all_done or not has_success:
             return False
         try:
             await self._tasks.transition(

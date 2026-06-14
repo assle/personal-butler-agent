@@ -26,6 +26,7 @@ class ResearchSubmissionService:
         workspace_service=None,
         hook_bus=None,
         approval_service=None,
+        step_dispatcher=None,
     ):
         """注入任务服务、队列派发器、工作空间服务、Hook 总线和审批服务"""
         self._tasks = task_service
@@ -33,6 +34,7 @@ class ResearchSubmissionService:
         self._workspace_service = workspace_service
         self._hook_bus = hook_bus
         self._approval_service = approval_service
+        self._step_dispatcher = step_dispatcher
 
     async def submit(
         self,
@@ -160,11 +162,16 @@ class ResearchSubmissionService:
         try:
             await self._approval_service.approve(db, workspace=ws_ctx, task_id=task_id)
             await db.commit()
-            return f"已批准研究任务 {task_id}，任务开始执行。"
         except ValueError as e:
             return str(e)
         except Exception as e:
             return f"审批失败：{e}"
+        if self._step_dispatcher is not None:
+            try:
+                await self._step_dispatcher.dispatch_ready(task_id)
+            except Exception as exc:
+                return f"已批准研究任务 {task_id}，但步骤派发失败：{exc}"
+        return f"已批准研究任务 {task_id}，任务开始执行。"
 
     async def reject(
         self,

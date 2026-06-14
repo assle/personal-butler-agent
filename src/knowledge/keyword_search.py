@@ -155,7 +155,7 @@ class KeywordSearchBackend:
                            ts_rank_cd(
                              to_tsvector(
                                'simple',
-                               coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(source, '')
+                               coalesce(content, '') || ' ' || coalesce(source, '')
                              ),
                              plainto_tsquery('simple', :query)
                            ) AS rank

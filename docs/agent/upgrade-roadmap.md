@@ -110,6 +110,8 @@
   - 知识关键字搜索多方言适配（SQLite FTS5 + PostgreSQL tsvector）
   - SQLite → PostgreSQL 一次性迁移 CLI（`butler-migrate-to-pg`）
   - 启动时 `DATABASE_REQUIRE_MIGRATIONS=true` 验证 Alembic 版本是否 HEAD
+  - 默认工作空间启动引导（`ensure_default_workspace`） — 启动时幂等创建默认空间和配置的 owner 成员
+  - 自建应用接收消息服务器 URL 回调验证（`app_callback_router`） — 独立于智能机器人回调的密码学验证端点
 
 ---
 
@@ -122,6 +124,12 @@
 - **Phase 3**: Supervisor 与检索 Specialist — LLM 结构化规划器、知识库/网页检索 Specialist、受控工具注册表、证据去重持久化、步骤执行器
 - **Phase 4**: 引用质量门与证据综合 — 结构化报告综合 + 引用审查 + 确定性质量门 + 有限修复协调 + 仅已校验报告可投递
 - **Phase 6**: 技能定义与加载 (ResearchSkillManifest, ResearchSkillCatalog/Loader)；内置 Provider 注册 + MCP Provider 预留边界；delivery 改进 (split_text_utf8)；离线质量评估框架 + CLI；全链路追踪上下文 (TraceContext)；CI workflow (test.yml)；运维手册 (research-runbook.md)
+- **Phase 7**: Worker-count benchmark (PostgreSQL 受控测试, 1/3/5 workers, 12 tasks)
+- **可靠性修复 (2026-06-14)**：
+  - DeepSeek 结构化输出兼容：`ainvoke_structured()` 使用 `method="function_calling"` + `tool_choice="required"`，空结果受限重试
+  - 步骤所有权修复：Worker 使用派发器生成的 owner 调用执行器，完成后重新派发解锁步骤
+  - 部分失败容错：有≥1个成功步骤且全部终结时可进入综合；管线步骤（synthesis/review/delivery）在校验前移除
+  - PlanValidator 从 `ResearchToolRegistry` 获取工具白名单，消除硬编码白名单漂移
 - **下一步**: 技能驱动的规划；MCP 动态工具集成；在线 EVAL；分布式追踪集成
 
 ---
@@ -144,4 +152,4 @@
 | 中 | 预计 1-3 小时 |
 | 大 | 预计半天以上 |
 
-最后更新: 2026-06-13（Phase 6 完成：技能定义、Provider 注册、Delivery 改进、评估框架、链路追踪、CI、运维手册）
+最后更新: 2026-06-14（工作空间启动引导、自建应用回调验证端点、研究管线可靠性修复）

@@ -34,3 +34,5 @@ class PrivateButlerState(TypedDict, total=False):
     error: str | None
     # 个性化画像上下文，由 handle() 检索并注入
     profile_context: str
+    # 异步研究提交服务是否已注入，用于生成真实能力说明
+    research_available: bool

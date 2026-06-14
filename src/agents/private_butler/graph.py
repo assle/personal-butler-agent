@@ -37,6 +37,31 @@ _RESEARCH_REJECT_PATTERN = re.compile(
     r"^拒绝研究任务\s+(R\d{8}-[A-F0-9]{8})(?:[：:]\s*(.+))?$",
     re.IGNORECASE | re.DOTALL,
 )
+_RESEARCH_HELP_PATTERN = re.compile(
+    r"(?:怎么|如何|怎样|是否|能否|可以|支持|启动|开启|使用|介绍|说明|有没有|有)"
+    r".{0,12}(?:深度研究|研究功能|研究任务)"
+    r"|(?:深度研究|研究功能|研究任务)"
+    r".{0,12}(?:怎么|如何|怎样|是否|能否|可以|支持|启动|开启|使用|介绍|说明)",
+    re.IGNORECASE,
+)
+
+
+def _research_help_reply(research_available: bool) -> str:
+    """生成研究功能使用说明；参数表示研究服务是否可用；返回帮助文本。"""
+    if research_available:
+        return (
+            "研究功能已启用，你不需要在聊天里额外启动。\n"
+            "1. 提交任务：`深度研究：<具体问题>`\n"
+            "2. 查询进度：`查看研究任务 <任务ID>`\n"
+            "3. 若任务需要审批：`批准研究任务 <任务ID>` 或 "
+            "`拒绝研究任务 <任务ID>：<原因>`\n"
+            "研究任务由后台 Taskiq Worker 异步执行，完成后会通过企业微信"
+            "自建应用主动发送结果。"
+        )
+    return (
+        "研究功能当前未启用。管理员需要配置 `RESEARCH_ENABLED=true`、Redis "
+        "和企业微信自建应用参数，并同时启动 FastAPI 与 Taskiq Worker。"
+    )
 
 
 def _direct_reminder_intent(message: str) -> str | None:
@@ -169,8 +194,15 @@ class PrivateButlerAgent:
             chat_type = extra_state.get("chat_type", chat_type)
             chat_id = extra_state.get("chat_id", chat_id)
 
+        research_available = self._research_submitter is not None
+        if chat_type == "single" and _RESEARCH_HELP_PATTERN.search(message.strip()):
+            return AgentResponse(
+                reply=_research_help_reply(research_available),
+                data={"intent": "research_help"},
+            )
+
         # ── 研究任务提交/查询 ──
-        if chat_type == "single" and self._research_submitter is not None:
+        if chat_type == "single" and research_available:
             status_match = _RESEARCH_STATUS_PATTERN.match(message.strip())
             if status_match:
                 reply = await self._research_submitter.status(
@@ -272,6 +304,7 @@ class PrivateButlerAgent:
             "conversation_summary": summary,
             "recent_messages": recent,
             "profile_context": profile_context,
+            "research_available": research_available,
         }
         config = {
             "configurable": {

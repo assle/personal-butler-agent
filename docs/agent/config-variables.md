@@ -17,6 +17,7 @@ Configuration is loaded by `src/config.py` with Pydantic Settings. The app reads
 | `DATABASE_REQUIRE_MIGRATIONS` | No | `true` | 启动时要求数据库 Alembic 版本已达到 HEAD |
 | `DEFAULT_WORKSPACE_ID` | No | `default` | 首次迁移时创建的默认工作空间 ID |
 | `DEFAULT_WORKSPACE_NAME` | No | `Default Workspace` | 默认工作空间名称 |
+| `DEFAULT_WORKSPACE_OWNER_OPEN_USERID` | Research setup | `""` | 启动时加入默认工作空间的企业微信用户 ID，留空则不自动授权 |
 | `WEATHER_TIMEOUT_SECONDS` | No | `8` | Open-Meteo geocoding/forecast HTTP timeout in seconds |
 | `DASHSCOPE_API_KEY` | No | `""` | 阿里云百炼 DashScope API key，用于 Qwen3-Embedding 语义向量模型。不配则使用本地字符 n-gram 哈希嵌入 |
 
@@ -34,6 +35,9 @@ DATABASE_URL=postgresql+asyncpg://butler:butler@127.0.0.1:5432/butler
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
 DATABASE_REQUIRE_MIGRATIONS=true
+DEFAULT_WORKSPACE_ID=default
+DEFAULT_WORKSPACE_NAME=Default Workspace
+DEFAULT_WORKSPACE_OWNER_OPEN_USERID=your-wecom-userid
 WEATHER_TIMEOUT_SECONDS=8
 ```
 
@@ -221,10 +225,25 @@ Phase 1 异步研究：私聊提交问题，Worker 在独立进程中生成 LLM 
 | `WECOM_APP_CORP_ID` | If research | `""` | 自建应用 CorpID |
 | `WECOM_APP_SECRET` | If research | `""` | 自建应用 Secret |
 | `WECOM_APP_AGENT_ID` | If research | `0` | 自建应用 AgentID |
+| `WECOM_APP_CALLBACK_TOKEN` | For callback verification | `""` | 自建应用“接收消息服务器”回调 Token |
+| `WECOM_APP_CALLBACK_ENCODING_AES_KEY` | For callback verification | `""` | 自建应用“接收消息服务器”回调 EncodingAESKey |
 
 当 `RESEARCH_ENABLED=true` 时，`WECOM_APP_CORP_ID`、`WECOM_APP_SECRET` 和 `WECOM_APP_AGENT_ID`（>0）为必填。缺失时应用启动报 `RuntimeError`。
 
-这些变量与已退役的 `WECOM_CORP_ID`/`WECOM_CORP_SECRET` 无关：旧变量用于自建应用回调验证（已移除），新变量仅用于主动私聊消息推送。
+这些变量与已退役的 `WECOM_CORP_ID`/`WECOM_CORP_SECRET` 无关。
+`WECOM_APP_CORP_ID`、`WECOM_APP_SECRET`、`WECOM_APP_AGENT_ID` 用于主动私聊；
+两个 `WECOM_APP_CALLBACK_*` 变量仅用于接收消息服务器 URL 验证。
+
+当 `WECOM_APP_CORP_ID`、`WECOM_APP_CALLBACK_TOKEN` 和
+`WECOM_APP_CALLBACK_ENCODING_AES_KEY` 同时配置时，应用注册：
+
+```text
+GET/POST /api/wechat/app/callback
+```
+
+该接口只用于企业微信后台验证“接收消息服务器 URL”。POST 消息通过验签和解密
+后直接返回 `success`，不会写入消息库、不会调用 Agent，也不会改变研究报告的发送
+对象。研究报告仍由 `WeComAppMessageClient` 使用自建应用 API 主动私聊任务发起人。
 
 ## Change Guidance
 

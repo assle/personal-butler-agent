@@ -135,3 +135,43 @@ def test_validator_accepts_valid_plan():
     PlanValidator(allowed_tools={"knowledge.search", "web.search"}).validate(
         _valid_draft(), limits=BudgetLimits.default(),
     )
+
+
+def test_validator_from_registry_accepts_web_fetch():
+    """验证校验器从注册表接收 web.fetch；无参数；无返回值。"""
+    from unittest.mock import AsyncMock
+
+    from src.research.providers.builtin import (
+        BuiltinResearchDependencies,
+        register_builtin_research_tools,
+    )
+    from src.research.tools.registry import ResearchToolRegistry
+
+    registry = ResearchToolRegistry()
+    register_builtin_research_tools(
+        registry,
+        BuiltinResearchDependencies(
+            source_gateway=AsyncMock(),
+            web_search_service=AsyncMock(),
+            web_fetcher=AsyncMock(),
+        ),
+    )
+    draft = PlanDraft(
+        objective="fetch source",
+        completion_criteria=["source fetched"],
+        estimated_tokens=100,
+        estimated_cost_microunits=100,
+        steps=[
+            StepDraft(
+                key="fetch_source",
+                kind="web_retrieval",
+                tool_name="web.fetch",
+                input_payload={"url": "https://example.com"},
+            )
+        ],
+    )
+
+    PlanValidator.from_registry(registry).validate(
+        draft,
+        limits=BudgetLimits.default(),
+    )

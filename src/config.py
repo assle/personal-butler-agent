@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # 首次迁移时用于承接现有单租户数据的默认工作空间
     default_workspace_id: str = "default"
     default_workspace_name: str = "Default Workspace"
+    default_workspace_owner_open_userid: str = ""
 
     # 联网搜索配置；默认关闭，启用后由 search_web 工具查询实时信息
     web_search_enabled: bool = False
@@ -85,6 +86,8 @@ class Settings(BaseSettings):
     wecom_app_corp_id: str = ""
     wecom_app_secret: str = ""
     wecom_app_agent_id: int = 0
+    wecom_app_callback_token: str = ""
+    wecom_app_callback_encoding_aes_key: str = ""
 
     # 向量嵌入配置；DashScope API（Qwen3-Embedding），不配则使用本地哈希嵌入
     dashscope_api_key: str = ""

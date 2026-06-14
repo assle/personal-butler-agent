@@ -5,8 +5,11 @@
 Workflow:
   KnowledgeService.ingest() 写入文档和 chunk → search() 按用户/群聊权限返回结果
 """
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
+from src.knowledge.keyword_search import KeywordSearchBackend
 from src.knowledge.schemas import KnowledgeIngestRequest
 from src.knowledge.service import KnowledgeService
 
@@ -241,3 +244,36 @@ def test_ingest_request_rejects_invalid_private_scope():
 
     with pytest.raises(ValueError, match="Private knowledge must have scope_id"):
         service._validate_request(request)
+
+
+@pytest.mark.asyncio
+async def test_postgres_keyword_index_only_references_chunk_columns():
+    """验证 PostgreSQL 索引不引用 chunk 表不存在的 title；无参数；无返回值。"""
+    db = MagicMock()
+    db.execute = AsyncMock()
+    bind = MagicMock()
+    bind.dialect.name = "postgresql"
+    db.get_bind.return_value = bind
+
+    await KnowledgeService()._ensure_keyword_index(db)
+
+    statement = str(db.execute.await_args.args[0])
+    assert "coalesce(title" not in statement
+    assert "coalesce(content" in statement
+    assert "coalesce(source" in statement
+
+
+@pytest.mark.asyncio
+async def test_postgres_keyword_search_only_references_chunk_columns():
+    """验证 PostgreSQL 检索表达式不引用 chunk 表不存在的 title；无参数；无返回值。"""
+    db = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = []
+    db.execute.return_value = result
+
+    await KeywordSearchBackend()._search_postgres(db, "test", 5)
+
+    statement = str(db.execute.await_args.args[0])
+    assert "coalesce(title" not in statement
+    assert "coalesce(content" in statement
+    assert "coalesce(source" in statement

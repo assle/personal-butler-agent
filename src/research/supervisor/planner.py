@@ -10,6 +10,9 @@ class TaskSnapshot:
     workspace_id: str
     question: str
     user_id: str
+    member_id: int = 0
+    role: str = "member"
+    research_approved_once: bool = False
 
 
 @dataclass(frozen=True)

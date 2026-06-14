@@ -9,6 +9,7 @@ The app exposes WeChat Work intelligent robot URL callback mode as the only inbo
 Current implementation baseline:
 - FastAPI app entry: `src.main:app`
 - Inbound API: `GET/POST /api/wechat/aibot/callback`
+- Custom-app verification API: `GET/POST /api/wechat/app/callback` validates the receive-server URL only; POST payloads do not enter agent dispatch
 - Message normalization: `src/messaging/inbound.py` converts callback dictionaries into `InboundMessage`
 - Scene dispatch: `src/messaging/dispatch.py` routes private chat to `PrivateButlerAgent` and group chat through `apply_group_policy()`
 - Group policy: `src/messaging/group_policy.py` saves group messages, cleans history, classifies allowed triggers, and passes the category to `GroupMentionAgent`
@@ -26,6 +27,7 @@ Current implementation baseline:
 - WeChat Work intelligent robot URL 回调模式：GET URL 验证、POST 加密回调接收、入站消息幂等落库、后台处理、通过 `response_url` 回复。
 - Scene-first message flow: callback body -> `InboundMessage` -> `dispatch_message()` -> private or group scene agent.
 - Private chat tool-calling controller: `PrivateButlerAgent` can call summary, local knowledge, web search, weather, and reminder tools.
+- Private research commands and research-capability questions use deterministic routing before the LLM; help replies reflect whether the research submitter is actually enabled.
 - Group message passive collection: non-trigger group messages are saved and not replied to.
 - Group mention restricted replies: group summary, real weather lookup, simple Q&A, polls, translation, and short rejection for unavailable capabilities. Dispatch-provided categories prevent duplicate classification.
 - APScheduler 企业微信群 webhook 主动推送：按本地 JSON 配置为多个群注册独立 cron；`mode="raw"` 原样发送固定正文并可通过 `weather_query` 追加当天真实天气，`mode="compose"` 继续触发 `WebhookComposerAgent` 生成正文，再推送 markdown 到对应群 webhook。
@@ -42,6 +44,8 @@ Current implementation baseline:
 - Semantic embedding: `EmbeddingService` uses DashScope Qwen3-Embedding API (`text-embedding-v4`, 1024-dim) for semantic vector matching. Falls back to local character n-gram hashing when API key is not configured or the API call fails, ensuring zero-downtime degradation.
 - Observability: Full-chain trace logging (`[trace:inject]` / `[trace:sidepath]` for memory extraction pipeline, `[trace:search]` for RAG retrieval). Logs include elapsed timings per stage, candidate counts, and source attribution.
 - Enterprise WeChat custom-application messaging: `WeComAppMessageClient` with `RedisAccessTokenCache`, open_userid-to-userid conversion, errcode validation, and token refresh (40014/42001).
+- Enterprise WeChat custom-application callback verification: isolated encrypted GET/POST endpoint for configuring the receive-server URL and unlocking trusted-IP settings; it does not replace proactive private research delivery.
+- Default workspace bootstrap: FastAPI startup idempotently creates `DEFAULT_WORKSPACE_ID` and grants owner membership only to the explicitly configured `DEFAULT_WORKSPACE_OWNER_OPEN_USERID`.
 
 - Phase 4 citation quality: 证据引用综合 (ReportSynthesisService) → 独立引用审查 (CitationReviewService) → 确定性质量门 → 有限修复协调 (QualityRepairCoordinator)。结构化结论 (ResearchClaim) + 证据绑定 (ResearchClaimEvidence) + 审查发现 (ResearchReviewFinding)。仅已验证报告可投递。
 - Phase 5: 失败分类与指数退避重试、Redis 熔断器、阶段上下文构建器、SSRF 防护 URL 策略、安全网页抓取、prompt 注入边界、步骤看门狗

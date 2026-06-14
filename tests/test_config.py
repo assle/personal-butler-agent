@@ -108,6 +108,8 @@ def test_settings_loads_research_and_wecom_app_config():
         "WECOM_APP_CORP_ID": "ww-test",
         "WECOM_APP_SECRET": "secret-test",
         "WECOM_APP_AGENT_ID": "1000002",
+        "WECOM_APP_CALLBACK_TOKEN": "callback-token",
+        "WECOM_APP_CALLBACK_ENCODING_AES_KEY": "callback-aes-key",
     }
     with patch.dict(os.environ, env_vars, clear=True):
         from src.config import Settings
@@ -121,6 +123,8 @@ def test_settings_loads_research_and_wecom_app_config():
         assert settings.wecom_app_corp_id == "ww-test"
         assert settings.wecom_app_secret == "secret-test"
         assert settings.wecom_app_agent_id == 1000002
+        assert settings.wecom_app_callback_token == "callback-token"
+        assert settings.wecom_app_callback_encoding_aes_key == "callback-aes-key"
 
 
 def test_settings_research_defaults_are_disabled():
@@ -137,6 +141,8 @@ def test_settings_research_defaults_are_disabled():
         assert settings.wecom_app_corp_id == ""
         assert settings.wecom_app_secret == ""
         assert settings.wecom_app_agent_id == 0
+        assert settings.wecom_app_callback_token == ""
+        assert settings.wecom_app_callback_encoding_aes_key == ""
 
 
 def test_legacy_self_built_app_env_is_ignored():
@@ -188,6 +194,7 @@ def test_settings_loads_workspace_bootstrap_config():
         "DEEPSEEK_API_KEY": "test",
         "DEFAULT_WORKSPACE_ID": "ws-internal",
         "DEFAULT_WORKSPACE_NAME": "Internal Research",
+        "DEFAULT_WORKSPACE_OWNER_OPEN_USERID": "owner-open-userid",
     }
     with patch.dict(os.environ, env, clear=True):
         from src.config import Settings
@@ -195,3 +202,4 @@ def test_settings_loads_workspace_bootstrap_config():
         settings = Settings(_env_file=None)
     assert settings.default_workspace_id == "ws-internal"
     assert settings.default_workspace_name == "Internal Research"
+    assert settings.default_workspace_owner_open_userid == "owner-open-userid"

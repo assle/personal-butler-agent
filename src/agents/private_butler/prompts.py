@@ -19,10 +19,14 @@ PRIVATE_BUTLER_SYSTEM_PROMPT = """你是"小管家"，用户私聊里的总控�
 - 用户要求翻译文本时，调用 translate 工具。
 - 用户说"把这个加到知识库"、"帮我存一下"、"记录这个"等要保存内容时，调用 add_to_knowledge。私聊存到个人知识库，群聊存到群知识库。
 - 用户要求记住、查看、修改或删除个性化记忆时，调用对应的记忆工具（add_memory / list_memories / update_memory / delete_memory / search_memory）。
+- 回答功能介绍时必须参考下方“异步研究能力”，不要错误声称不存在已经启用的研究模块。
 - 请按 ReAct 思路工作：先判断用户真正问题，再看现有信息是否足够；不足时调用最相关工具，拿到结果后再判断是否足够回答。
 - 每轮只调用必要工具，避免为了局部信息反复查询；如果工具多次无结果或信息仍不足，停止调用并如实说明还缺什么。
 - 工具返回资料后，要用自然中文整合结果，不要暴露工具调用细节。
 - 不确定、资料不足或工具无结果时，如实说明，不要编造。
+
+[异步研究能力]
+{research_capability}
 
 [用户画像]
 {profile_context}
@@ -45,6 +49,7 @@ def build_system_prompt(
     conversation_summary: str | None,
     recent_messages: list[dict] | None,
     profile_context: str = "",
+    research_available: bool = False,
 ) -> str:
     """构建 PrivateButlerAgent system prompt
 
@@ -52,6 +57,7 @@ def build_system_prompt(
         conversation_summary: ConversationMemory 返回的历史摘要，可为空
         recent_messages: ConversationMemory 返回的最近消息列表，可为空
         profile_context: 个性化画像上下文，由 handle() 注入
+        research_available: 异步研究提交服务是否已启用
 
     返回:
         str: 可放入 SystemMessage 的完整提示词
@@ -65,8 +71,21 @@ def build_system_prompt(
     else:
         recent_text = "（暂无最近对话）"
 
+    if research_available:
+        research_capability = (
+            "异步研究功能已启用。用户可发送“深度研究：<具体问题>”提交任务，"
+            "发送“查看研究任务 <任务ID>”查询进度。该命令由外层确定性路由处理，"
+            "不要调用普通工具，也不要声称没有研究功能。"
+        )
+    else:
+        research_capability = (
+            "异步研究功能当前未启用。不得声称可以创建研究任务；如用户询问，"
+            "说明需要管理员配置并启动研究服务。"
+        )
+
     return PRIVATE_BUTLER_SYSTEM_PROMPT.format(
         conversation_summary=summary_text,
         recent_messages=recent_text,
         profile_context=profile_context or "（暂无已知信息）",
+        research_capability=research_capability,
     )

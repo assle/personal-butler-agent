@@ -12,9 +12,43 @@ from src.research.supervisor.prompts import SUPERVISOR_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+_PIPELINE_ONLY_KINDS = {
+    "synthesis",
+    "synthesize",
+    "report_synthesis",
+    "citation_review",
+    "validation",
+    "delivery",
+}
+
 
 class SupervisorPlanningError(RuntimeError):
     """Supervisor 规划失败"""
+
+
+def _normalize_tool_steps(draft: PlanDraft) -> PlanDraft:
+    """移除由固定管线负责的伪步骤；参数为原始计划；返回仅含工具步骤的计划。"""
+    removed_keys = {
+        step.key
+        for step in draft.steps
+        if not step.tool_name.strip() and step.kind.strip().lower() in _PIPELINE_ONLY_KINDS
+    }
+    if not removed_keys:
+        return draft
+
+    retained_steps = [step for step in draft.steps if step.key not in removed_keys]
+    invalid_dependencies = {
+        dependency
+        for step in retained_steps
+        for dependency in step.depends_on
+        if dependency in removed_keys
+    }
+    if invalid_dependencies:
+        raise SupervisorPlanningError(
+            "工具步骤不能依赖管线自动步骤: "
+            + ", ".join(sorted(invalid_dependencies))
+        )
+    return draft.model_copy(update={"steps": retained_steps})
 
 
 class ResearchSupervisor:
@@ -109,13 +143,14 @@ class ResearchSupervisor:
             schema=PlanDraft,
             temperature=0.1,
         )
+        draft = _normalize_tool_steps(draft)
 
         # 验证
         self._validator.validate(draft, limits=self._budget_limits)
 
         # 评估审批
         requires_approval = self._approval_policy.evaluate(
-            first_use=True,
+            first_use=not snapshot.research_approved_once,
             estimated_cost=draft.estimated_cost_microunits,
         )
 
@@ -146,11 +181,28 @@ class ResearchSupervisor:
 
         # 转换状态并激活步骤
         if requires_approval:
-            await task_service.transition(
-                db, snapshot.task_id, snapshot.workspace_id,
-                expected={ResearchTaskStatus.PLANNING},
-                target=ResearchTaskStatus.AWAITING_APPROVAL,
-            )
+            if self._approval_service is not None:
+                from src.governance.workspaces import WorkspaceContext
+
+                task = await task_service.get_task(db, snapshot.task_id)
+                await self._approval_service.request_approval(
+                    db,
+                    task=task,
+                    plan=plan,
+                    workspace=WorkspaceContext(
+                        workspace_id=snapshot.workspace_id,
+                        member_id=snapshot.member_id,
+                        open_userid=snapshot.user_id,
+                        role=snapshot.role,
+                        research_approved_once=snapshot.research_approved_once,
+                    ),
+                )
+            else:
+                await task_service.transition(
+                    db, snapshot.task_id, snapshot.workspace_id,
+                    expected={ResearchTaskStatus.PLANNING},
+                    target=ResearchTaskStatus.AWAITING_APPROVAL,
+                )
         else:
             await task_service.transition(
                 db, snapshot.task_id, snapshot.workspace_id,
@@ -166,6 +218,12 @@ class ResearchSupervisor:
             plan=draft,
             requires_approval=requires_approval,
             approval_reason=(
-                "first_use" if requires_approval else ""
+                (
+                    "first_use"
+                    if not snapshot.research_approved_once
+                    else "high_cost"
+                )
+                if requires_approval
+                else ""
             ),
         )

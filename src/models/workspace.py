@@ -5,7 +5,7 @@
 Workflow:
 1. Workspace 存储工作空间基础信息和策略
 2. WorkspaceMember 绑定企业微信用户到工作空间并记录角色
-3. 首次迁移时通过 default_workspace_id 创建默认工作空间
+3. FastAPI 启动时按显式配置幂等创建默认工作空间和 owner 成员
 """
 from datetime import datetime, timezone
 

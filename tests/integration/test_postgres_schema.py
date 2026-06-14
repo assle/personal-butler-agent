@@ -61,8 +61,16 @@ async def test_alembic_upgrade_applies_schema(postgres_engine):
                 for column in sa_inspect(sync_conn).get_columns("research_events")
             }
         )
+        inbound_columns = await conn.run_sync(
+            lambda sync_conn: {
+                column["name"]: column
+                for column in sa_inspect(sync_conn).get_columns("inbound_messages")
+            }
+        )
     assert task_columns["trace_id"]["nullable"] is False
     assert event_columns["trace_id"]["nullable"] is False
+    assert inbound_columns["received_at"]["type"].timezone is True
+    assert inbound_columns["processed_at"]["type"].timezone is True
 
 
 def test_trace_migration_has_postgresql_backfill():

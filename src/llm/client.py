@@ -84,8 +84,18 @@ class LLMClient:
         返回:
             BaseModel: 已通过 Schema 校验的结构化结果
         """
-        runnable = self._model.with_structured_output(schema)
-        return await runnable.ainvoke(messages, temperature=temperature)
+        # DeepSeek 支持 Function Calling，但不支持 OpenAI 的 json_schema
+        # response_format；显式指定方法，避免 langchain-openai 默认值变化。
+        runnable = self._model.with_structured_output(
+            schema,
+            method="function_calling",
+            tool_choice="required",
+        )
+        for _attempt in range(2):
+            result = await runnable.ainvoke(messages, temperature=temperature)
+            if result is not None:
+                return result
+        raise RuntimeError(f"{schema.__name__} 结构化输出为空")
 
     async def chat(
         self,

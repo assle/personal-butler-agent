@@ -47,7 +47,7 @@ class WebFetchResearcher:
             source_ref=url,
             title=str(arguments.get("title") or url),
             excerpt=content[:2000],
-            query=str(arguments.get("query") or ""),
+            query=str(arguments.get("query") or url),
             retrieved_at=datetime.now(timezone.utc),
             confidence=None,
         )

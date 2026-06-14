@@ -225,10 +225,14 @@ Rules:
 LLM decisions are verified or overridden by deterministic code:
 
 1. Group message triggers → keyword matching, not LLM classification
-2. Research commands (`深度研究：`, `批准研究任务`, `查看研究任务`) → regex interception before agent
+2. Research commands (`深度研究：`, `批准研究任务`, `查看研究任务`) and research help questions → regex interception before agent
 3. Quality gate → material claims with no evidence bindings fail regardless of Reviewer LLM output
 4. Tool registry → unknown tool names rejected before provider execution
 5. URL policy → scheme/address validation before any HTTP request
+
+The Supervisor tool catalog and `PlanValidator` allowlist must come from the same
+`ResearchToolRegistry`. Do not maintain a second hard-coded tool-name set in Worker
+wiring.
 
 ## Provider and Tool Registration Pattern
 
@@ -248,3 +252,28 @@ Provider failures and worker crashes are handled deterministically:
 3. `ProviderCircuitBreaker` uses Redis atomic INCR/SETEX — opens after threshold, auto-resets
 4. `ResearchWatchdog.run_once()` recovers expired leases and requeues steps
 5. Retryable failures set step to `RETRY_WAIT`; terminal failures cascade cancellation
+
+## Governance Bootstrap Pattern
+
+`ensure_default_workspace()` in `src/governance/bootstrap.py` runs once at FastAPI startup, before any agent or scheduler activity.
+
+Rules:
+- Idempotent: checks existence via `db.get()` and `db.scalar(select(...))` before creating. Repeated restarts are safe.
+- Bootstrap creates the workspace first (`db.add` + `db.flush`), then conditionally creates the owner member only when `owner_open_userid` is non-empty.
+- The bootstrap function receives its own `AsyncSession` from the lifespan — it does not reuse request-scoped sessions.
+- Bootstrap data (workspace + member) is committed by the lifespan's outer `db.commit()`, not inside the bootstrap function.
+- Multi-workspace setups must use manual operations for now; bootstrap covers only the default single-tenant case.
+
+## App Callback Router Pattern
+
+The WeChat Work custom-application receive-server callback is a standalone FastAPI router in `src/wechat/app_callback_router.py`. It serves one purpose: pass the WeChat admin's receive-server URL verification to unlock trusted-IP configuration.
+
+Rules:
+- `create_app_callback_router(token, encoding_aes_key, corp_id)` returns a configured `APIRouter` — it is a pure factory with no side effects.
+- `register_app_callback_router(app, ...)` wraps the factory in a config gating check and calls `app.include_router()`. It returns `bool` so the caller can log registration status.
+- Registration is conditional: all three config fields (`WECOM_APP_CORP_ID`, `WECOM_APP_CALLBACK_TOKEN`, `WECOM_APP_CALLBACK_ENCODING_AES_KEY`) must be non-empty.
+- GET handler: validates signature, decrypts `echostr`, returns plain text.
+- POST handler: extracts encrypted payload (XML or JSON), validates signature, decrypts, validates plain payload format, returns `"success"`.
+- POST never writes to the database, never invokes an agent, never changes research delivery state.
+- Reuses `WeComCallbackCrypto` from `src/wechat/callback_crypto.py` — the same crypto as the intelligent robot callback path.
+- Kept completely separate from the intelligent robot callback to avoid dual-write issues on `inbound_messages` and accidental bypass of group policy.

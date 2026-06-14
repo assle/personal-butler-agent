@@ -7,7 +7,8 @@ Workflow:
 2. 私聊、群聊 @、scheduler webhook 分别由场景 agent 处理
 3. lifespan 中初始化数据库表结构
 4. 注册智能机器人 URL 回调路由
-5. 配置企业微信群 webhook 定时推送
+5. 按配置注册自建应用验证回调路由
+6. 配置企业微信群 webhook 定时推送
 """
 import logging
 from contextlib import asynccontextmanager
@@ -17,6 +18,7 @@ from fastapi import FastAPI
 from src.config import settings
 from src.db.migrations import assert_database_at_head
 from src.db.session import async_session
+from src.governance.bootstrap import ensure_default_workspace
 from src.llm.client import LLMClient
 from src.agents.summary import SummaryAgent
 from src.agents.group_mention import GroupMentionAgent
@@ -94,6 +96,7 @@ if settings.research_enabled:
         recover_research_leases as _recover_task,
         run_research_step as _step_task,
         run_research_task as _run_task,
+        _step_dispatcher as _research_step_dispatcher,
     )
 
     _research_broker_module = _research_broker
@@ -113,6 +116,7 @@ if settings.research_enabled:
         workspace_service=_workspace_service,
         hook_bus=_hook_bus,
         approval_service=_approval_service,
+        step_dispatcher=_research_step_dispatcher,
     )
 
     # 异步研究的 Worker 端单例（Taskiq 进程，非主进程）
@@ -173,6 +177,15 @@ async def lifespan(app: FastAPI):
         else:
             await conn.run_sync(Base.metadata.create_all)
 
+    async with async_session() as db:
+        await ensure_default_workspace(
+            db,
+            workspace_id=settings.default_workspace_id,
+            workspace_name=settings.default_workspace_name,
+            owner_open_userid=settings.default_workspace_owner_open_userid,
+        )
+        await db.commit()
+
     global scheduler_manager
 
     if settings.scheduler_targets_file:
@@ -222,3 +235,14 @@ if settings.wecom_aibot_token and settings.wecom_aibot_encoding_aes_key:
         )
     )
     logger.info("AIBot callback route: registered")
+
+# 自建应用回调仅用于接收消息服务器 URL 验证，不进入 Agent 业务流程
+from src.wechat.app_callback_router import register_app_callback_router
+
+if register_app_callback_router(
+    app,
+    token=settings.wecom_app_callback_token,
+    encoding_aes_key=settings.wecom_app_callback_encoding_aes_key,
+    corp_id=settings.wecom_app_corp_id,
+):
+    logger.info("WeCom app callback route: registered")

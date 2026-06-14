@@ -71,3 +71,81 @@ async def test_coordinator_transitions_are_idempotent(db_session):
     result2 = await coordinator.queue_synthesis_if_complete(db_session, "R-idem")
     assert result2 is False  # Already synthesizing
     fake_synth.enqueue_synthesis.assert_awaited_once()  # 未重复调用
+
+
+@pytest.mark.asyncio
+async def test_coordinator_synthesizes_when_some_sources_fail(db_session):
+    """验证至少有成功证据时部分步骤失败仍进入综合；参数为测试会话；无返回值。"""
+    from src.research.service import ResearchTaskService
+
+    db_session.add(Workspace(id="ws-partial", name="workspace-partial"))
+    await db_session.flush()
+    task = ResearchTask(
+        id="R-partial",
+        source_msgid="msg-partial",
+        requester_open_userid="u1",
+        workspace_id="ws-partial",
+        question="test",
+        research_type="foundation",
+        status=ResearchTaskStatus.RUNNING.value,
+        access_scope={},
+        max_rounds=4,
+        timeout_seconds=300,
+        current_round=0,
+        cancel_requested=False,
+    )
+    db_session.add(task)
+    await db_session.flush()
+    plan = ResearchPlan(
+        workspace_id="ws-partial",
+        task_id="R-partial",
+        version=1,
+        objective="test",
+        completion_criteria=["c1"],
+        estimated_cost_microunits=100,
+        estimated_tokens=1000,
+        raw_plan={},
+    )
+    db_session.add(plan)
+    await db_session.flush()
+    db_session.add_all([
+        ResearchStep(
+            id="R-partial:1:ok",
+            workspace_id="ws-partial",
+            task_id="R-partial",
+            plan_id=plan.id,
+            kind="test",
+            tool_name="web.search",
+            input_payload={},
+            status=ResearchStepStatus.COMPLETED.value,
+            idempotency_key="R-partial:ok",
+        ),
+        ResearchStep(
+            id="R-partial:1:failed",
+            workspace_id="ws-partial",
+            task_id="R-partial",
+            plan_id=plan.id,
+            kind="test",
+            tool_name="web.fetch",
+            input_payload={},
+            status=ResearchStepStatus.FAILED.value,
+            idempotency_key="R-partial:failed",
+            error="HTTP 404",
+        ),
+    ])
+    await db_session.flush()
+
+    fake_synth = AsyncMock()
+    coordinator = ResearchPipelineCoordinator(
+        task_service=ResearchTaskService(max_rounds=4, timeout_seconds=300),
+        dispatcher=AsyncMock(),
+        synthesis_dispatcher=fake_synth,
+        validation_dispatcher=AsyncMock(),
+        delivery_dispatcher=AsyncMock(),
+        step_dispatcher=AsyncMock(),
+    )
+
+    result = await coordinator.queue_synthesis_if_complete(db_session, "R-partial")
+
+    assert result is True
+    fake_synth.enqueue_synthesis.assert_awaited_once_with("R-partial")

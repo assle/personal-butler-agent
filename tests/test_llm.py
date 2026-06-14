@@ -94,7 +94,7 @@ class _FakePlanDraft(BaseModel):
 
 @pytest.mark.asyncio
 async def test_ainvoke_structured_returns_validated_model():
-    """验证结构化调用返回 Pydantic 模型"""
+    """验证结构化调用通过 DeepSeek 兼容的函数调用返回模型；无参数；无返回值。"""
     from src.llm.client import LLMClient
 
     client = LLMClient()
@@ -113,3 +113,53 @@ async def test_ainvoke_structured_returns_validated_model():
     )
     assert isinstance(result, _FakePlanDraft)
     assert result.objective == "compare"
+    fake_model.with_structured_output.assert_called_once_with(
+        _FakePlanDraft,
+        method="function_calling",
+        tool_choice="required",
+    )
+
+
+@pytest.mark.asyncio
+async def test_ainvoke_structured_retries_empty_provider_result_once():
+    """验证结构化接口收到空结果时重试一次；无参数；无返回值。"""
+    from src.llm.client import LLMClient
+
+    client = LLMClient()
+    fake_model = MagicMock()
+    structured_runnable = AsyncMock()
+    structured_runnable.ainvoke.side_effect = [
+        None,
+        _FakePlanDraft(objective="retry-success", steps=[]),
+    ]
+    fake_model.with_structured_output.return_value = structured_runnable
+    client._model = fake_model
+
+    result = await client.ainvoke_structured(
+        messages=[{"role": "user", "content": "compare"}],
+        schema=_FakePlanDraft,
+    )
+
+    assert result.objective == "retry-success"
+    assert structured_runnable.ainvoke.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_ainvoke_structured_rejects_repeated_empty_provider_result():
+    """验证结构化接口连续为空时抛出明确错误；无参数；无返回值。"""
+    from src.llm.client import LLMClient
+
+    client = LLMClient()
+    fake_model = MagicMock()
+    structured_runnable = AsyncMock()
+    structured_runnable.ainvoke.return_value = None
+    fake_model.with_structured_output.return_value = structured_runnable
+    client._model = fake_model
+
+    with pytest.raises(RuntimeError, match="结构化输出为空"):
+        await client.ainvoke_structured(
+            messages=[{"role": "user", "content": "compare"}],
+            schema=_FakePlanDraft,
+        )
+
+    assert structured_runnable.ainvoke.await_count == 2

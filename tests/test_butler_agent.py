@@ -256,6 +256,86 @@ async def test_private_butler_submits_explicit_deep_research(db_session):
 
 
 @pytest.mark.asyncio
+async def test_private_butler_explains_enabled_research_feature(db_session):
+    """验证研究已启用时帮助问题直接返回用法；参数为测试会话；无返回值。"""
+    submitter = AsyncMock()
+    llm = FakeToolCallingLLM([])
+    agent = PrivateButlerAgent(
+        llm_client=llm,
+        summary_agent=FakeAgent(),
+        knowledge_service=AsyncMock(),
+        web_search_service=AsyncMock(),
+        research_submitter=submitter,
+    )
+
+    result = await agent.handle(
+        "private_butler",
+        "怎么启动研究功能",
+        "open-u1",
+        db_session,
+        extra_state={"chat_type": "single", "source_msgid": "msg-help"},
+    )
+
+    assert result.data == {"intent": "research_help"}
+    assert "研究功能已启用" in result.reply
+    assert "深度研究：<具体问题>" in result.reply
+    assert "查看研究任务 <任务ID>" in result.reply
+    assert llm.calls == []
+
+
+@pytest.mark.asyncio
+async def test_private_butler_explains_disabled_research_feature(db_session):
+    """验证研究未启用时帮助问题说明后台配置；参数为测试会话；无返回值。"""
+    llm = FakeToolCallingLLM([])
+    agent = PrivateButlerAgent(
+        llm_client=llm,
+        summary_agent=FakeAgent(),
+        knowledge_service=AsyncMock(),
+        web_search_service=AsyncMock(),
+        research_submitter=None,
+    )
+
+    result = await agent.handle(
+        "private_butler",
+        "如何使用深度研究",
+        "open-u1",
+        db_session,
+        extra_state={"chat_type": "single"},
+    )
+
+    assert result.data == {"intent": "research_help"}
+    assert "研究功能当前未启用" in result.reply
+    assert "RESEARCH_ENABLED=true" in result.reply
+    assert "Taskiq Worker" in result.reply
+    assert llm.calls == []
+
+
+@pytest.mark.asyncio
+async def test_private_butler_prompt_describes_research_availability(db_session):
+    """验证通用能力问答提示词包含真实研究状态；参数为测试会话；无返回值。"""
+    llm = FakeToolCallingLLM([AIMessage(content="我可以协助你。")])
+    agent = PrivateButlerAgent(
+        llm_client=llm,
+        summary_agent=FakeAgent(),
+        knowledge_service=AsyncMock(),
+        web_search_service=AsyncMock(),
+        research_submitter=AsyncMock(),
+    )
+
+    await agent.handle(
+        "private_butler",
+        "介绍一下你的全部能力",
+        "open-u1",
+        db_session,
+        extra_state={"chat_type": "single"},
+    )
+
+    system_prompt = llm.calls[0][0].content
+    assert "异步研究功能已启用" in system_prompt
+    assert "深度研究：<具体问题>" in system_prompt
+
+
+@pytest.mark.asyncio
 async def test_private_butler_returns_research_status(db_session):
     """"查看研究任务 ID"只允许查询当前用户任务"""
     submitter = AsyncMock()

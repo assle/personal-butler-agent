@@ -9,7 +9,7 @@
 - Stack: Python 3.13+, FastAPI, LangChain, LangGraph, langchain-openai, SQLAlchemy 2 async, PostgreSQL (production) / SQLite (dev), asyncpg, Alembic, ChromaDB, Taskiq, Redis, Pydantic v2, uv, pytest
 - Purpose: AI personal butler for WeChat Work natural-language workflows: private Q&A, group-chat interactions, weather lookup, reminders, polls, translation, personalized memory, async long-form research, RAG knowledge retrieval, and scheduled group pushes.
 - Runtime entry: `src.main:app` (FastAPI producer); optional `taskiq worker src.research.broker:broker src.research.tasks` for async research
-- Current interfaces: `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing (inbound); scheduler jobs push to Enterprise WeChat group webhooks (outbound group); WeChat custom-application API for proactive private delivery (outbound private, research complete notifications)
+- Current interfaces: `GET/POST /api/wechat/aibot/callback` for WeChat Work intelligent robot URL callback routing (inbound); `GET/POST /api/wechat/app/callback` for custom-application receive-server verification only; scheduler jobs push to Enterprise WeChat group webhooks (outbound group); WeChat custom-application API for proactive private delivery (outbound private, research complete notifications)
 
 ## Build, Test & Verify
 
@@ -29,9 +29,9 @@ For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`
 
 - `src/main.py`: FastAPI app, lifespan DB initialization, singleton wiring for domain agents, scene agents, and optional async research.
 - `src/messaging/`: normalized inbound messages, group message policy, and private/group scene dispatch.
-- `src/wechat/`: WeChat Work intelligent robot integration (URL callback crypto, callback router, inbox, response_url reply) and custom-application client (access token cache, ID conversion, proactive private messaging).
+- `src/wechat/`: WeChat Work intelligent robot integration (URL callback crypto, callback router, inbox, response_url reply), custom-application callback verification, and custom-application client (access token cache, ID conversion, proactive private messaging).
 - `src/agents/`: scene agents (`private_butler`, `group_mention`, `webhook_composer`) plus domain agents for summary, reminder, poll, memory, and shared utilities (translate).
-- `src/governance/`: workspace membership resolution, permission engine, and research lifecycle hooks.
+- `src/governance/`: workspace membership resolution, permission engine, research lifecycle hooks, and default workspace bootstrap.
 - `src/research/`: async research subsystem — task lifecycle, broker, queue, planning, approval, budgeting, supervisor, specialists, tool registry, evidence, synthesis, citation review, quality gate, repair, delivery, and step execution.
 - `src/research/skills/`: research skill manifest schema, catalog, and on-demand loader
 - `src/research/providers/`: built-in tool registrations and MCP provider boundary
