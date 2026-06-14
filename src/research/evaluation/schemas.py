@@ -62,6 +62,17 @@ class EvaluationResult(BaseModel):
     latency_ms: int = 0
 
 
+class EvaluationProvenance(BaseModel):
+    """离线评测来源说明，防止把 fixture 数据描述为在线实测"""
+
+    evaluation_mode: str = "offline_fixture"
+    artifact_source: str
+    external_calls: bool = False
+    pipeline_execution: bool = False
+    latency_source: str = "fixture_input"
+    cost_source: str = "fixture_input"
+
+
 class EvaluationSummary(BaseModel):
     """全面评估汇总指标"""
 

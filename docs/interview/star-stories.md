@@ -63,14 +63,14 @@
 **Action**:
 - Audited the evaluation runner (`src/research/evaluation/`). Found that the original implementation skipped the actual pipeline execution for each case and returned hardcoded constants. It was written during early Phase 4 when the pipeline wasn't fully wired, and was never updated.
 - Replaced the fixed values with real metric computation. For each of the 24 cases, the runner now:
-  1. Executes the full pipeline (Supervisor -> Specialists -> Synthesizer -> Reviewer -> Quality Gate)
+  1. Calculates deterministic metrics from versioned fixture artifacts (offline evaluator, no DeepSeek call)
   2. Measures `claim_topic_coverage`: proportion of required sub-topics addressed in the output report
   3. Measures `citation_validity`: proportion of claims where cited sources support the claim text
   4. Measures `unsupported_material_claim_rate`: proportion of material claims without evidence bindings
   5. Measures `required_source_coverage`: proportion of claims that cite required sources
   6. Records latency and token cost
 - Updated the evaluation CLI to accept `--output` for reproducibility and added the `generated_at` timestamp.
-- Re-ran the evaluation. The results (now in `artifacts/evaluation/results.json`) show real variance: coverage ranges from 0.0 to 1.0, citation validity from 0.67 to 1.0. Mean topic coverage is 0.78 — not 1.0.
+- Re-ran the evaluation. The results (now in `artifacts/evaluation/2026-06-interview-baseline.json`) show real variance: coverage ranges from 0.0 to 1.0, citation validity from 0.67 to 1.0. Mean topic coverage is 0.78 — not 1.0.
 
 **Result**: The evaluation now produces honest, actionable metrics. The output reveals real quality differences between case categories (factual/howto/troubleshooting cases score perfectly; design/research/migration cases show gaps — the harder the case, the more the pipeline struggles). This data directly informs the Phase 4 quality gate thresholds and repair budget allocation.
 

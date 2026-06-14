@@ -12,8 +12,8 @@
 | Durable research DAG (plan -> steps -> synthesis -> review) | Implemented (Week 1) | `tests/test_research_pipeline.py`, `tests/integration/test_research_step_claims.py` |
 | Citation quality gate with bounded repair | Implemented (Week 1) | `tests/test_research_quality_gate.py`, `tests/test_research_citation_reviewer.py` |
 | Retry/circuit breaker/lease recovery | Implemented (Week 2) | `tests/test_research_retry_policy.py`, `tests/test_research_circuit_breaker.py`, `tests/test_research_watchdog.py` |
-| Deterministic evaluation (24 cases) | Implemented (Week 3) | `tests/fixtures/research_eval_cases.json`, `artifacts/evaluation/results.json` |
-| Worker-count benchmark (1/2) | Implemented (Week 3) | `artifacts/evaluation/benchmark_results.json` |
+| Deterministic evaluation (24 cases) | Implemented (Week 3) | `tests/fixtures/research_eval_cases.json`, `artifacts/evaluation/2026-06-interview-baseline.json` |
+| Worker-count benchmark (1/3/5) | Implemented (Week 3) | `artifacts/benchmarks/2026-06-interview-baseline.json` |
 | PostgreSQL + Alembic (production) | Implemented | `alembic/versions/`, `src/db/migrations.py` |
 | SQLite (local dev fallback) | Implemented | `DATABASE_REQUIRE_MIGRATIONS=false` |
 | SSRF and prompt-injection protection | Implemented | `tests/test_research_security.py`, `src/research/web/url_policy.py` |
@@ -37,5 +37,5 @@
 |---|---|
 | PostgreSQL authoritative, Redis transport | DB owns all state; queue carries only task IDs, preventing split-brain |
 | LangGraph for scene agents, durable DAG for research | Scene agents need low-latency ReAct loops; research needs checkpointable, resumable long-running workflows |
-| Dynamic tools default-denied | Tools without explicit permission rules are rejected at registration time; prevents unintended capability exposure |
+| Dynamic tools default-denied | Registered tools checked by PermissionEngine at execution time; prevents unintended capability exposure |
 | Delivery separate from research execution | Failed delivery preserves a completed report; failed research never enqueues delivery; isolation prevents cascading failures |

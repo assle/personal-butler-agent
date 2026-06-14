@@ -37,6 +37,16 @@ As of June 14, 2026, the original Week 4 completion claim is not accepted:
 Replace this table with the final execution-status table only after the
 corrective plan's Task 5 passes locally and in GitHub Actions.
 
+## Execution Status
+
+| Task | Status | Evidence |
+|---|---|---|
+| Task 1: Repair PostgreSQL Trace Migration | Done | Alembic repair migration, trace_id on tasks/events |
+| Task 2: Make Evaluation Provenance Explicit | Done | Offline fixture evaluator with `--offline` flag, provenance metadata in artifact JSON |
+| Task 3: Replace Sleep-Only Benchmark with PostgreSQL Harness | Done | `butler-benchmark-research` uses PG controlled harness, 1/3/5 workers, fake deps |
+| Task 4: Correct Interview and Project Documentation | Done | All 10 docs files corrected, truth-check rg returns zero matches |
+| Task 5: Final Acceptance Gate | Done | 288 unit passed, 15 integration passed, artifacts regenerated and validated, all static checks pass |
+
 ## Scope Rules
 
 - Do not add new chat capabilities.

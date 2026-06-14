@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.research.evaluation.runner import EvaluationRunner
+from src.research.evaluation.schemas import EvaluationProvenance
 
 
 def run():
@@ -30,11 +31,15 @@ def run():
     )
     args = parser.parse_args()
 
+    cases_path = Path(args.cases)
     runner = EvaluationRunner()
-    results, summary = runner.run_offline_with_summary(Path(args.cases))
+    results, summary = runner.run_offline_with_summary(cases_path)
 
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "provenance": EvaluationProvenance(
+            artifact_source=str(cases_path),
+        ).model_dump(),
         "summary": summary.model_dump(),
         "results": [r.model_dump() for r in results],
     }

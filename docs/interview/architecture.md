@@ -154,7 +154,7 @@ sequenceDiagram
 ### Dynamic Tools Default Denied
 
 - The `ResearchToolRegistry` enforces a permission policy chain: system admin -> workspace admin -> workspace permission -> tool policy -> default denied.
-- Any tool without an explicit permission rule is **denied by default** at registration time, not at call time. This prevents accidental capability exposure when new tools are added.
+- Any tool without an explicit permission rule is **denied by default** — the PermissionEngine checks at execution time. This prevents accidental capability exposure when new tools are added.
 - **Trade-off**: adding a new research tool requires updating the tool manifest and the security policy. This is intentional: every tool should be explicitly reviewed before it becomes available to LLM planners.
 
 ### Delivery Separate from Research Execution

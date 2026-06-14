@@ -30,10 +30,12 @@
 | **LLM 接口** | langchain-openai (ChatOpenAI) | 统一包装 DeepSeek API，支持工具绑定和流式调用 |
 | **异步队列** | Taskiq + Redis Stream | 异步研究任务的生产者-消费者解耦 |
 | **ORM** | SQLAlchemy 2.0 (async) | 全异步数据库操作 |
-| **数据库** | SQLite (aiosqlite) | 结构化数据存储（对话、知识库、提醒、投票、记忆等） |
+| **数据库** | PostgreSQL (asyncpg, production) / SQLite (aiosqlite, dev fallback) | 结构化数据存储（对话、知识库、提醒、投票、记忆等） |
 | **向量数据库** | ChromaDB (嵌入式) | 知识库 chunks 的向量存储和 ANN 检索 |
 | **嵌入模型** | DashScope Qwen3-Embedding (1024-dim) | 语义向量生成，带本地哈希 fallback |
 | **定时任务** | APScheduler (AsyncIOScheduler) | 群 webhook 定时推送 + 提醒到期扫描 + 投票到期回调 |
+>
+> **Note**: PostgreSQL is the authoritative production database. SQLite is a local development fallback for zero-dependency setup. All schema changes are managed via Alembic migrations, and production deployments use `DATABASE_REQUIRE_MIGRATIONS=true` to verify migration state. |
 | **HTTP 客户端** | httpx | 企业微信 webhook 推送和 response_url 回复 |
 | **配置** | pydantic-settings | .env 文件配置加载和类型校验 |
 | **数据校验** | Pydantic v2 | 请求/响应模型和数据校验 |
