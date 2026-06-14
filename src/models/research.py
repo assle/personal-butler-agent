@@ -9,6 +9,7 @@ Workflow:
 4. WeComUserBinding 缓存 open_userid 到 userid 的受控转换
 5. UserGroupAccess 为后续群知识库检索提供管理员授权
 """
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -41,6 +42,9 @@ class ResearchTask(Base):
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    trace_id: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=lambda: uuid.uuid4().hex[:16], index=True
+    )
     source_msgid: Mapped[str] = mapped_column(
         String(128), nullable=False, unique=True, index=True
     )

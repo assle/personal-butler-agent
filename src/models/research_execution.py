@@ -9,6 +9,7 @@ Workflow:
 4. 每次模型/工具调用记录到 ResearchUsage
 5. 审计事件追加到 ResearchEvent
 """
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -218,6 +219,9 @@ class ResearchEvent(Base):
         index=True,
     )
     step_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    trace_id: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="", index=True
+    )
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(

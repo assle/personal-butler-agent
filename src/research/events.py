@@ -25,6 +25,7 @@ class EventWriter:
         step_id: str | None = None,
         event_type: str,
         payload: dict | None = None,
+        trace_id: str = "",
     ) -> ResearchEvent:
         """追加一条审计事件
 
@@ -35,6 +36,7 @@ class EventWriter:
             step_id: 可选步骤 ID
             event_type: 事件类型（如 tool.called、plan.created）
             payload: 事件载荷
+            trace_id: 追踪 ID
 
         返回:
             ResearchEvent: 已持久化事件
@@ -44,6 +46,7 @@ class EventWriter:
             workspace_id=workspace_id,
             task_id=task_id,
             step_id=step_id,
+            trace_id=trace_id,
             event_type=event_type,
             payload=safe_payload,
             created_at=datetime.now(timezone.utc),

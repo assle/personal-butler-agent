@@ -1,1 +1,543 @@
-[{"id": "comparison-001", "question": "Compare Taskiq and Celery", "required_claim_topics": ["async", "delivery"], "required_source_types": ["knowledge", "web"], "forbidden_claims": ["exactly-once"], "max_cost_microunits": 500000}]
+[
+  {
+    "id": "comparison-001",
+    "question": "Compare Taskiq and Celery",
+    "category": "comparison",
+    "required_claim_topics": ["async", "delivery"],
+    "required_source_types": ["knowledge", "web"],
+    "forbidden_claims": ["exactly-once"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 500000,
+    "artifact": {
+      "claims": [
+        { "text": "Both support async task processing", "material": true, "validation_status": "supported", "evidence_ids": [1, 2] },
+        { "text": "Taskiq uses Redis Streams for delivery", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Celery supports multiple brokers", "material": true, "validation_status": "supported", "evidence_ids": [2] },
+        { "text": "Taskiq does not support priority queues", "material": false, "validation_status": "unsupported" }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" },
+        { "id": 2, "source_type": "web" }
+      ],
+      "latency_ms": 1200,
+      "estimated_cost_microunits": 45000
+    }
+  },
+  {
+    "id": "comparison-002",
+    "question": "Compare SQLite and PostgreSQL for async workloads",
+    "category": "comparison",
+    "required_claim_topics": ["concurrency", "connection", "isolation"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["fully managed"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 300000,
+    "artifact": {
+      "claims": [
+        { "text": "PostgreSQL supports concurrent writes", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "SQLite serializes all writes", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Connection pooling is available for both", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Both provide full isolation levels", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 900,
+      "estimated_cost_microunits": 25000
+    }
+  },
+  {
+    "id": "performance-001",
+    "question": "What is the latency profile of Redis Streams vs Kafka?",
+    "category": "performance",
+    "required_claim_topics": ["p99", "throughput", "partition"],
+    "required_source_types": ["knowledge", "web", "web_page"],
+    "forbidden_claims": ["unbounded retention"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 400000,
+    "artifact": {
+      "claims": [
+        { "text": "Kafka achieves sub-10ms p99 with proper tuning", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Redis Streams throughput degrades beyond 10GB", "material": true, "validation_status": "unsupported", "evidence_ids": [] },
+        { "text": "Kafka partitions enable parallel consumption", "material": true, "validation_status": "supported", "evidence_ids": [2] },
+        { "text": "Streams have lower operational overhead", "material": false, "validation_status": "supported" }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" },
+        { "id": 2, "source_type": "knowledge" }
+      ],
+      "latency_ms": 2100,
+      "estimated_cost_microunits": 62000
+    }
+  },
+  {
+    "id": "performance-002",
+    "question": "Benchmark FastAPI vs Express.js request throughput",
+    "category": "performance",
+    "required_claim_topics": ["requests per second", "concurrency", "Python"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["native compilation"],
+    "max_unsupported_material_claim_rate": 0.2,
+    "max_cost_microunits": 350000,
+    "artifact": {
+      "claims": [
+        { "text": "FastAPI handles over 10k req/s with async endpoints", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Express.js relies on libuv event loop", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Python GIL limits CPU-bound parallelism", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 800,
+      "estimated_cost_microunits": 15000
+    }
+  },
+  {
+    "id": "architecture-001",
+    "question": "Explain event-driven architecture patterns for microservices",
+    "category": "architecture",
+    "required_claim_topics": ["event sourcing", "CQRS", "saga"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["two-phase commit"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 450000,
+    "artifact": {
+      "claims": [
+        { "text": "Event sourcing stores state changes as events", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "CQRS separates read and write models", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Saga pattern manages distributed transactions", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Sagas require orchestration or choreography", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 1500,
+      "estimated_cost_microunits": 38000
+    }
+  },
+  {
+    "id": "architecture-002",
+    "question": "How does the repository pattern work with SQLAlchemy?",
+    "category": "architecture",
+    "required_claim_topics": ["abstraction", "session", "query"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["automatic caching"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 200000,
+    "artifact": {
+      "claims": [
+        { "text": "Repository abstracts data access behind interfaces", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "SQLAlchemy session manages unit of work", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Queries can be composed with select()", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 600,
+      "estimated_cost_microunits": 10000
+    }
+  },
+  {
+    "id": "factual-001",
+    "question": "What is the default isolation level in PostgreSQL?",
+    "category": "factual",
+    "required_claim_topics": ["read committed"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["serializable"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 100000,
+    "artifact": {
+      "claims": [
+        { "text": "PostgreSQL default isolation is Read Committed", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Read Committed prevents dirty reads", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 200,
+      "estimated_cost_microunits": 2000
+    }
+  },
+  {
+    "id": "factual-002",
+    "question": "When was Python 3.13 released?",
+    "category": "factual",
+    "required_claim_topics": ["2024", "October"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["March"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 50000,
+    "artifact": {
+      "claims": [
+        { "text": "Python 3.13 was released in October 2024", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 150,
+      "estimated_cost_microunits": 1500
+    }
+  },
+  {
+    "id": "howto-001",
+    "question": "How to set up Alembic with async SQLAlchemy?",
+    "category": "howto",
+    "required_claim_topics": ["async engine", "run_sync", "migration"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["sync driver"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 250000,
+    "artifact": {
+      "claims": [
+        { "text": "Use async engine from sqlalchemy.ext.asyncio", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Migrations run via connection.run_sync()", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "env.py must configure async context", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 700,
+      "estimated_cost_microunits": 12000
+    }
+  },
+  {
+    "id": "howto-002",
+    "question": "How to implement health checks in FastAPI?",
+    "category": "howto",
+    "required_claim_topics": ["endpoint", "liveness", "readiness"],
+    "required_source_types": ["knowledge", "web"],
+    "forbidden_claims": ["middleware-only"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 150000,
+    "artifact": {
+      "claims": [
+        { "text": "Health checks are exposed as GET endpoints", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Liveness checks verify the app is running", "material": true, "validation_status": "supported", "evidence_ids": [2] },
+        { "text": "Readiness checks verify dependencies", "material": true, "validation_status": "supported", "evidence_ids": [2] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" },
+        { "id": 2, "source_type": "web" }
+      ],
+      "latency_ms": 500,
+      "estimated_cost_microunits": 8000
+    }
+  },
+  {
+    "id": "troubleshooting-001",
+    "question": "Why is my SQLAlchemy async session raising 'MissingGreenlet'?",
+    "category": "troubleshooting",
+    "required_claim_topics": ["greenlet", "async", "sync"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["thread-safe"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 200000,
+    "artifact": {
+      "claims": [
+        { "text": "MissingGreenlet occurs when lazily loading in async context", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Use selectinload or awaitable_attrs to avoid it", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Greenlet is not a thread replacement", "material": false, "validation_status": "unsupported" }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 400,
+      "estimated_cost_microunits": 6000
+    }
+  },
+  {
+    "id": "troubleshooting-002",
+    "question": "Why does pip install fail with 'externally-managed-environment'?",
+    "category": "troubleshooting",
+    "required_claim_topics": ["PEP 668", "virtual environment"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["system package manager"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 80000,
+    "artifact": {
+      "claims": [
+        { "text": "PEP 668 prevents pip from modifying system Python", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Using a virtual environment solves the issue", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 250,
+      "estimated_cost_microunits": 3000
+    }
+  },
+  {
+    "id": "design-001",
+    "question": "Design a notification system for 10 million users",
+    "category": "design",
+    "required_claim_topics": ["queue", "fan-out", "retry"],
+    "required_source_types": ["knowledge", "web"],
+    "forbidden_claims": ["single database"],
+    "max_unsupported_material_claim_rate": 0.2,
+    "max_cost_microunits": 600000,
+    "artifact": {
+      "claims": [
+        { "text": "Message queues decouple producers from consumers", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Fan-out delivers notifications to all subscribers", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Retry with backoff handles transient failures", "material": true, "validation_status": "supported", "evidence_ids": [2] },
+        { "text": "A single Redis instance can handle the load", "material": true, "validation_status": "unsupported", "evidence_ids": [] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" },
+        { "id": 2, "source_type": "web" }
+      ],
+      "latency_ms": 3000,
+      "estimated_cost_microunits": 120000
+    }
+  },
+  {
+    "id": "design-002",
+    "question": "Design a real-time collaborative editing backend",
+    "category": "design",
+    "required_claim_topics": ["CRDT", "WebSocket", "conflict resolution"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["lock-based"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 550000,
+    "artifact": {
+      "claims": [
+        { "text": "CRDTs enable conflict-free merging", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "WebSocket maintains persistent connections", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Operational transformation is an alternative approach", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 1800,
+      "estimated_cost_microunits": 55000
+    }
+  },
+  {
+    "id": "security-001",
+    "question": "What are best practices for API authentication?",
+    "category": "security",
+    "required_claim_topics": ["JWT", "OAuth2", "rate limiting"],
+    "required_source_types": ["knowledge", "web"],
+    "forbidden_claims": ["plain text passwords"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 300000,
+    "artifact": {
+      "claims": [
+        { "text": "JWT tokens should be short-lived and signed", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "OAuth2 provides delegated authorization", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Rate limiting prevents brute force attacks", "material": true, "validation_status": "supported", "evidence_ids": [2] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" },
+        { "id": 2, "source_type": "web" }
+      ],
+      "latency_ms": 1100,
+      "estimated_cost_microunits": 28000
+    }
+  },
+  {
+    "id": "security-002",
+    "question": "How to secure a FastAPI application?",
+    "category": "security",
+    "required_claim_topics": ["CORS", "HTTPS", "input validation"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["disable CSRF"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 250000,
+    "artifact": {
+      "claims": [
+        { "text": "CORS middleware restricts cross-origin requests", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "HTTPS encrypts all traffic in transit", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Pydantic models validate all inputs", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Security headers can only be set by reverse proxy", "material": true, "validation_status": "unsupported", "evidence_ids": [] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 950,
+      "estimated_cost_microunits": 18000
+    }
+  },
+  {
+    "id": "best-practice-001",
+    "question": "Best practices for Python project structure",
+    "category": "best-practice",
+    "required_claim_topics": ["package", "modularity", "testing"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["monolithic"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 200000,
+    "artifact": {
+      "claims": [
+        { "text": "Use src layout for Python packages", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Modular design improves maintainability", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Separate test directory mirrors source structure", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 550,
+      "estimated_cost_microunits": 9000
+    }
+  },
+  {
+    "id": "best-practice-002",
+    "question": "Best practices for SQLAlchemy async sessions",
+    "category": "best-practice",
+    "required_claim_topics": ["session factory", "commit", "rollback"],
+    "required_source_types": ["knowledge", "web"],
+    "forbidden_claims": ["global session"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 180000,
+    "artifact": {
+      "claims": [
+        { "text": "Create sessions via async_sessionmaker", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Always commit or rollback after operations", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Use session per request pattern", "material": true, "validation_status": "supported", "evidence_ids": [2] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" },
+        { "id": 2, "source_type": "web" }
+      ],
+      "latency_ms": 650,
+      "estimated_cost_microunits": 11000
+    }
+  },
+  {
+    "id": "migration-001",
+    "question": "How to migrate from SQLite to PostgreSQL?",
+    "category": "migration",
+    "required_claim_topics": ["dump", "schema", "data types"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["zero downtime"],
+    "max_unsupported_material_claim_rate": 0.2,
+    "max_cost_microunits": 350000,
+    "artifact": {
+      "claims": [
+        { "text": "Use pgloader for bulk migration", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "SQLite and PostgreSQL data types differ", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Schema must be adapted to PostgreSQL features", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 1300,
+      "estimated_cost_microunits": 42000
+    }
+  },
+  {
+    "id": "migration-002",
+    "question": "Steps to upgrade LangChain from 0.2 to 0.3",
+    "category": "migration",
+    "required_claim_topics": ["deprecation", "API change", "compatibility"],
+    "required_source_types": ["web"],
+    "forbidden_claims": ["backward compatible"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 250000,
+    "artifact": {
+      "claims": [
+        { "text": "LangChain 0.3 removed several deprecated APIs", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "New import paths were introduced", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "The upgrade requires full test coverage", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" }
+      ],
+      "latency_ms": 900,
+      "estimated_cost_microunits": 22000
+    }
+  },
+  {
+    "id": "research-001",
+    "question": "What are the latest trends in vector databases?",
+    "category": "research",
+    "required_claim_topics": ["embedding", "hybrid search", "scaling"],
+    "required_source_types": ["web", "web_page"],
+    "forbidden_claims": ["replaces relational"],
+    "max_unsupported_material_claim_rate": 0.15,
+    "max_cost_microunits": 500000,
+    "artifact": {
+      "claims": [
+        { "text": "Vector databases store embeddings for similarity search", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Hybrid search combines vector and keyword approaches", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "DiskANN enables billion-scale vector search", "material": true, "validation_status": "supported", "evidence_ids": [2] },
+        { "text": "Vector databases will replace all relational databases", "material": true, "validation_status": "unsupported", "evidence_ids": [] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" },
+        { "id": 2, "source_type": "web_page" }
+      ],
+      "latency_ms": 2800,
+      "estimated_cost_microunits": 95000
+    }
+  },
+  {
+    "id": "research-002",
+    "question": "What are the latest developments in WebAssembly?",
+    "category": "research",
+    "required_claim_topics": ["WASI", "component model", "browser"],
+    "required_source_types": ["web", "web_page"],
+    "forbidden_claims": ["Java replacement"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 450000,
+    "artifact": {
+      "claims": [
+        { "text": "WASI provides system interface outside the browser", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Component model enables modular composition", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "All major browsers support WebAssembly", "material": true, "validation_status": "supported", "evidence_ids": [2] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "web" },
+        { "id": 2, "source_type": "web_page" }
+      ],
+      "latency_ms": 2200,
+      "estimated_cost_microunits": 78000
+    }
+  },
+  {
+    "id": "data-modeling-001",
+    "question": "How to model hierarchical data in SQL?",
+    "category": "data-modeling",
+    "required_claim_topics": ["adjacency list", "nested set", "CTE"],
+    "required_source_types": ["knowledge"],
+    "forbidden_claims": ["document store"],
+    "max_unsupported_material_claim_rate": 0.0,
+    "max_cost_microunits": 200000,
+    "artifact": {
+      "claims": [
+        { "text": "Adjacency list stores parent references", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Nested sets use left and right values", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Recursive CTEs traverse hierarchical trees", "material": true, "validation_status": "supported", "evidence_ids": [1] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" }
+      ],
+      "latency_ms": 750,
+      "estimated_cost_microunits": 14000
+    }
+  },
+  {
+    "id": "data-modeling-002",
+    "question": "Design a time-series data model for IoT sensors",
+    "category": "data-modeling",
+    "required_claim_topics": ["partitioning", "downsampling", "retention"],
+    "required_source_types": ["knowledge", "web"],
+    "forbidden_claims": ["unlimited storage"],
+    "max_unsupported_material_claim_rate": 0.1,
+    "max_cost_microunits": 350000,
+    "artifact": {
+      "claims": [
+        { "text": "Time-based partitioning improves query performance", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Downsampling reduces storage for historical data", "material": true, "validation_status": "supported", "evidence_ids": [1] },
+        { "text": "Retention policies automatically purge old data", "material": true, "validation_status": "supported", "evidence_ids": [2] },
+        { "text": "All IoT sensors produce data at the same rate", "material": true, "validation_status": "unsupported", "evidence_ids": [] }
+      ],
+      "evidence": [
+        { "id": 1, "source_type": "knowledge" },
+        { "id": 2, "source_type": "web" }
+      ],
+      "latency_ms": 1600,
+      "estimated_cost_microunits": 48000
+    }
+  }
+]

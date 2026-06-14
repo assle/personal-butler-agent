@@ -1,0 +1,117 @@
+{
+  "generated_at": "2026-06-14T01:50:02.754851+00:00",
+  "config": {
+    "database_url": "sqlite+aiosqlite:///:memory:",
+    "worker_counts": [
+      1,
+      2
+    ],
+    "task_count": 5
+  },
+  "results": [
+    {
+      "scenario": "normal",
+      "worker_count": 1,
+      "task_count": 5,
+      "success_count": 5,
+      "failure_count": 0,
+      "total_duration_s": 0.74,
+      "p50_latency_s": 0.158,
+      "p90_latency_s": 0.167,
+      "p99_latency_s": 0.171,
+      "mean_latency_s": 0.148,
+      "throughput_tasks_per_sec": 6.76
+    },
+    {
+      "scenario": "normal",
+      "worker_count": 2,
+      "task_count": 5,
+      "success_count": 5,
+      "failure_count": 0,
+      "total_duration_s": 0.612,
+      "p50_latency_s": 0.188,
+      "p90_latency_s": 0.274,
+      "p99_latency_s": 0.277,
+      "mean_latency_s": 0.212,
+      "throughput_tasks_per_sec": 8.166
+    },
+    {
+      "scenario": "timeout",
+      "worker_count": 1,
+      "task_count": 5,
+      "success_count": 0,
+      "failure_count": 5,
+      "total_duration_s": 25.007,
+      "p50_latency_s": 5.001,
+      "p90_latency_s": 5.001,
+      "p99_latency_s": 5.001,
+      "mean_latency_s": 5.001,
+      "throughput_tasks_per_sec": 0.2
+    },
+    {
+      "scenario": "timeout",
+      "worker_count": 2,
+      "task_count": 5,
+      "success_count": 0,
+      "failure_count": 5,
+      "total_duration_s": 15.004,
+      "p50_latency_s": 5.001,
+      "p90_latency_s": 5.001,
+      "p99_latency_s": 5.001,
+      "mean_latency_s": 5.001,
+      "throughput_tasks_per_sec": 0.333
+    },
+    {
+      "scenario": "execution_error",
+      "worker_count": 1,
+      "task_count": 5,
+      "success_count": 0,
+      "failure_count": 5,
+      "total_duration_s": 0.338,
+      "p50_latency_s": 0.055,
+      "p90_latency_s": 0.097,
+      "p99_latency_s": 0.1,
+      "mean_latency_s": 0.067,
+      "throughput_tasks_per_sec": 14.809
+    },
+    {
+      "scenario": "execution_error",
+      "worker_count": 2,
+      "task_count": 5,
+      "success_count": 0,
+      "failure_count": 5,
+      "total_duration_s": 0.107,
+      "p50_latency_s": 0.029,
+      "p90_latency_s": 0.055,
+      "p99_latency_s": 0.06,
+      "mean_latency_s": 0.036,
+      "throughput_tasks_per_sec": 46.873
+    },
+    {
+      "scenario": "rate_limited",
+      "worker_count": 1,
+      "task_count": 5,
+      "success_count": 0,
+      "failure_count": 5,
+      "total_duration_s": 0.0,
+      "p50_latency_s": 0.0,
+      "p90_latency_s": 0.0,
+      "p99_latency_s": 0.0,
+      "mean_latency_s": 0.0,
+      "throughput_tasks_per_sec": 14316.391
+    },
+    {
+      "scenario": "rate_limited",
+      "worker_count": 2,
+      "task_count": 5,
+      "success_count": 0,
+      "failure_count": 5,
+      "total_duration_s": 0.0,
+      "p50_latency_s": 0.0,
+      "p90_latency_s": 0.0,
+      "p99_latency_s": 0.0,
+      "mean_latency_s": 0.0,
+      "throughput_tasks_per_sec": 20290.893
+    }
+  ]
+}

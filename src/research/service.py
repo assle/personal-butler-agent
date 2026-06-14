@@ -2,6 +2,7 @@
 研究任务生命周期服务
 负责创建、幂等、单用户并发限制、状态转换、报告持久化和权限化查询。
 """
+import uuid
 from datetime import datetime, timezone
 from secrets import token_hex
 
@@ -75,6 +76,7 @@ class ResearchTaskService:
 
         task = ResearchTask(
             id=_new_task_id(),
+            trace_id=uuid.uuid4().hex[:16],
             source_msgid=source_msgid,
             requester_open_userid=workspace.open_userid,
             workspace_id=workspace.workspace_id,
