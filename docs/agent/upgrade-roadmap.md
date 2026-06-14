@@ -84,9 +84,12 @@
 
 ### 5.3 CI/CD
 
-- **当前**: 无持续集成
-- **目标**: GitHub Actions 自动化测试 + lint，PR 时自动运行
-- **工作量**: 小（单文件 `.github/workflows/test.yml`）
+- **当前**: GitHub Actions 自动化测试已部署（unit + integration），PR 和 push 时自动运行
+- **已完成**:
+  - `.github/workflows/test.yml` 包含 unit 和 integration 两个 job
+  - unit: 基础 pytest + compileall 检查 + CLAUDE.md/AGENTS.md 同步校验
+  - integration: PostgreSQL 16 + Redis 7 服务容器，Alembic 迁移后执行集成测试
+- **下一步**: 增加 lint 步骤（ruff/black）、类型检查（mypy/pyright）
 
 ### 5.4 端到端测试
 
