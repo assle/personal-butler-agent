@@ -30,9 +30,9 @@ async def test_migration_copies_research_tasks(postgres_engine, postgres_session
     await postgres_session.execute(text(
         "INSERT INTO research_tasks (id, source_msgid, requester_open_userid, workspace_id, "
         "question, research_type, status, access_scope, max_rounds, timeout_seconds, "
-        "current_round, cancel_requested, created_at, updated_at) "
+        "current_round, cancel_requested, trace_id, created_at, updated_at) "
         "VALUES (:id, :msgid, :userid, :ws_id, :question, 'foundation', 'completed', "
-        ":scope, 4, 300, 0, false, :now, :now)"
+        ":scope, 4, 300, 0, false, :trace, :now, :now)"
     ), {
         "id": "R20240101-TEST0001",
         "msgid": "msg-test-1",
@@ -40,6 +40,7 @@ async def test_migration_copies_research_tasks(postgres_engine, postgres_session
         "ws_id": "default",
         "question": "test question",
         "scope": json.dumps({"workspace_id": "default"}),
+        "trace": "test-trace-00001",
         "now": now,
     })
     await postgres_session.flush()

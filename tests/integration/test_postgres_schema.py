@@ -4,6 +4,7 @@ PostgreSQL 集成测试
 """
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 from sqlalchemy import text, inspect as sa_inspect
@@ -45,3 +46,29 @@ async def test_alembic_upgrade_applies_schema(postgres_engine):
     assert "workspaces" in tables
     assert "workspace_members" in tables
     assert "knowledge_chunks" in tables
+
+    # 验证 trace_id 列为非空
+    async with postgres_engine.connect() as conn:
+        task_columns = await conn.run_sync(
+            lambda sync_conn: {
+                column["name"]: column
+                for column in sa_inspect(sync_conn).get_columns("research_tasks")
+            }
+        )
+        event_columns = await conn.run_sync(
+            lambda sync_conn: {
+                column["name"]: column
+                for column in sa_inspect(sync_conn).get_columns("research_events")
+            }
+        )
+    assert task_columns["trace_id"]["nullable"] is False
+    assert event_columns["trace_id"]["nullable"] is False
+
+
+def test_trace_migration_has_postgresql_backfill():
+    """验证 trace 迁移不再把 SQLite randomblob 用于 PostgreSQL"""
+    migration = Path(
+        "alembic/versions/add_trace_id_20260613.py"
+    ).read_text()
+    assert 'if dialect == "postgresql":' in migration
+    assert "md5(id)" in migration

@@ -279,3 +279,11 @@ Check:
 Fix pattern:
 - Verify the circuit breaker configuration (`failure_threshold`, `open_seconds`) matches provider reliability expectations.
 
+
+## PostgreSQL randomblob 函数错误
+
+Symptom: PostgreSQL 报告 function randomblob(integer) does not exist
+Check: 对 PG 运行 alembic upgrade head
+Cause: 迁移未按数据库方言分支
+Fix: 使用 op.get_bind().dialect.name 判断，PG 路径用 substr(md5(id), 1, 16)
+Regression: TEST_DATABASE_URL=... uv run pytest tests/integration -q
