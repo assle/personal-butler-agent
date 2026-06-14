@@ -19,7 +19,8 @@ For build, test, and verification steps, see `deployment.en.md` in the project r
 
 - Follow existing Python style in `src/`; keep changes small and local.
 - Preserve the current scene-agent boundary: URL callback messages normalize to `InboundMessage`, scene dispatch chooses private chat or group policy, scene agents call domain StateGraph agents as needed, returning `AgentResponse`.
-- Do not add or modify test files unless the user explicitly asks for tests.
+- Add or modify test files when needed to verify requested behavior, bug fixes,
+  or regressions. Keep test changes focused and follow existing test patterns.
 - All functions and methods must include Chinese comments describing: (1) what the function does, (2) input parameters, (3) return value. Every `.py` file must start with a Chinese comment block explaining the file's purpose and overall workflow.
 
 For detailed patterns (async DB, agent structure), load `docs/agent/patterns.md`.

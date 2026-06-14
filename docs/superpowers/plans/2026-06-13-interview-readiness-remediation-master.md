@@ -20,6 +20,22 @@ Implement the phase plans in order.
 | 2 | [Integration and Reliability](2026-06-13-interview-readiness-week2-reliability.md) | PostgreSQL/Redis CI, concurrency, retry, security, and idempotency evidence |
 | 3 | [Evaluation and Metrics](2026-06-13-interview-readiness-week3-evaluation.md) | 20+ deterministic cases plus quality, latency, cost, and concurrency reports |
 | 4 | [Interview Presentation](2026-06-13-interview-readiness-week4-presentation.md) | Clean documentation, ten-minute demo, architecture diagrams, STAR stories, and question bank |
+| Correction | [Corrective Audit](2026-06-14-interview-readiness-corrective-plan.md) | PostgreSQL migration repaired, evidence provenance corrected, and Gate 4 rerun |
+
+## Audit Status
+
+As of June 14, 2026, the original Week 4 completion claim is not accepted:
+
+| Phase | Current status | Blocking evidence |
+|---|---|---|
+| Week 1 | Implemented | Unit pipeline path passes |
+| Week 2 | Implemented, gate reopened | PostgreSQL integration suite fails after the Week 3 trace migration |
+| Week 3 | Partially accepted | Offline metrics work, but provenance is unclear and benchmark ignores its database URL |
+| Week 4 | Acceptance failed | CI integration job fails and interview documents contain unsupported claims |
+| Corrective plan | Pending | Execute `2026-06-14-interview-readiness-corrective-plan.md` |
+
+Replace this table with the final execution-status table only after the
+corrective plan's Task 5 passes locally and in GitHub Actions.
 
 ## Scope Rules
 
