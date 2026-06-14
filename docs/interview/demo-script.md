@@ -3,14 +3,11 @@
 ## Setup Command Cheat Sheet
 
 ```bash
-# From readiness repo root:
-cd READINESS_REPO
-
-# 1. Create venv + install deps
+# From readiness repo root (/Users/assle/dev/personal_butler_agent-readiness):
 uv sync --extra dev
 
-# 2. Run schema migrations
-uv run alembic upgrade head
+# 2. Run schema migrations (set DATABASE_URL for Alembic)
+DATABASE_URL='sqlite+aiosqlite:///butler.db' uv run alembic upgrade head
 
 # 3. Run fast unit tests
 time DEEPSEEK_API_KEY=test uv run pytest -q --ignore=tests/integration
@@ -139,7 +136,7 @@ uv run butler-evaluate-research \
 
 **If credentials are not available** (no DeepSeek key), show committed results:
 ```bash
-python3 -m json.tool artifacts/evaluation/results.json | head -15
+python3 -m json.tool artifacts/evaluation/2026-06-interview-baseline.json | head -15
 ```
 
 **Key metrics** (from committed results):
@@ -150,14 +147,12 @@ python3 -m json.tool artifacts/evaluation/results.json | head -15
 
 **Honest context**: These are deterministic measurements from offline evaluation. They indicate the pipeline produces well-structured research reports with good citation hygiene. They do not measure factual accuracy against ground truth — that requires human evaluation or a held-out answer set.
 
-**Benchmark results** (1/2 workers, SQLite):
-| Scenario | 1 Worker (t/s) | 2 Workers (t/s) |
-|---|---|---|
-| Normal | 6.76 | 8.17 |
-| Timeout | 0.20 | 0.33 |
-| Execution error | 14.81 | 46.87 |
+**Benchmark results** (PostgreSQL controlled harness, 1/3/5 workers, 12 tasks):
+- All external dependencies mocked; measures DB contention and dispatch overhead only
+- Zero duplicate claims across all worker counts (validates `FOR UPDATE SKIP LOCKED`)
+- Results in `artifacts/benchmarks/2026-06-interview-baseline.json`
 
-Nearly linear scaling for parallel-dispatched errors; sub-linear for normal execution due to SQLite write contention.
+Run `python3 -m json.tool artifacts/benchmarks/2026-06-interview-baseline.json` for per-worker throughput and latency percentiles.
 
 ---
 

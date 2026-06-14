@@ -46,8 +46,7 @@ Current implementation baseline:
 - Phase 4 citation quality: 证据引用综合 (ReportSynthesisService) → 独立引用审查 (CitationReviewService) → 确定性质量门 → 有限修复协调 (QualityRepairCoordinator)。结构化结论 (ResearchClaim) + 证据绑定 (ResearchClaimEvidence) + 审查发现 (ResearchReviewFinding)。仅已验证报告可投递。
 - Phase 5: 失败分类与指数退避重试、Redis 熔断器、阶段上下文构建器、SSRF 防护 URL 策略、安全网页抓取、prompt 注入边界、步骤看门狗
 - Phase 6: 定义研究技能 (ResearchSkillManifest) + general-research 技能目录；Skill 目录扫描与按名加载 (ResearchSkillCatalog, ResearchSkillLoader)；内置研究工具注册 (BuiltinResearchDependencies) + MCP Provider 预留边界；研究技能提交消息更新；split_text_utf8 长文本按 UTF-8 边界拆分投递；离线质量评估框架 (EvaluationRunner + CLI)；全链路追踪上下文 (TraceContext)；CI workflow (.github/workflows/test.yml)；运维手册 (docs/operations/research-runbook.md)
-- Phase 7: Worker-count benchmark (1/2 workers, normal/timeout/execution_error/rate_limited scenarios)
-- Phase 6: 离线质量评估框架 (EvaluationRunner + CLI) + 全链路追踪上下文 + CI workflow (.github/workflows/test.yml, unit + integration)
+- Phase 7: Worker-count benchmark (PostgreSQL controlled harness, 1/3/5 workers, 12 tasks)
 - Phase 3: Structured Supervisor 规划 + Knowledge/Web Specialist 检索 + 受控工具注册表 + 证据持久化
 - Phase 2: DAG 步骤 + 审批 + 预算
 - Phase 1: PostgreSQL + workspace 治理 + Alembic

@@ -93,8 +93,8 @@
 
 ### 5.4 端到端测试
 
-- **当前**: 所有测试 mock 了 LLM 和数据库
-- **目标**: 增加有限数量的端到端测试（真实 SQLite + 真实 DeepSeek 调用），在 CI 中手动触发
+- **当前**: 所有测试 mock 了 LLM 和数据库。CI pipeline 已配置 (test.yml) 但尚未在全真环境端到端验证通过。
+- **目标**: 增加有限数量的端到端测试（真实 SQLite + 真实 DeepSeek 调用），在 CI 中手动触发。CI 管道仅在 GitHub Actions 变绿后才能标记为完成。
 - **工作量**: 中
 
 ### 5.5 PostgreSQL 迁移与工作空间治理（已完成）

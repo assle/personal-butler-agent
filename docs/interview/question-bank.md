@@ -28,19 +28,19 @@
 
 ### Q6: How do you evaluate quality?
 
-**Suggested answer**: Two orthogonal dimensions. Quality evaluation: 24 predefined cases across 12 categories (comparison, performance, architecture, factual, howto, troubleshooting, design, security, best-practice, migration, research, data-modeling). Each case runs through the full pipeline and computes four metrics: topic coverage (did we address all sub-topics?), citation validity (do citations support the claims?), required source coverage (do we cite required sources?), and unsupported material claim rate (claims without evidence — our hallucination proxy). Mean scores: coverage 0.78, citation validity 0.94, source coverage 0.99, unsupported rate 0.06. Benchmark evaluation: worker-count tests (1 vs 2 workers) measure throughput and latency under normal, timeout, execution_error, and rate_limited scenarios.
+**Suggested answer**: Two orthogonal dimensions. Quality evaluation: 24 predefined cases across 12 categories (comparison, performance, architecture, factual, howto, troubleshooting, design, security, best-practice, migration, research, data-modeling). Each case runs through the offline fixture evaluator (no DeepSeek calls) and computes four deterministic metrics: topic coverage, citation validity, required source coverage, and unsupported material claim rate. Mean scores: coverage 0.78, citation validity 0.94, source coverage 0.99, unsupported rate 0.06. Benchmark evaluation: worker-count tests (1/3/5 workers) in a PostgreSQL controlled harness measure throughput and latency under normal, timeout, execution_error, and rate_limited scenarios.
 
 ### Q7: How do you prevent security issues like SSRF and prompt injection?
 
-**Suggested answer**: SSRF: the URL security policy (`src/research/web/url_policy.py`) validates all outbound URLs against a blocklist and allowlist before fetching. Internal IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x) are blocked by default. Prompt injection: the governed tool registry (`ResearchToolRegistry`) enforces a 5-rule permission chain — system admin, workspace admin, workspace permission, tool policy, default denied. Any tool without an explicit permission rule is denied at registration time, not at call time. The LLM planner never has direct access to system tools; it can only call registered, permission-checked research tools. Additionally, the tool gate provides a deterministic check that prevents LDAP-style injection from bypassing the registry.
+**Suggested answer**: SSRF: the URL security policy (`src/research/web/url_policy.py`) validates all outbound URLs against a blocklist and allowlist before fetching. Internal IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x) are blocked by default. Prompt injection: the governed tool registry (`ResearchToolRegistry`) enforces a 5-rule permission chain — system admin, workspace admin, workspace permission, tool policy, default denied. Permission decision occurs when `ResearchToolRegistry.execute()` runs — tools without an explicit permission rule are denied at execution time by the PermissionEngine. The LLM planner never has direct access to system tools; it can only call registered, permission-checked research tools. Additionally, the tool gate provides a deterministic check that prevents LDAP-style injection from bypassing the registry.
 
 ### Q8: What would you improve next?
 
-**Suggested answer**: Four priorities. (1) MCP provider integration — the provider boundary is defined but the transport layer is not implemented; adding stdio/SSE MCP transport would allow dynamic tool discovery from external servers. (2) Online evaluation — current evaluation is offline (predefined cases); an online eval loop would measure production performance with real user queries. (3) Multi-user conversation memory — current memory is per-user SQLite; scaling to 100+ users with shared knowledge requires PostgreSQL-backed conversation memory with proper indexing. (4) Worker-count and task-count configurable benchmarking — the existing benchmark only tests 1 and 2 workers; a configurable benchmark would help right-size worker pools for production deployment.
+**Suggested answer**: Four priorities. (1) MCP provider integration — the provider boundary is defined but the transport layer is not implemented; adding stdio/SSE MCP transport would allow dynamic tool discovery from external servers. (2) Online evaluation — current evaluation is offline (predefined cases); an online eval loop would measure production performance with real user queries. (3) Multi-user conversation memory — current memory is per-user SQLite; scaling to 100+ users with shared knowledge requires PostgreSQL-backed conversation memory with proper indexing. (4) CI completion — the CI pipeline is in place but not yet proven green end-to-end; live E2E testing with actual DeepSeek calls remains future work.
 
 ### Q9: What was the biggest engineering challenge?
 
-**Suggested answer**: The lease recovery race condition. The original two-step recovery (release lease, then claim) created a window where a parallel worker could steal the step. Fixing this required making the state transition atomic at the database level — a single `UPDATE ... SET status='pending', lease_expires_at=NULL WHERE status='running' AND lease_expires_at < NOW()`. This seems obvious in retrospect, but it's a classic distributed systems bug that only manifests under concurrent worker load. The fix taught me to think in terms of database transactions rather than code sequences when designing multi-worker systems.
+**Suggested answer**: The lease recovery race condition. The original two-step recovery (release lease, then claim) created a window where a parallel worker could steal the step. Fixing this required making the state transition atomic at the database level — a single `UPDATE ... SET status='ready', lease_expires_at=NULL WHERE status='running' AND lease_expires_at < NOW()`. This seems obvious in retrospect, but it's a classic distributed systems bug that only manifests under concurrent worker load. The fix taught me to think in terms of database transactions rather than code sequences when designing multi-worker systems.
 
 ### Q10: How would you scale this to support 1000 users?
 
@@ -128,7 +128,7 @@
 
 ### Q29: How do you test LLM-dependent code without real API calls?
 
-**Suggested answer**: Mocking at the LLMClient level. Tests set `DEEPSEEK_API_KEY=test` and patch `LLMClient.ainvoke()` or `ChatOpenAIMock` to return predefined responses. The mock preserves the LangChain message interface, so agent code passes through unchanged. Integration tests run against real DeepSeek with isolated databases. The evaluation framework (24 cases) runs against the real API to produce metrics.
+**Suggested answer**: Mocking at the LLMClient level. Tests set `DEEPSEEK_API_KEY=test` and patch `LLMClient.ainvoke()` or `ChatOpenAIMock` to return predefined responses. The mock preserves the LangChain message interface, so agent code passes through unchanged. Integration tests run against DeepSeek with isolated databases when an API key is configured. The evaluation framework (24 cases) runs offline against fixture data with no DeepSeek calls.
 
 ### Q30: How does the system handle context window limits for long conversations?
 
@@ -184,7 +184,7 @@
 
 ### Q41: How is the codebase tested?
 
-**Suggested answer**: Three layers. Unit tests (fast, mock LLM, isolate DB) cover agent logic, service methods, and utility functions. Integration tests exercise the full pipeline against real PostgreSQL and Redis in CI. Evaluation tests (24 cases) run against the real DeepSeek API to produce quality metrics. CI runs both unit and integration tests on every push and PR.
+**Suggested answer**: Three layers. Unit tests (fast, mock LLM, isolate DB) cover agent logic, service methods, and utility functions. Integration tests exercise the full pipeline against real PostgreSQL and Redis in CI. Evaluation tests (24 cases) run offline against fixture data — no DeepSeek calls, deterministic metric computation. CI runs both unit and integration tests on every push and PR.
 
 ### Q42: What does the CI pipeline look like?
 
@@ -192,7 +192,7 @@
 
 ### Q43: How do you ensure deterministic quality measurement?
 
-**Suggested answer**: The evaluation framework defines 24 cases with structured expected outputs. Metrics are computed from actual pipeline output: topic coverage (sub-topics addressed), citation validity (citations support claims), required source coverage (required sources cited), and unsupported claim rate (claims without evidence). These are exact, reproducible calculations — not LLM-judged scores.
+**Suggested answer**: The evaluation framework defines 24 cases with structured fixture inputs. Metrics are computed from offline analysis of the fixture artifacts: topic coverage (sub-topics addressed), citation validity (citations support claims), required source coverage (required sources cited), and unsupported claim rate (claims without evidence). These are exact, reproducible calculations — not LLM-judged scores, and no actual DeepSeek calls are made.
 
 ### Q44: How do you test idempotent behavior?
 
@@ -236,19 +236,19 @@
 
 ### Q53: How do you prevent multiple workers from processing the same step?
 
-**Suggested answer**: Steps use PostgreSQL row-level locking (`SELECT ... FOR UPDATE`) when claiming. The claim query: `UPDATE research_steps SET status='running', lease_expires_at=NOW()+interval WHERE status='pending' AND step_id=? RETURNING step_id`. If two workers race, only one gets the RETURNING row. The other's UPDATE affects zero rows.
+**Suggested answer**: Steps use PostgreSQL row-level locking (`SELECT ... FOR UPDATE SKIP LOCKED`) when claiming. The claim query: `UPDATE research_steps SET status='running', lease_expires_at=NOW()+interval WHERE status='ready' AND step_id=? RETURNING step_id`. Workers only select steps in `ready` status (the dispatcher transitions steps from `pending` to `ready` after dependency resolution). If two workers race, only one gets the RETURNING row. The other's UPDATE affects zero rows.
 
 ### Q54: What happens when a worker crashes mid-step?
 
-**Suggested answer**: The lease expires (configurable TTL). The watchdog in each worker's recovery loop runs periodically: `UPDATE research_steps SET status='pending', lease_expires_at=NULL WHERE status='running' AND lease_expires_at < NOW()`. The recovered step can then be claimed by any available worker.
+**Suggested answer**: The lease expires (configurable TTL). The watchdog in each worker's recovery loop runs periodically: `UPDATE research_steps SET status='ready', lease_expires_at=NULL WHERE status='running' AND lease_expires_at < NOW()`. The recovered step (now `ready`) can then be claimed by any available worker.
 
 ### Q55: How do you handle step dependencies in a distributed setting?
 
-**Suggested answer**: The dispatcher uses a `NOT EXISTS` subquery pattern: `SELECT * FROM research_steps WHERE status='pending' AND NOT EXISTS (SELECT 1 FROM research_step_deps WHERE step_id=research_steps.step_id AND dep_status != 'completed')`. This makes the dependency check atomic at query time — no race between checking dependencies and claiming a step.
+**Suggested answer**: The dispatcher uses a `NOT EXISTS` subquery pattern: `SELECT * FROM research_steps WHERE status IN ('pending', 'ready') AND NOT EXISTS (SELECT 1 FROM research_step_deps WHERE step_id=research_steps.step_id AND dep_status != 'completed')`. This makes the dependency check atomic at query time — no race between checking dependencies and claiming a step. Steps transition from `pending` to `ready` only after all dependencies are resolved; workers then claim `ready` steps.
 
 ### Q56: Why Taskiq over Celery?
 
-**Suggested answer**: Taskiq is async-native — the broker, worker, and task definitions are all async. Celery requires sync wrappers around async code. Taskiq has fewer configuration files (no celery.py, no beat_schedule config). Integration with existing async SQLAlchemy sessions is clean. The Redis Stream backend is production-proven.
+**Suggested answer**: Taskiq is async-native — the broker, worker, and task definitions are all async. Celery requires sync wrappers around async code. Taskiq has fewer configuration files (no celery.py, no beat_schedule config). Integration with existing async SQLAlchemy sessions is clean. The Redis Stream backend provides reliable at-least-once delivery.
 
 ### Q57: How does the approval flow work?
 
@@ -256,7 +256,7 @@
 
 ### Q58: How do you debug distributed research failures?
 
-**Suggested answer**: The observability system (`src/research/observability.py`) injects a trace context (trace_id + span_id) at every stage: submission, planning, each step execution, synthesis, review, delivery. Logs include stage timing, LLM call duration, and failure details. The research status query endpoint returns the full trace for any task ID. The operator can also query the research_steps table directly to see which step last touched a given task.
+**Suggested answer**: The observability system (`src/research/observability.py`) injects a trace context (trace_id) at every stage: submission, planning, each step execution, synthesis, review, delivery. Logs include stage timing, LLM call duration, and failure details. The operator can query the research_steps table directly to see which step last touched a given task. (Note: full distributed trace with per-span correlation across processes is not implemented — inter-process correlation relies on the shared trace_id in log lines.)
 
 ### Q59: How does the system handle SQLite write contention with multiple workers?
 
@@ -272,7 +272,7 @@
 
 ### Q61: What are the phases of the research pipeline?
 
-**Suggested answer**: Phase 1: PostgreSQL + workspace governance + Alembic. Phase 2: DAG steps + approval + budget. Phase 3: Structured supervisor planner + specialists + governed tool registry + evidence persistence. Phase 4: Quality gate + citation review + bounded repair. Phase 5: Retry + circuit breaker + lease watchdog + SSRF protection. Phase 6: Skills + evaluation framework + CI + observability. Phase 7: Worker benchmarks.
+**Suggested answer**: Phase 1: PostgreSQL + workspace governance + Alembic. Phase 2: DAG steps + approval + budget. Phase 3: Structured supervisor planner + specialists + governed tool registry + evidence persistence. Phase 4: Quality gate + citation review + bounded repair. Phase 5: Retry + circuit breaker + lease watchdog + SSRF protection. Phase 6: Skills + evaluation framework + CI + observability. Phase 7: Worker benchmarks (1/3/5 workers, PostgreSQL controlled harness).
 
 ### Q62: How does the supervisor produce a plan?
 
@@ -344,11 +344,11 @@
 
 ### Q78: How do you handle log aggregation across processes?
 
-**Suggested answer**: Currently no centralized log aggregation. Each process (FastAPI, N workers) logs to stdout/stderr. Trace IDs (trace_id + span_id) are injected into every log line, allowing manual correlation across processes. For production, deploying with systemd or Docker Compose and aggregating with Loki/Promtail would be the standard approach.
+**Suggested answer**: Currently no centralized log aggregation. Each process (FastAPI, N workers) logs to stdout/stderr. Trace IDs (trace_id) are injected into every log line, allowing manual correlation across processes. Span IDs are not implemented, so inter-process correlation relies on the shared trace_id. For production, deploying with systemd or Docker Compose and aggregating with Loki/Promtail would be the standard approach.
 
 ### Q79: How do you manage worker scaling?
 
-**Suggested answer**: Manually, via `--workers N`. The benchmark results guide the choice: for normal execution on SQLite, 2 workers provides ~21% throughput improvement over 1. The optimal worker count depends on workload mix (normal vs timeout-heavy) and database backend (SQLite vs PostgreSQL). Dynamic scaling based on queue depth is future work.
+**Suggested answer**: Manually, via `--workers N`. The controlled-harness benchmark results (PostgreSQL, 1/3/5 workers, 12 tasks) guide the choice. The optimal worker count depends on workload mix (normal vs timeout-heavy) and database contention. Dynamic scaling based on queue depth is future work.
 
 ### Q80: How does the system degrade when Redis is unavailable?
 
