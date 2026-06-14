@@ -389,8 +389,23 @@ def test_cli_output_format(tmp_path):
 
     data = json.loads(out.read_text())
     assert "generated_at" in data
+    assert "provenance" in data
+    assert data["provenance"]["evaluation_mode"] == "offline_fixture"
+    assert data["provenance"]["external_calls"] is False
+    assert data["provenance"]["pipeline_execution"] is False
     assert "summary" in data
     assert "results" in data
     assert len(data["results"]) == 24
     assert "mean_topic_coverage" in data["summary"]
     assert data["summary"]["case_count"] == 24
+
+
+def test_evaluation_provenance_is_explicit():
+    """验证离线评测不会被误认为真实模型运行"""
+    from src.research.evaluation.schemas import EvaluationProvenance
+    provenance = EvaluationProvenance(
+        artifact_source="tests/fixtures/research_eval_cases.json"
+    )
+    assert provenance.evaluation_mode == "offline_fixture"
+    assert provenance.external_calls is False
+    assert provenance.pipeline_execution is False

@@ -1,0 +1,238 @@
+{
+  "generated_at": "2026-06-14T03:07:09.288556+00:00",
+  "provenance": {
+    "evaluation_mode": "offline_fixture",
+    "artifact_source": "tests/fixtures/research_eval_cases.json",
+    "external_calls": false,
+    "pipeline_execution": false,
+    "latency_source": "fixture_input",
+    "cost_source": "fixture_input"
+  },
+  "summary": {
+    "case_count": 24,
+    "mean_topic_coverage": 0.7777777777777778,
+    "mean_citation_validity": 0.9444444444444445,
+    "mean_unsupported_material_claim_rate": 0.05555555555555555,
+    "mean_required_source_coverage": 0.9861111111111112,
+    "total_estimated_cost_microunits": 767500,
+    "mean_latency_ms": 1120
+  },
+  "results": [
+    {
+      "case_id": "comparison-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 45000,
+      "latency_ms": 1200
+    },
+    {
+      "case_id": "comparison-002",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 25000,
+      "latency_ms": 900
+    },
+    {
+      "case_id": "performance-001",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 0.6666666666666666,
+      "unsupported_material_claim_rate": 0.3333333333333333,
+      "required_source_coverage": 0.6666666666666666,
+      "estimated_cost_microunits": 62000,
+      "latency_ms": 2100
+    },
+    {
+      "case_id": "performance-002",
+      "claim_topic_coverage": 0.3333333333333333,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 15000,
+      "latency_ms": 800
+    },
+    {
+      "case_id": "architecture-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 38000,
+      "latency_ms": 1500
+    },
+    {
+      "case_id": "architecture-002",
+      "claim_topic_coverage": 0.3333333333333333,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 10000,
+      "latency_ms": 600
+    },
+    {
+      "case_id": "factual-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 2000,
+      "latency_ms": 200
+    },
+    {
+      "case_id": "factual-002",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 1500,
+      "latency_ms": 150
+    },
+    {
+      "case_id": "howto-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 12000,
+      "latency_ms": 700
+    },
+    {
+      "case_id": "howto-002",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 8000,
+      "latency_ms": 500
+    },
+    {
+      "case_id": "troubleshooting-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 6000,
+      "latency_ms": 400
+    },
+    {
+      "case_id": "troubleshooting-002",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 3000,
+      "latency_ms": 250
+    },
+    {
+      "case_id": "design-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 0.75,
+      "unsupported_material_claim_rate": 0.25,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 120000,
+      "latency_ms": 3000
+    },
+    {
+      "case_id": "design-002",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 55000,
+      "latency_ms": 1800
+    },
+    {
+      "case_id": "security-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 28000,
+      "latency_ms": 1100
+    },
+    {
+      "case_id": "security-002",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 0.75,
+      "unsupported_material_claim_rate": 0.25,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 18000,
+      "latency_ms": 950
+    },
+    {
+      "case_id": "best-practice-001",
+      "claim_topic_coverage": 0.3333333333333333,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 9000,
+      "latency_ms": 550
+    },
+    {
+      "case_id": "best-practice-002",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 11000,
+      "latency_ms": 650
+    },
+    {
+      "case_id": "migration-001",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 42000,
+      "latency_ms": 1300
+    },
+    {
+      "case_id": "migration-002",
+      "claim_topic_coverage": 0.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 22000,
+      "latency_ms": 900
+    },
+    {
+      "case_id": "research-001",
+      "claim_topic_coverage": 0.6666666666666666,
+      "citation_validity": 0.75,
+      "unsupported_material_claim_rate": 0.25,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 95000,
+      "latency_ms": 2800
+    },
+    {
+      "case_id": "research-002",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 78000,
+      "latency_ms": 2200
+    },
+    {
+      "case_id": "data-modeling-001",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 1.0,
+      "unsupported_material_claim_rate": 0.0,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 14000,
+      "latency_ms": 750
+    },
+    {
+      "case_id": "data-modeling-002",
+      "claim_topic_coverage": 1.0,
+      "citation_validity": 0.75,
+      "unsupported_material_claim_rate": 0.25,
+      "required_source_coverage": 1.0,
+      "estimated_cost_microunits": 48000,
+      "latency_ms": 1600
+    }
+  ]
+}
